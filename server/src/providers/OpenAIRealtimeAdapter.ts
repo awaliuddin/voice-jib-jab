@@ -248,6 +248,15 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
       this.audioBuffer = Buffer.alloc(0);
 
       console.log("[OpenAI] Audio buffer committed");
+
+      // Trigger response generation after committing audio
+      this.sendMessage({
+        type: "response.create",
+        response: {
+          modalities: ["text", "audio"],
+        },
+      });
+      console.log("[OpenAI] Response requested");
     } catch (error) {
       console.error("[OpenAI] Failed to commit audio:", error);
     }
