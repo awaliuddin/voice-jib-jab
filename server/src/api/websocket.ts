@@ -91,6 +91,63 @@ export class VoiceWebSocketServer {
       });
     });
 
+    // Handle transcripts
+    providerAdapter.on('transcript', (segment) => {
+      this.sendToClient(ws, {
+        type: 'transcript',
+        text: segment.text,
+        confidence: segment.confidence,
+        isFinal: segment.isFinal,
+        timestamp: segment.timestamp,
+      });
+
+      const event: Event = {
+        event_id: uuidv4(),
+        session_id: sessionId,
+        t_ms: Date.now(),
+        source: 'provider',
+        type: 'transcript',
+        payload: segment,
+      };
+      eventBus.emit(event);
+    });
+
+    // Handle user transcripts (from speech recognition)
+    providerAdapter.on('user_transcript', (segment) => {
+      this.sendToClient(ws, {
+        type: 'user_transcript',
+        text: segment.text,
+        confidence: segment.confidence,
+        isFinal: segment.isFinal,
+        timestamp: segment.timestamp,
+      });
+
+      const event: Event = {
+        event_id: uuidv4(),
+        session_id: sessionId,
+        t_ms: Date.now(),
+        source: 'client',
+        type: 'user_transcript',
+        payload: segment,
+      };
+      eventBus.emit(event);
+    });
+
+    // Handle speech detection events
+    providerAdapter.on('speech_started', () => {
+      this.sendToClient(ws, {
+        type: 'speech.started',
+        timestamp: Date.now(),
+      });
+    });
+
+    providerAdapter.on('speech_stopped', () => {
+      this.sendToClient(ws, {
+        type: 'speech.stopped',
+        timestamp: Date.now(),
+      });
+    });
+
     // Handle response start/end
     providerAdapter.on('response_start', () => {
       sessionManager.updateSessionState(sessionId, 'responding');

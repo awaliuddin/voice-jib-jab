@@ -1,154 +1,536 @@
 /**
  * OpenAI Realtime API Adapter
  * Implements ProviderAdapter for OpenAI's Realtime API
+ *
+ * Protocol documentation: https://platform.openai.com/docs/guides/realtime
  */
 
 import { ProviderAdapter, ProviderConfig, AudioChunk, TranscriptSegment } from './ProviderAdapter.js';
-import OpenAI from 'openai';
+import WebSocket from 'ws';
+import { EventEmitter } from 'events';
+
+/**
+ * OpenAI Realtime API Message Types
+ */
+interface RealtimeMessage {
+  type: string;
+  [key: string]: any;
+}
+
+interface SessionConfig {
+  modalities?: string[];
+  instructions?: string;
+  voice?: string;
+  input_audio_format?: string;
+  output_audio_format?: string;
+  input_audio_transcription?: {
+    model: string;
+  };
+  turn_detection?: {
+    type: string;
+    threshold?: number;
+    prefix_padding_ms?: number;
+    silence_duration_ms?: number;
+  };
+  tools?: any[];
+  tool_choice?: string;
+  temperature?: number;
+  max_response_output_tokens?: number | "inf";
+}
 
 export class OpenAIRealtimeAdapter extends ProviderAdapter {
-  private client: OpenAI;
-  private realtimeSession: any = null;
+  private ws: WebSocket | null = null;
   private connected: boolean = false;
+  private reconnectAttempts: number = 0;
+  private readonly maxReconnectAttempts: number = 5;
+  private readonly reconnectDelay: number = 1000;
+  private messageQueue: RealtimeMessage[] = [];
+  private isSessionCreated: boolean = false;
+  private pingInterval: NodeJS.Timeout | null = null;
+  private responseInProgress: boolean = false;
+  private audioBuffer: Buffer = Buffer.alloc(0);
 
   constructor(config: ProviderConfig) {
     super(config);
-    this.client = new OpenAI({
-      apiKey: config.apiKey,
-    });
   }
 
   async connect(sessionId: string): Promise<void> {
     this.sessionId = sessionId;
 
-    try {
-      // Note: OpenAI Realtime API implementation details
-      // This is a placeholder structure - adjust based on actual API
-      // The Realtime API uses WebSocket connection
+    return new Promise((resolve, reject) => {
+      try {
+        // Construct WebSocket URL with API key in query parameters
+        const wsUrl = `wss://api.openai.com/v1/realtime?model=${this.config.model}`;
 
-      // For now, this is a stub that will be implemented when
-      // OpenAI Realtime API documentation is available
+        console.log(`[OpenAI] Connecting to Realtime API for session: ${sessionId}`);
 
-      this.connected = true;
-      console.log(`[OpenAI] Connected session: ${sessionId}`);
+        // Create WebSocket connection with proper headers
+        this.ws = new WebSocket(wsUrl, {
+          headers: {
+            'Authorization': `Bearer ${this.config.apiKey}`,
+            'OpenAI-Beta': 'realtime=v1',
+          }
+        });
 
-      // TODO: Implement actual WebSocket connection to OpenAI Realtime API
-      // const ws = new WebSocket('wss://api.openai.com/v1/realtime');
-      // Handle WebSocket events: open, message, error, close
+        // Handle connection open
+        this.ws.on('open', () => {
+          console.log(`[OpenAI] WebSocket connected for session: ${sessionId}`);
+          this.connected = true;
+          this.reconnectAttempts = 0;
 
-    } catch (error) {
-      this.emit('error', error);
-      throw error;
-    }
+          // Create session with configuration
+          this.createSession();
+
+          // Start ping interval to keep connection alive
+          this.startPingInterval();
+
+          // Process any queued messages
+          this.processMessageQueue();
+
+          resolve();
+        });
+
+        // Handle incoming messages
+        this.ws.on('message', (data: WebSocket.Data) => {
+          try {
+            const message = JSON.parse(data.toString()) as RealtimeMessage;
+            this.handleMessage(message);
+          } catch (error) {
+            console.error('[OpenAI] Failed to parse message:', error);
+            this.emit('error', error);
+          }
+        });
+
+        // Handle errors
+        this.ws.on('error', (error: Error) => {
+          console.error('[OpenAI] WebSocket error:', error);
+          this.emit('error', error);
+
+          if (!this.connected) {
+            reject(error);
+          }
+        });
+
+        // Handle connection close
+        this.ws.on('close', (code: number, reason: Buffer) => {
+          console.log(`[OpenAI] WebSocket closed. Code: ${code}, Reason: ${reason.toString()}`);
+          this.connected = false;
+          this.isSessionCreated = false;
+
+          // Clear ping interval
+          if (this.pingInterval) {
+            clearInterval(this.pingInterval);
+            this.pingInterval = null;
+          }
+
+          // Attempt reconnection if not intentional disconnect
+          if (code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
+            this.attemptReconnect();
+          }
+        });
+
+      } catch (error) {
+        console.error('[OpenAI] Failed to create WebSocket connection:', error);
+        reject(error);
+      }
+    });
   }
 
+  /**
+   * Create and configure the session
+   */
+  private createSession(): void {
+    const sessionConfig: SessionConfig = {
+      modalities: ["text", "audio"],
+      instructions: this.config.systemInstructions || "You are a helpful voice assistant. Please be concise and natural in your responses.",
+      voice: "alloy",
+      input_audio_format: "pcm16",
+      output_audio_format: "pcm16",
+      input_audio_transcription: {
+        model: "whisper-1"
+      },
+      turn_detection: {
+        type: "server_vad",
+        threshold: 0.5,
+        prefix_padding_ms: 300,
+        silence_duration_ms: 500
+      },
+      temperature: 0.8,
+      max_response_output_tokens: "inf"
+    };
+
+    this.sendMessage({
+      type: 'session.update',
+      session: sessionConfig
+    });
+
+    console.log('[OpenAI] Session configuration sent');
+  }
+
+  /**
+   * Send audio chunk to OpenAI
+   */
   async sendAudio(chunk: AudioChunk): Promise<void> {
-    if (!this.connected || !this.realtimeSession) {
+    if (!this.connected || !this.ws) {
       throw new Error('Not connected to OpenAI Realtime API');
     }
 
     try {
-      // TODO: Send audio chunk to OpenAI via WebSocket
-      // Format: base64 encoded PCM or Opus
-      // this.realtimeSession.send({
-      //   type: 'input_audio_buffer.append',
-      //   audio: chunk.data.toString('base64')
-      // });
+      // OpenAI expects PCM16 audio as base64
+      let audioData: string;
+
+      if (chunk.format === 'pcm') {
+        // Convert PCM16 to base64
+        audioData = chunk.data.toString('base64');
+      } else {
+        // Would need to convert other formats to PCM16 first
+        throw new Error(`Unsupported audio format: ${chunk.format}`);
+      }
+
+      // Send audio to OpenAI
+      this.sendMessage({
+        type: 'input_audio_buffer.append',
+        audio: audioData
+      });
+
+      // Accumulate audio for potential processing
+      this.audioBuffer = Buffer.concat([this.audioBuffer, chunk.data]);
 
       console.log(`[OpenAI] Sent audio chunk: ${chunk.data.length} bytes`);
     } catch (error) {
+      console.error('[OpenAI] Failed to send audio:', error);
       this.emit('error', error);
       throw error;
     }
-  }
-
-  async cancel(): Promise<void> {
-    if (!this.connected || !this.realtimeSession) {
-      return;
-    }
-
-    try {
-      // TODO: Send cancellation message to OpenAI
-      // this.realtimeSession.send({
-      //   type: 'response.cancel'
-      // });
-
-      console.log(`[OpenAI] Cancelled response for session: ${this.sessionId}`);
-    } catch (error) {
-      this.emit('error', error);
-      throw error;
-    }
-  }
-
-  async disconnect(): Promise<void> {
-    if (!this.connected) {
-      return;
-    }
-
-    try {
-      // TODO: Close WebSocket connection
-      // this.realtimeSession?.close();
-
-      this.connected = false;
-      this.realtimeSession = null;
-      this.sessionId = null;
-
-      console.log(`[OpenAI] Disconnected session`);
-    } catch (error) {
-      this.emit('error', error);
-      throw error;
-    }
-  }
-
-  isConnected(): boolean {
-    return this.connected;
   }
 
   /**
-   * Handle incoming WebSocket messages from OpenAI
-   * TODO: Implement based on actual OpenAI Realtime API spec
+   * Commit the audio buffer and trigger response
    */
-  private handleMessage(message: any): void {
+  async commitAudio(): Promise<void> {
+    if (!this.connected || !this.ws) {
+      return;
+    }
+
+    try {
+      this.sendMessage({
+        type: 'input_audio_buffer.commit'
+      });
+
+      // Clear the audio buffer after commit
+      this.audioBuffer = Buffer.alloc(0);
+
+      console.log('[OpenAI] Audio buffer committed');
+    } catch (error) {
+      console.error('[OpenAI] Failed to commit audio:', error);
+    }
+  }
+
+  /**
+   * Cancel current response
+   */
+  async cancel(): Promise<void> {
+    if (!this.connected || !this.ws) {
+      return;
+    }
+
+    try {
+      this.sendMessage({
+        type: 'response.cancel'
+      });
+
+      this.responseInProgress = false;
+      console.log(`[OpenAI] Cancelled response for session: ${this.sessionId}`);
+    } catch (error) {
+      console.error('[OpenAI] Failed to cancel response:', error);
+      this.emit('error', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Disconnect from OpenAI
+   */
+  async disconnect(): Promise<void> {
+    if (!this.connected && !this.ws) {
+      return;
+    }
+
+    try {
+      // Clear ping interval
+      if (this.pingInterval) {
+        clearInterval(this.pingInterval);
+        this.pingInterval = null;
+      }
+
+      // Close WebSocket connection
+      if (this.ws) {
+        this.ws.close(1000, 'Client disconnect');
+        this.ws = null;
+      }
+
+      this.connected = false;
+      this.isSessionCreated = false;
+      this.sessionId = null;
+      this.messageQueue = [];
+      this.audioBuffer = Buffer.alloc(0);
+
+      console.log('[OpenAI] Disconnected session');
+    } catch (error) {
+      console.error('[OpenAI] Error during disconnect:', error);
+      this.emit('error', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if connected
+   */
+  isConnected(): boolean {
+    return this.connected && this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  /**
+   * Send message to OpenAI
+   */
+  private sendMessage(message: RealtimeMessage): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      // Queue message if not connected
+      this.messageQueue.push(message);
+      return;
+    }
+
+    try {
+      this.ws.send(JSON.stringify(message));
+      console.log(`[OpenAI] Sent message: ${message.type}`);
+    } catch (error) {
+      console.error('[OpenAI] Failed to send message:', error);
+      this.emit('error', error);
+    }
+  }
+
+  /**
+   * Process queued messages
+   */
+  private processMessageQueue(): void {
+    while (this.messageQueue.length > 0 && this.isConnected()) {
+      const message = this.messageQueue.shift();
+      if (message) {
+        this.sendMessage(message);
+      }
+    }
+  }
+
+  /**
+   * Handle incoming messages from OpenAI
+   */
+  private handleMessage(message: RealtimeMessage): void {
+    console.log(`[OpenAI] Received message: ${message.type}`);
+
     switch (message.type) {
-      case 'response.audio.delta':
-        // Emit audio chunk
-        this.emit('audio', {
-          data: Buffer.from(message.delta, 'base64'),
-          format: 'pcm',
-          sampleRate: 24000,
-        } as AudioChunk);
+      case 'session.created':
+        this.isSessionCreated = true;
+        console.log('[OpenAI] Session created successfully');
+        break;
+
+      case 'session.updated':
+        console.log('[OpenAI] Session configuration updated');
+        break;
+
+      case 'conversation.created':
+        console.log('[OpenAI] Conversation created');
+        break;
+
+      case 'input_audio_buffer.committed':
+        console.log('[OpenAI] Audio buffer committed successfully');
+        break;
+
+      case 'input_audio_buffer.cleared':
+        console.log('[OpenAI] Audio buffer cleared');
+        break;
+
+      case 'input_audio_buffer.speech_started':
+        console.log('[OpenAI] Speech detected - started');
+        this.emit('speech_started');
+        break;
+
+      case 'input_audio_buffer.speech_stopped':
+        console.log('[OpenAI] Speech detected - stopped');
+        this.emit('speech_stopped');
+        // Automatically commit when speech stops (if using server VAD)
+        this.commitAudio();
+        break;
+
+      case 'conversation.item.created':
+        if (message.item?.role === 'user' && message.item?.content) {
+          // User transcript
+          const transcript = message.item.content.find((c: any) => c.type === 'input_text');
+          if (transcript?.text) {
+            this.emit('transcript', {
+              text: transcript.text,
+              confidence: 1.0,
+              isFinal: true,
+              timestamp: Date.now(),
+            } as TranscriptSegment);
+          }
+        }
+        break;
+
+      case 'response.created':
+        console.log('[OpenAI] Response started');
+        this.responseInProgress = true;
+        this.emit('response_start');
         break;
 
       case 'response.audio_transcript.delta':
-        // Emit transcript
-        this.emit('transcript', {
-          text: message.delta,
-          confidence: 1.0,
-          isFinal: false,
-          timestamp: Date.now(),
-        } as TranscriptSegment);
+        // Incremental transcript
+        if (message.delta) {
+          this.emit('transcript', {
+            text: message.delta,
+            confidence: 1.0,
+            isFinal: false,
+            timestamp: Date.now(),
+          } as TranscriptSegment);
+        }
         break;
 
       case 'response.audio_transcript.done':
         // Final transcript
-        this.emit('transcript', {
-          text: message.transcript,
-          confidence: 1.0,
-          isFinal: true,
-          timestamp: Date.now(),
-        } as TranscriptSegment);
+        if (message.transcript) {
+          this.emit('transcript', {
+            text: message.transcript,
+            confidence: 1.0,
+            isFinal: true,
+            timestamp: Date.now(),
+          } as TranscriptSegment);
+        }
+        break;
+
+      case 'response.audio.delta':
+        // Audio chunk from assistant
+        if (message.delta) {
+          // OpenAI sends base64 encoded PCM16 audio
+          const audioBuffer = Buffer.from(message.delta, 'base64');
+
+          this.emit('audio', {
+            data: audioBuffer,
+            format: 'pcm',
+            sampleRate: 24000, // OpenAI uses 24kHz for PCM16
+          } as AudioChunk);
+        }
+        break;
+
+      case 'response.audio.done':
+        console.log('[OpenAI] Audio response complete');
         break;
 
       case 'response.done':
+        console.log('[OpenAI] Response complete');
+        this.responseInProgress = false;
         this.emit('response_end');
         break;
 
+      case 'conversation.item.input_audio_transcription.completed':
+        // User's audio transcription completed
+        if (message.transcript) {
+          this.emit('user_transcript', {
+            text: message.transcript,
+            confidence: 1.0,
+            isFinal: true,
+            timestamp: Date.now(),
+          } as TranscriptSegment);
+        }
+        break;
+
+      case 'conversation.item.input_audio_transcription.failed':
+        console.error('[OpenAI] Transcription failed:', message.error);
+        break;
+
+      case 'rate_limits.updated':
+        console.log('[OpenAI] Rate limits updated:', message.rate_limits);
+        break;
+
       case 'error':
-        this.emit('error', new Error(message.error.message));
+        console.error('[OpenAI] Error from API:', message.error);
+        this.emit('error', new Error(message.error?.message || 'Unknown error from OpenAI'));
         break;
 
       default:
-        console.log(`[OpenAI] Unknown message type: ${message.type}`);
+        console.log(`[OpenAI] Unhandled message type: ${message.type}`);
+    }
+  }
+
+  /**
+   * Attempt to reconnect after connection loss
+   */
+  private attemptReconnect(): void {
+    this.reconnectAttempts++;
+    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+
+    console.log(`[OpenAI] Attempting reconnection (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${delay}ms...`);
+
+    setTimeout(() => {
+      if (this.sessionId) {
+        this.connect(this.sessionId).catch((error) => {
+          console.error('[OpenAI] Reconnection failed:', error);
+        });
+      }
+    }, delay);
+  }
+
+  /**
+   * Start ping interval to keep connection alive
+   */
+  private startPingInterval(): void {
+    // OpenAI Realtime API doesn't require explicit pings,
+    // but we'll keep track of connection health
+    this.pingInterval = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        // Connection is healthy
+        console.log('[OpenAI] Connection health check: OK');
+      } else {
+        console.warn('[OpenAI] Connection health check: Not connected');
+        if (this.pingInterval) {
+          clearInterval(this.pingInterval);
+          this.pingInterval = null;
+        }
+      }
+    }, 30000); // Check every 30 seconds
+  }
+
+  /**
+   * Create a response programmatically
+   */
+  async createResponse(text?: string, generateAudio: boolean = true): Promise<void> {
+    if (!this.connected || !this.ws) {
+      throw new Error('Not connected to OpenAI Realtime API');
+    }
+
+    try {
+      if (text) {
+        // Create response with specific text
+        this.sendMessage({
+          type: 'response.create',
+          response: {
+            modalities: generateAudio ? ["text", "audio"] : ["text"],
+            instructions: text
+          }
+        });
+      } else {
+        // Create response based on current conversation context
+        this.sendMessage({
+          type: 'response.create',
+          response: {
+            modalities: ["text", "audio"]
+          }
+        });
+      }
+
+      console.log('[OpenAI] Response creation requested');
+    } catch (error) {
+      console.error('[OpenAI] Failed to create response:', error);
+      this.emit('error', error);
+      throw error;
     }
   }
 }
