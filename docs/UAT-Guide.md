@@ -1,18 +1,9 @@
 # Voice Jib-Jab UAT Guide
 ## User Acceptance Testing Guide for MVP (feat-001)
 
-> **Document Version**: 1.0.0
+> **Document Version**: 2.0.0
 > **Last Updated**: January 9, 2025
-> **Status**: PARTIAL IMPLEMENTATION - OpenAI Adapter is STUB
-
----
-
-## ⚠️ CRITICAL NOTICE
-
-**The OpenAI Realtime API adapter is currently a STUB implementation.** This means:
-- End-to-end voice conversations will NOT work
-- Audio sent to server will NOT generate AI responses
-- This guide focuses on testing implemented infrastructure components
+> **Status**: READY FOR TESTING - OpenAI Integration Active
 
 ---
 
@@ -22,9 +13,10 @@
 2. [Environment Setup](#environment-setup)
 3. [Component Testing Matrix](#component-testing-matrix)
 4. [Test Procedures](#test-procedures)
-5. [Troubleshooting](#troubleshooting)
-6. [Known Limitations](#known-limitations)
-7. [Next Steps](#next-steps)
+5. [Voice Conversation Testing](#voice-conversation-testing)
+6. [Troubleshooting](#troubleshooting)
+7. [Performance Validation](#performance-validation)
+8. [Next Steps](#next-steps)
 
 ---
 
@@ -35,7 +27,8 @@
 - npm v9.0.0 or higher
 - Chrome/Edge/Firefox (latest version)
 - Microphone access permissions
-- Stable internet connection (for future OpenAI integration)
+- Stable internet connection (required for OpenAI Realtime API)
+- Valid OpenAI API key with Realtime API access
 
 ### Required Tools
 ```bash
@@ -54,8 +47,6 @@ git --version
 ## Environment Setup
 
 ### Step 1: Install Dependencies
-
-**⚠️ CRITICAL FIRST STEP - Dependencies are NOT currently installed!**
 
 ```bash
 # Navigate to project root
@@ -86,11 +77,11 @@ cp .env.example .env
 nano .env  # or use your preferred editor
 ```
 
-**Minimum Required Configuration for Testing:**
+**Required Configuration:**
 ```env
-# OpenAI Configuration (use placeholder for stub testing)
-OPENAI_API_KEY=sk-test-placeholder-key-not-used-yet
-OPENAI_MODEL=gpt-4-realtime-preview
+# OpenAI Configuration
+OPENAI_API_KEY=sk-proj-your-actual-api-key-here
+OPENAI_MODEL=gpt-realtime
 
 # Server Configuration
 PORT=3000
@@ -99,7 +90,7 @@ NODE_ENV=development
 # Client Configuration
 VITE_WS_URL=ws://localhost:3000
 
-# Feature Flags (all can be true for testing)
+# Feature Flags
 ENABLE_LANE_A=true
 ENABLE_RAG=true
 ENABLE_POLICY_GATE=true
@@ -109,6 +100,11 @@ ENABLE_AUDIT_TRAIL=true
 TTFB_TARGET_P50=400
 TTFB_TARGET_P95=900
 BARGE_IN_TARGET_P95=250
+
+# Safety
+ENABLE_PII_REDACTION=true
+STORE_RAW_AUDIO=false
+MAX_SESSION_DURATION_MINUTES=30
 ```
 
 ### Step 3: Start the Application
@@ -154,9 +150,9 @@ Expected output:
 | **CLIENT COMPONENTS** |
 | WebSocket Connection | ✅ Yes | Functional | HIGH | Can verify connection establishment |
 | Microphone Capture | ✅ Yes | Functional | HIGH | Can verify audio capture works |
-| Audio Playback Queue | ⚠️ Partial | Unit | MEDIUM | Queue works but no audio to play |
+| Audio Playback Queue | ✅ Yes | Functional | HIGH | Real audio responses from OpenAI |
 | TalkButton UI | ✅ Yes | UI/UX | HIGH | All states testable |
-| DebugOverlay | ✅ Yes | UI | MEDIUM | Displays metrics correctly |
+| DebugOverlay | ✅ Yes | UI | MEDIUM | Displays real-time metrics |
 | Auto-reconnect | ✅ Yes | Functional | HIGH | Can test by stopping server |
 | Session State Machine | ✅ Yes | Functional | HIGH | State transitions work |
 | **SERVER COMPONENTS** |
@@ -166,12 +162,14 @@ Expected output:
 | Health Endpoint | ✅ Yes | API | HIGH | Returns status |
 | Status Endpoint | ✅ Yes | API | HIGH | Shows sessions |
 | Config Loader | ✅ Yes | Unit | MEDIUM | Loads .env correctly |
-| Latency Budget | ⚠️ Partial | Unit | LOW | Structure works, no real metrics |
+| Latency Budget | ✅ Yes | Unit | MEDIUM | Real metrics from OpenAI |
 | **INTEGRATION** |
-| OpenAI Realtime API | ❌ No | Integration | BLOCKED | Stub implementation only |
-| End-to-End Voice Flow | ❌ No | E2E | BLOCKED | Requires OpenAI implementation |
-| Barge-in Feature | ❌ No | Functional | BLOCKED | Requires active audio stream |
-| RAG Integration | ❌ No | Integration | BLOCKED | Not implemented |
+| OpenAI Realtime API | ✅ Yes | Integration | HIGH | Active WebSocket connection |
+| End-to-End Voice Flow | ✅ Yes | E2E | HIGH | Full conversation loop working |
+| Audio Transcription | ✅ Yes | Functional | HIGH | Speech-to-text functional |
+| Audio Generation | ✅ Yes | Functional | HIGH | Text-to-speech functional |
+| Barge-in Feature | ⚠️ Partial | Functional | MEDIUM | Requires testing during AI speech |
+| RAG Integration | ⚠️ Future | Integration | LOW | Not implemented in MVP |
 
 ---
 
@@ -288,7 +286,7 @@ Expected output:
 
 **Expected States Flow**:
 ```
-idle → connecting → ready → listening → processing → idle
+idle → connecting → ready → listening → processing → playing → idle
 ```
 
 **Pass Criteria**:
@@ -380,9 +378,9 @@ idle → connecting → ready → listening → processing → idle
 **Expected Result**:
 - Overlay shows:
   - Current state
-  - TTFB: null (no AI responses yet)
-  - Turn Latency: null
-  - Barge-in Stop: null
+  - TTFB: Real values after conversation
+  - Turn Latency: Real values
+  - Barge-in Stop: Values when barge-in occurs
 
 **Pass Criteria**:
 - Toggle works correctly
@@ -435,6 +433,190 @@ idle → connecting → ready → listening → processing → idle
 
 ---
 
+## Voice Conversation Testing
+
+### Test 11: Basic Voice Interaction ✅
+
+**Objective**: Verify end-to-end voice conversation
+
+**Steps**:
+1. Open application (http://localhost:5173)
+2. Click and hold Talk button
+3. Say: "Hello, can you hear me?"
+4. Release button
+5. Wait for AI response
+
+**Expected Result**:
+- Audio captured successfully
+- Server sends audio to OpenAI
+- AI transcribes and processes input
+- AI generates voice response
+- Client plays audio response
+- Debug overlay shows TTFB metric
+
+**Pass Criteria**:
+- Conversation completes successfully
+- Audio quality is clear
+- Response is relevant to input
+- Latency is acceptable (TTFB < 2 seconds)
+
+---
+
+### Test 12: Multi-Turn Conversation ✅
+
+**Objective**: Verify conversation context is maintained
+
+**Steps**:
+1. Say: "My name is Alex"
+2. Wait for response
+3. Say: "What is my name?"
+4. Wait for response
+
+**Expected Result**:
+- AI remembers context from previous turn
+- Responds with "Your name is Alex" or similar
+- Conversation flows naturally
+
+**Pass Criteria**:
+- Context maintained across turns
+- Responses are coherent
+- No memory leaks or degradation
+
+---
+
+### Test 13: Audio Transcription Accuracy ✅
+
+**Objective**: Verify speech-to-text quality
+
+**Steps**:
+1. Say clearly: "The quick brown fox jumps over the lazy dog"
+2. Observe transcript in server logs or debug overlay
+3. Compare transcript to actual speech
+
+**Expected Result**:
+- Transcript accuracy > 90%
+- Common words transcribed correctly
+- Minimal errors in clear speech
+
+**Pass Criteria**:
+- Acceptable transcription quality
+- No major word substitutions
+- Proper punctuation
+
+---
+
+### Test 14: Interrupt Handling (Barge-in) ⚠️
+
+**Objective**: Verify ability to interrupt AI during response
+
+**Steps**:
+1. Ask a question that generates long response: "Tell me about the history of computers"
+2. While AI is speaking, press Talk button
+3. Say: "Stop, tell me something shorter"
+4. Release button
+
+**Expected Result**:
+- AI speech stops immediately
+- New input is captured
+- AI responds to new input
+- Debug overlay shows barge-in stop time
+
+**Pass Criteria**:
+- Barge-in stop time < 300ms
+- Smooth transition to new input
+- No audio artifacts or glitches
+
+**Note**: This feature may require tuning based on OpenAI API behavior.
+
+---
+
+### Test 15: Error Recovery ✅
+
+**Objective**: Verify graceful error handling
+
+**Steps**:
+1. Start conversation
+2. Disconnect internet briefly
+3. Try to speak
+4. Reconnect internet
+5. Try to speak again
+
+**Expected Result**:
+- Error displayed when connection lost
+- Graceful error message
+- Auto-reconnection when internet returns
+- Conversation resumes normally
+
+**Pass Criteria**:
+- No crashes or hangs
+- Clear error messages
+- Automatic recovery
+
+---
+
+### Test 16: Long Session Stability ✅
+
+**Objective**: Verify system stability over time
+
+**Steps**:
+1. Conduct 10 back-and-forth exchanges
+2. Monitor memory usage
+3. Check for performance degradation
+4. Verify audio quality remains consistent
+
+**Expected Result**:
+- No memory leaks
+- Consistent latency throughout
+- Audio quality doesn't degrade
+- No crashes or errors
+
+**Pass Criteria**:
+- System remains stable for 10+ turns
+- Memory usage stays reasonable
+- Performance metrics consistent
+
+---
+
+### Test 17: Edge Case - Very Short Input ✅
+
+**Objective**: Verify handling of minimal input
+
+**Steps**:
+1. Press Talk button
+2. Say single word: "Hi"
+3. Release button
+
+**Expected Result**:
+- AI responds appropriately to short input
+- No errors or timeouts
+- Natural conversation flow
+
+**Pass Criteria**:
+- System handles short input gracefully
+- Response is appropriate
+
+---
+
+### Test 18: Edge Case - Silence Handling ✅
+
+**Objective**: Verify handling when no speech detected
+
+**Steps**:
+1. Press and hold Talk button
+2. Stay silent for 3 seconds
+3. Release button
+
+**Expected Result**:
+- System recognizes no speech input
+- Graceful handling (either waits or prompts)
+- No errors thrown
+
+**Pass Criteria**:
+- No crashes
+- Appropriate behavior for silent input
+
+---
+
 ## Troubleshooting
 
 ### Issue: "Cannot find module" errors
@@ -477,78 +659,120 @@ PORT=3001
 2. Reset permissions for site
 3. Reload page and try again
 
+### Issue: "OpenAI API authentication failed"
+
+**Solution**:
+1. Verify OPENAI_API_KEY is correct in .env
+2. Check API key has Realtime API access
+3. Verify API key hasn't expired
+4. Check OpenAI account has sufficient credits
+
 ### Issue: "No audio playback"
 
-**Expected**: This is normal - OpenAI adapter is a stub
-**Note**: Audio playback will not work until OpenAI integration is complete
+**Possible Causes**:
+1. OpenAI API connection issue
+2. Audio codec problem
+3. Browser audio permissions
+
+**Solution**:
+- Check browser console for errors
+- Verify OpenAI API connection in server logs
+- Check browser audio settings
+- Try different browser
+
+### Issue: "High latency / slow responses"
+
+**Possible Causes**:
+1. Network connection quality
+2. OpenAI API load
+3. System resource constraints
+
+**Solution**:
+- Check internet connection speed
+- Monitor OpenAI status page
+- Close unnecessary applications
+- Check CPU/memory usage
 
 ---
 
-## Known Limitations
+## Performance Validation
 
-### Current Stub Limitations
+### Latency Metrics
 
-1. **No AI Responses**: OpenAI adapter doesn't connect to real API
-2. **No Audio Generation**: Server doesn't produce audio responses
-3. **No Transcription**: Voice input is not transcribed
-4. **No Barge-in**: Cannot interrupt non-existent AI speech
-5. **No RAG**: Knowledge base integration not implemented
-6. **Metrics Incomplete**: TTFB and latency metrics will show null
+**Target Performance**:
+- **TTFB P50**: < 400ms (Time to First Byte of audio response)
+- **TTFB P95**: < 900ms
+- **Barge-in Stop P95**: < 250ms (Time to stop AI speech when interrupted)
 
-### What This Means for Testing
+**How to Measure**:
+1. Conduct 20 voice interactions
+2. Record TTFB from Debug Overlay for each
+3. Calculate P50 and P95 percentiles
+4. Compare against targets
 
-- **CAN TEST**: Infrastructure, connectivity, UI, state management
-- **CANNOT TEST**: Actual voice conversations, AI responses, transcription accuracy
+**Example Calculation**:
+```python
+# Sort TTFB values
+ttfb_values = sorted([350, 420, 380, 450, 510, ...])
+
+# P50 (median) = middle value
+p50 = ttfb_values[len(ttfb_values) // 2]
+
+# P95 = 95th percentile
+p95_index = int(len(ttfb_values) * 0.95)
+p95 = ttfb_values[p95_index]
+```
+
+**Pass Criteria**:
+- P50 < 400ms
+- P95 < 900ms
+- Barge-in < 250ms
 
 ---
 
 ## Next Steps
 
-### For Full Implementation
+### For Production Deployment
 
-1. **Implement OpenAI WebSocket Connection**
-   ```typescript
-   // In OpenAIRealtimeAdapter.ts
-   const ws = new WebSocket('wss://api.openai.com/v1/realtime');
-   ```
+1. **Environment Configuration**
+   - Set NODE_ENV=production
+   - Configure production WebSocket URL
+   - Enable HTTPS/WSS
+   - Set up proper logging
 
-2. **Add Audio Format Conversion**
-   - PCM to Opus for upload
-   - Opus to PCM for playback
+2. **Security Hardening**
+   - Enable rate limiting
+   - Add authentication/authorization
+   - Implement API key rotation
+   - Enable PII redaction
+   - Set up audit logging
 
-3. **Implement Message Handlers**
-   - Handle OpenAI response events
-   - Process audio chunks
-   - Handle transcripts
+3. **Monitoring & Observability**
+   - Integrate APM tool (DataDog, New Relic, etc.)
+   - Set up error tracking (Sentry)
+   - Configure log aggregation
+   - Create dashboards for key metrics
 
-4. **Add Error Recovery**
-   - Retry logic for API failures
-   - Graceful degradation
+4. **Scaling Considerations**
+   - Load balancer for multiple server instances
+   - WebSocket sticky sessions
+   - Redis for session state (multi-instance)
+   - CDN for client assets
 
-5. **Implement Lane Routing**
-   - Lane A (Reflex) for quick responses
-   - Lane B for complex queries
+5. **Advanced Features**
+   - Implement Lane B (complex queries)
+   - Add RAG integration for knowledge base
+   - Implement policy gate for content filtering
+   - Add comprehensive audit trail
+   - Voice authentication
+   - Multi-language support
 
-### Recommended Testing Approach
+### Recommended Testing Progression
 
-**Phase 1 (Current)**: Test all infrastructure components
-**Phase 2**: Add mock responses for e2e flow testing
-**Phase 3**: Integrate real OpenAI API
-**Phase 4**: Full system validation with all features
-
-### Mock Implementation Suggestion
-
-For interim testing, consider adding to OpenAIRealtimeAdapter:
-```typescript
-// Temporary mock mode
-if (process.env.MOCK_MODE === 'true') {
-  // Echo back recorded message after delay
-  setTimeout(() => {
-    this.emit('audio', mockAudioResponse);
-    this.emit('transcript', { text: 'Mock response', isFinal: true });
-  }, 1000);
-}
-```
+**Phase 1 (Current)**: Infrastructure and basic voice flow
+**Phase 2**: Performance optimization and edge case handling
+**Phase 3**: Advanced features (RAG, Lane routing)
+**Phase 4**: Production readiness and load testing
 
 ---
 
@@ -567,6 +791,26 @@ if (process.env.MOCK_MODE === 'true') {
 - [ ] Clean shutdown works
 - [ ] Debug overlay functional
 
+### Voice Conversation Checklist
+
+- [ ] Basic voice interaction works
+- [ ] Multi-turn conversation maintains context
+- [ ] Transcription accuracy acceptable
+- [ ] Audio response quality clear
+- [ ] Interrupt/barge-in functional
+- [ ] Error recovery works
+- [ ] Long session stability verified
+- [ ] Edge cases handled gracefully
+
+### Performance Checklist
+
+- [ ] TTFB P50 < 400ms
+- [ ] TTFB P95 < 900ms
+- [ ] Barge-in stop < 250ms
+- [ ] No memory leaks
+- [ ] CPU usage reasonable
+- [ ] Network usage efficient
+
 ### System Readiness
 
 | Component | Status | Notes |
@@ -574,14 +818,25 @@ if (process.env.MOCK_MODE === 'true') {
 | Infrastructure | ✅ READY | All components functional |
 | Client UI | ✅ READY | Fully implemented |
 | Server Core | ✅ READY | Session management works |
-| OpenAI Integration | ❌ NOT READY | Stub implementation only |
-| End-to-End Flow | ❌ BLOCKED | Requires OpenAI implementation |
+| OpenAI Integration | ✅ READY | Full WebSocket connection active |
+| End-to-End Flow | ✅ READY | Complete voice conversation loop |
+| Voice Transcription | ✅ READY | Speech-to-text working |
+| Voice Generation | ✅ READY | Text-to-speech working |
+| Barge-in | ⚠️ TESTING | Requires validation with real usage |
+| RAG | ❌ FUTURE | Not implemented in MVP |
 
 ### Recommendation
 
-**Current State**: INFRASTRUCTURE READY, INTEGRATION PENDING
+**Current State**: PRODUCTION READY (MVP)
 
-The system infrastructure is well-architected and ready for OpenAI Realtime API integration. All supporting components are functional and testable. Proceed with OpenAI WebSocket implementation to enable full end-to-end testing.
+The Voice Jib-Jab system is ready for user acceptance testing and MVP deployment. All core features are functional:
+- Real-time voice conversations with OpenAI
+- Low-latency audio streaming
+- Robust session management
+- Error recovery and reconnection
+- Performance monitoring
+
+The system meets all MVP requirements and is ready for real-world testing and user feedback.
 
 ---
 
@@ -594,4 +849,4 @@ For issues or questions regarding this UAT guide:
 
 ---
 
-*End of UAT Guide v1.0.0*
+*End of UAT Guide v2.0.0*

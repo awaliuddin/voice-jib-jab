@@ -191,7 +191,7 @@ Outbound message types:
 ```bash
 # Required
 OPENAI_API_KEY=sk-...          # Your OpenAI API key
-OPENAI_MODEL=gpt-4o-realtime-preview-2024-12-17  # Model version
+OPENAI_MODEL=gpt-realtime  # Model version
 
 # Optional (with defaults)
 PORT=3000                       # Server port

@@ -321,7 +321,7 @@ Server logs show all OpenAI interactions with `[OpenAI]` prefix.
 
 - **OpenAI API Costs:** Realtime API is billed per audio minute (~$0.06/minute input, ~$0.24/minute output)
 - **Rate Limits:** Check OpenAI console for your limits
-- **Model:** Uses `gpt-4o-realtime-preview-2024-12-17`
+- **Model:** Uses `gpt-realtime`
 - **Browser:** Chrome/Edge recommended (best WebRTC support)
 - **Network:** Requires stable internet (WebSocket streaming)
 

@@ -62,7 +62,7 @@ export const config: ServerConfig = {
   nodeEnv: getEnvVar('NODE_ENV', 'development'),
   openai: {
     apiKey: getEnvVar('OPENAI_API_KEY'),
-    model: getEnvVar('OPENAI_MODEL', 'gpt-4-realtime-preview'),
+    model: getEnvVar('OPENAI_MODEL', 'gpt-realtime'),
   },
   features: {
     enableLaneA: getEnvBool('ENABLE_LANE_A', true),

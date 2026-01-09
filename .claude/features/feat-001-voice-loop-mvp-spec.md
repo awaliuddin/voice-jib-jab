@@ -87,7 +87,7 @@ Implement the foundational voice interaction loop: browser microphone capture â†
 **Environment Variables (.env):**
 ```
 OPENAI_API_KEY=your_key_here
-OPENAI_MODEL=gpt-4-realtime-preview
+OPENAI_MODEL=gpt-realtime
 PORT=3000
 VITE_WS_URL=ws://localhost:3000
 ```

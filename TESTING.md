@@ -30,7 +30,7 @@ cp .env.example .env
 
 # Edit .env file and add your OpenAI API key
 # Set: OPENAI_API_KEY=your_actual_api_key_here
-# Model should be: gpt-4o-realtime-preview-2024-12-17
+# Model should be: gpt-realtime
 ```
 
 ### 2. Install Dependencies
