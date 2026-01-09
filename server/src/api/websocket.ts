@@ -241,6 +241,12 @@ export class VoiceWebSocketServer {
           sessionManager.touchSession(sessionId);
           break;
 
+        case "audio.commit":
+          // User released Talk button - commit audio buffer to trigger response
+          console.log("[WebSocket] Committing audio buffer");
+          await providerAdapter.commitAudio();
+          break;
+
         case "user.barge_in":
           // Cancel current response
           await providerAdapter.cancel();

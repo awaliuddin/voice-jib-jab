@@ -225,9 +225,13 @@ export class SessionManager {
 
     this.micCapture.stop();
     this.lastUserSpeechEnd = Date.now();
-    this.setState("connected");
 
-    console.log("[SessionManager] Stopped talking");
+    // Tell server to commit audio buffer and generate response
+    this.wsClient.send({ type: "audio.commit" });
+
+    // Stay in talking state until we get response.start
+    // This keeps the button in "processing" state
+    console.log("[SessionManager] Stopped talking, waiting for response...");
   }
 
   /**
