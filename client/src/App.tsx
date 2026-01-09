@@ -3,17 +3,21 @@
  * Voice Jib-Jab Client
  */
 
-import React, { useEffect, useState } from 'react';
-import { SessionManager, SessionState, LatencyMetrics } from './state/SessionManager';
-import { TalkButton } from './ui/TalkButton';
-import { DebugOverlay } from './ui/DebugOverlay';
-import './App.css';
+import React, { useEffect, useState } from "react";
+import {
+  SessionManager,
+  SessionState,
+  LatencyMetrics,
+} from "./state/SessionManager";
+import { TalkButton } from "./ui/TalkButton";
+import { DebugOverlay } from "./ui/DebugOverlay";
+import "./App.css";
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3000';
+const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:3000";
 
 function App() {
   const [sessionManager] = useState(() => new SessionManager(WS_URL));
-  const [state, setState] = useState<SessionState>('idle');
+  const [state, setState] = useState<SessionState>("idle");
   const [metrics, setMetrics] = useState<LatencyMetrics>({
     ttfb: null,
     turnLatency: null,
@@ -26,17 +30,24 @@ function App() {
     // Setup callbacks
     sessionManager.setOnStateChange((newState) => {
       setState(newState);
+      // Clear error when successfully connected
+      if (newState === "connected") {
+        setError(null);
+      }
     });
 
     sessionManager.setOnMetricsUpdate((newMetrics) => {
       setMetrics(newMetrics);
     });
 
-    // Auto-initialize on mount
-    handleConnect();
+    // Auto-initialize on mount with small delay for DOM stability
+    const initTimer = setTimeout(() => {
+      handleConnect();
+    }, 100);
 
     // Cleanup on unmount
     return () => {
+      clearTimeout(initTimer);
       sessionManager.disconnect();
     };
   }, [sessionManager]);
@@ -46,9 +57,9 @@ function App() {
       setError(null);
       await sessionManager.initialize();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to connect';
+      const message = err instanceof Error ? err.message : "Failed to connect";
       setError(message);
-      console.error('Connection error:', err);
+      console.error("Connection error:", err);
     }
   };
 
@@ -79,10 +90,7 @@ function App() {
           <div className="error-banner">
             <span className="error-banner__icon">⚠️</span>
             <span className="error-banner__text">{error}</span>
-            <button
-              className="error-banner__retry"
-              onClick={handleConnect}
-            >
+            <button className="error-banner__retry" onClick={handleConnect}>
               Retry
             </button>
           </div>
@@ -101,16 +109,12 @@ function App() {
             className="app-controls__button"
             onClick={() => setShowDebug(!showDebug)}
           >
-            {showDebug ? '🔇 Hide Debug' : '🔊 Show Debug'}
+            {showDebug ? "🔇 Hide Debug" : "🔊 Show Debug"}
           </button>
         </div>
       </main>
 
-      <DebugOverlay
-        state={state}
-        metrics={metrics}
-        isVisible={showDebug}
-      />
+      <DebugOverlay state={state} metrics={metrics} isVisible={showDebug} />
 
       <footer className="app-footer">
         <p>Built with NXTG-Forge • Lane-based Architecture</p>

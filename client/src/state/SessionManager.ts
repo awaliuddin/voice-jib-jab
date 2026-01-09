@@ -47,9 +47,9 @@ export class SessionManager {
     this.setState("initializing");
 
     try {
-      // Initialize components
+      // Initialize WebSocket and audio playback first
+      // Microphone is initialized lazily when user starts talking
       await Promise.all([
-        this.micCapture.initialize(),
         this.audioPlayback.initialize(),
         this.wsClient.connect(),
       ]);
@@ -65,11 +65,31 @@ export class SessionManager {
       });
 
       this.setState("connected");
-      console.log("[SessionManager] Initialized successfully");
+      console.log(
+        "[SessionManager] Initialized successfully (mic will init on first talk)",
+      );
     } catch (error) {
       console.error("[SessionManager] Initialization failed:", error);
       this.setState("error");
       throw error;
+    }
+  }
+
+  private async ensureMicrophoneInitialized(): Promise<boolean> {
+    if (this.micCapture.isInitialized()) {
+      return true;
+    }
+
+    try {
+      await this.micCapture.initialize();
+      console.log("[SessionManager] Microphone initialized on demand");
+      return true;
+    } catch (error) {
+      console.error(
+        "[SessionManager] Microphone initialization failed:",
+        error,
+      );
+      return false;
     }
   }
 
@@ -163,9 +183,16 @@ export class SessionManager {
     });
   }
 
-  startTalking(): void {
+  async startTalking(): Promise<void> {
     if (this.state !== "connected") {
       console.warn("[SessionManager] Cannot start talking, not connected");
+      return;
+    }
+
+    // Ensure microphone is initialized (lazy init on first use)
+    const micReady = await this.ensureMicrophoneInitialized();
+    if (!micReady) {
+      console.error("[SessionManager] Cannot start talking without microphone");
       return;
     }
 
@@ -206,7 +233,7 @@ export class SessionManager {
   /**
    * Trigger barge-in (interrupt assistant)
    */
-  bargeIn(): void {
+  async bargeIn(): Promise<void> {
     if (!this.audioPlayback.isActive()) {
       return;
     }
@@ -228,7 +255,7 @@ export class SessionManager {
     // Transition to connected state first, then start talking
     if (this.state === "listening") {
       this.setState("connected");
-      this.startTalking();
+      await this.startTalking();
     }
   }
 

@@ -26,11 +26,16 @@ export class WebSocketClient {
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
+        console.log(`[WebSocket] Connecting to ${this.url}...`);
         this.ws = new WebSocket(this.url);
         this.isIntentionallyClosed = false;
 
+        let hasConnected = false;
+        let hasErrored = false;
+
         this.ws.onopen = () => {
-          console.log('[WebSocket] Connected');
+          console.log("[WebSocket] Connected");
+          hasConnected = true;
           this.reconnectAttempts = 0;
           resolve();
         };
@@ -40,22 +45,46 @@ export class WebSocketClient {
             const message: WebSocketMessage = JSON.parse(event.data);
             this.handleMessage(message);
           } catch (error) {
-            console.error('[WebSocket] Failed to parse message:', error);
+            console.error("[WebSocket] Failed to parse message:", error);
           }
         };
 
-        this.ws.onerror = (error) => {
-          console.error('[WebSocket] Error:', error);
-          reject(error);
+        this.ws.onerror = () => {
+          // WebSocket onerror provides minimal info - just log it
+          // The real handling happens in onclose
+          if (!hasConnected && !hasErrored) {
+            console.warn("[WebSocket] Connection error occurred");
+            hasErrored = true;
+          }
         };
 
-        this.ws.onclose = () => {
-          console.log('[WebSocket] Disconnected');
+        this.ws.onclose = (event) => {
+          console.log(
+            `[WebSocket] Closed (code: ${event.code}, reason: ${event.reason || "none"})`,
+          );
 
+          // If we never connected successfully, reject the promise
+          if (!hasConnected) {
+            reject(
+              new Error(`WebSocket connection failed (code: ${event.code})`),
+            );
+            return;
+          }
+
+          // If already connected before and this wasn't intentional, try to reconnect
           if (!this.isIntentionallyClosed) {
             this.attemptReconnect();
           }
         };
+
+        // Add connection timeout
+        setTimeout(() => {
+          if (!hasConnected && !hasErrored) {
+            console.error("[WebSocket] Connection timeout");
+            this.ws?.close();
+            reject(new Error("WebSocket connection timeout"));
+          }
+        }, 10000);
       } catch (error) {
         reject(error);
       }
@@ -64,8 +93,8 @@ export class WebSocketClient {
 
   private attemptReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('[WebSocket] Max reconnect attempts reached');
-      this.emit({ type: 'connection.failed' });
+      console.error("[WebSocket] Max reconnect attempts reached");
+      this.emit({ type: "connection.failed" });
       return;
     }
 
@@ -73,26 +102,26 @@ export class WebSocketClient {
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
 
     console.log(
-      `[WebSocket] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
+      `[WebSocket] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`,
     );
 
     setTimeout(() => {
       this.connect().catch((error) => {
-        console.error('[WebSocket] Reconnect failed:', error);
+        console.error("[WebSocket] Reconnect failed:", error);
       });
     }, delay);
   }
 
   send(message: WebSocketMessage): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn('[WebSocket] Cannot send, not connected');
+      console.warn("[WebSocket] Cannot send, not connected");
       return;
     }
 
     try {
       this.ws.send(JSON.stringify(message));
     } catch (error) {
-      console.error('[WebSocket] Send failed:', error);
+      console.error("[WebSocket] Send failed:", error);
     }
   }
 
@@ -118,7 +147,7 @@ export class WebSocketClient {
     }
 
     // Call wildcard handlers
-    const wildcardHandlers = this.handlers.get('*');
+    const wildcardHandlers = this.handlers.get("*");
     if (wildcardHandlers) {
       wildcardHandlers.forEach((handler) => handler(message));
     }
@@ -136,7 +165,7 @@ export class WebSocketClient {
       this.ws = null;
     }
 
-    console.log('[WebSocket] Disconnected intentionally');
+    console.log("[WebSocket] Disconnected intentionally");
   }
 
   isConnected(): boolean {
