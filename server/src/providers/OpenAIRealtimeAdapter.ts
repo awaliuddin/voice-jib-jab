@@ -5,9 +5,13 @@
  * Protocol documentation: https://platform.openai.com/docs/guides/realtime
  */
 
-import { ProviderAdapter, ProviderConfig, AudioChunk, TranscriptSegment } from './ProviderAdapter.js';
-import WebSocket from 'ws';
-import { EventEmitter } from 'events';
+import {
+  ProviderAdapter,
+  ProviderConfig,
+  AudioChunk,
+  TranscriptSegment,
+} from "./ProviderAdapter.js";
+import WebSocket from "ws";
 
 /**
  * OpenAI Realtime API Message Types
@@ -45,9 +49,9 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
   private readonly maxReconnectAttempts: number = 5;
   private readonly reconnectDelay: number = 1000;
   private messageQueue: RealtimeMessage[] = [];
-  private isSessionCreated: boolean = false;
+  private sessionCreated: boolean = false;
   private pingInterval: NodeJS.Timeout | null = null;
-  private responseInProgress: boolean = false;
+  private responding: boolean = false;
   private audioBuffer: Buffer = Buffer.alloc(0);
 
   constructor(config: ProviderConfig) {
@@ -62,18 +66,20 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
         // Construct WebSocket URL with API key in query parameters
         const wsUrl = `wss://api.openai.com/v1/realtime?model=${this.config.model}`;
 
-        console.log(`[OpenAI] Connecting to Realtime API for session: ${sessionId}`);
+        console.log(
+          `[OpenAI] Connecting to Realtime API for session: ${sessionId}`,
+        );
 
         // Create WebSocket connection with proper headers
         this.ws = new WebSocket(wsUrl, {
           headers: {
-            'Authorization': `Bearer ${this.config.apiKey}`,
-            'OpenAI-Beta': 'realtime=v1',
-          }
+            Authorization: `Bearer ${this.config.apiKey}`,
+            "OpenAI-Beta": "realtime=v1",
+          },
         });
 
         // Handle connection open
-        this.ws.on('open', () => {
+        this.ws.on("open", () => {
           console.log(`[OpenAI] WebSocket connected for session: ${sessionId}`);
           this.connected = true;
           this.reconnectAttempts = 0;
@@ -91,20 +97,20 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
         });
 
         // Handle incoming messages
-        this.ws.on('message', (data: WebSocket.Data) => {
+        this.ws.on("message", (data: WebSocket.Data) => {
           try {
             const message = JSON.parse(data.toString()) as RealtimeMessage;
             this.handleMessage(message);
           } catch (error) {
-            console.error('[OpenAI] Failed to parse message:', error);
-            this.emit('error', error);
+            console.error("[OpenAI] Failed to parse message:", error);
+            this.emit("error", error);
           }
         });
 
         // Handle errors
-        this.ws.on('error', (error: Error) => {
-          console.error('[OpenAI] WebSocket error:', error);
-          this.emit('error', error);
+        this.ws.on("error", (error: Error) => {
+          console.error("[OpenAI] WebSocket error:", error);
+          this.emit("error", error);
 
           if (!this.connected) {
             reject(error);
@@ -112,10 +118,12 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
         });
 
         // Handle connection close
-        this.ws.on('close', (code: number, reason: Buffer) => {
-          console.log(`[OpenAI] WebSocket closed. Code: ${code}, Reason: ${reason.toString()}`);
+        this.ws.on("close", (code: number, reason: Buffer) => {
+          console.log(
+            `[OpenAI] WebSocket closed. Code: ${code}, Reason: ${reason.toString()}`,
+          );
           this.connected = false;
-          this.isSessionCreated = false;
+          this.sessionCreated = false;
 
           // Clear ping interval
           if (this.pingInterval) {
@@ -124,13 +132,15 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
           }
 
           // Attempt reconnection if not intentional disconnect
-          if (code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
+          if (
+            code !== 1000 &&
+            this.reconnectAttempts < this.maxReconnectAttempts
+          ) {
             this.attemptReconnect();
           }
         });
-
       } catch (error) {
-        console.error('[OpenAI] Failed to create WebSocket connection:', error);
+        console.error("[OpenAI] Failed to create WebSocket connection:", error);
         reject(error);
       }
     });
@@ -142,46 +152,49 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
   private createSession(): void {
     const sessionConfig: SessionConfig = {
       modalities: ["text", "audio"],
-      instructions: this.config.systemInstructions || "You are a helpful voice assistant. Please be concise and natural in your responses.",
+      instructions:
+        this.config.systemInstructions ||
+        "You are a helpful voice assistant. Please be concise and natural in your responses.",
       voice: "alloy",
       input_audio_format: "pcm16",
       output_audio_format: "pcm16",
       input_audio_transcription: {
-        model: "whisper-1"
+        model: "whisper-1",
       },
       turn_detection: {
         type: "server_vad",
         threshold: 0.5,
         prefix_padding_ms: 300,
-        silence_duration_ms: 500
+        silence_duration_ms: 500,
       },
       temperature: 0.8,
-      max_response_output_tokens: "inf"
+      max_response_output_tokens: "inf",
     };
 
     this.sendMessage({
-      type: 'session.update',
-      session: sessionConfig
+      type: "session.update",
+      session: sessionConfig,
     });
 
-    console.log('[OpenAI] Session configuration sent');
+    console.log("[OpenAI] Session configuration sent");
   }
 
   /**
    * Send audio chunk to OpenAI
    */
   async sendAudio(chunk: AudioChunk): Promise<void> {
-    if (!this.connected || !this.ws) {
-      throw new Error('Not connected to OpenAI Realtime API');
+    if (!this.isConnected()) {
+      console.warn("[OpenAI] Cannot send audio: not connected");
+      return; // Silently return instead of throwing - prevents error spam
     }
 
     try {
       // OpenAI expects PCM16 audio as base64
       let audioData: string;
 
-      if (chunk.format === 'pcm') {
+      if (chunk.format === "pcm") {
         // Convert PCM16 to base64
-        audioData = chunk.data.toString('base64');
+        audioData = chunk.data.toString("base64");
       } else {
         // Would need to convert other formats to PCM16 first
         throw new Error(`Unsupported audio format: ${chunk.format}`);
@@ -189,8 +202,8 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
 
       // Send audio to OpenAI
       this.sendMessage({
-        type: 'input_audio_buffer.append',
-        audio: audioData
+        type: "input_audio_buffer.append",
+        audio: audioData,
       });
 
       // Accumulate audio for potential processing
@@ -198,31 +211,45 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
 
       console.log(`[OpenAI] Sent audio chunk: ${chunk.data.length} bytes`);
     } catch (error) {
-      console.error('[OpenAI] Failed to send audio:', error);
-      this.emit('error', error);
+      console.error("[OpenAI] Failed to send audio:", error);
+      this.emit("error", error);
       throw error;
     }
   }
 
   /**
    * Commit the audio buffer and trigger response
+   * Only commits if there's enough audio data (at least 100ms at 24kHz)
    */
   async commitAudio(): Promise<void> {
-    if (!this.connected || !this.ws) {
+    if (!this.isConnected()) {
+      return;
+    }
+
+    // PCM16 at 24kHz: 24000 samples/sec * 2 bytes/sample = 48000 bytes/sec
+    // 100ms minimum = 4800 bytes
+    const MIN_BUFFER_SIZE = 4800;
+
+    if (this.audioBuffer.length < MIN_BUFFER_SIZE) {
+      console.log(
+        `[OpenAI] Skipping audio commit: buffer too small (${this.audioBuffer.length} bytes, need ${MIN_BUFFER_SIZE})`,
+      );
+      // Clear the small buffer to avoid accumulation issues
+      this.audioBuffer = Buffer.alloc(0);
       return;
     }
 
     try {
       this.sendMessage({
-        type: 'input_audio_buffer.commit'
+        type: "input_audio_buffer.commit",
       });
 
       // Clear the audio buffer after commit
       this.audioBuffer = Buffer.alloc(0);
 
-      console.log('[OpenAI] Audio buffer committed');
+      console.log("[OpenAI] Audio buffer committed");
     } catch (error) {
-      console.error('[OpenAI] Failed to commit audio:', error);
+      console.error("[OpenAI] Failed to commit audio:", error);
     }
   }
 
@@ -236,14 +263,14 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
 
     try {
       this.sendMessage({
-        type: 'response.cancel'
+        type: "response.cancel",
       });
 
-      this.responseInProgress = false;
+      this.responding = false;
       console.log(`[OpenAI] Cancelled response for session: ${this.sessionId}`);
     } catch (error) {
-      console.error('[OpenAI] Failed to cancel response:', error);
-      this.emit('error', error);
+      console.error("[OpenAI] Failed to cancel response:", error);
+      this.emit("error", error);
       throw error;
     }
   }
@@ -265,20 +292,20 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
 
       // Close WebSocket connection
       if (this.ws) {
-        this.ws.close(1000, 'Client disconnect');
+        this.ws.close(1000, "Client disconnect");
         this.ws = null;
       }
 
       this.connected = false;
-      this.isSessionCreated = false;
+      this.sessionCreated = false;
       this.sessionId = null;
       this.messageQueue = [];
       this.audioBuffer = Buffer.alloc(0);
 
-      console.log('[OpenAI] Disconnected session');
+      console.log("[OpenAI] Disconnected session");
     } catch (error) {
-      console.error('[OpenAI] Error during disconnect:', error);
-      this.emit('error', error);
+      console.error("[OpenAI] Error during disconnect:", error);
+      this.emit("error", error);
       throw error;
     }
   }
@@ -288,6 +315,20 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
    */
   isConnected(): boolean {
     return this.connected && this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  /**
+   * Check if session has been created with OpenAI
+   */
+  isSessionCreated(): boolean {
+    return this.sessionCreated;
+  }
+
+  /**
+   * Check if currently generating a response
+   */
+  isResponding(): boolean {
+    return this.responding;
   }
 
   /**
@@ -304,8 +345,8 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
       this.ws.send(JSON.stringify(message));
       console.log(`[OpenAI] Sent message: ${message.type}`);
     } catch (error) {
-      console.error('[OpenAI] Failed to send message:', error);
-      this.emit('error', error);
+      console.error("[OpenAI] Failed to send message:", error);
+      this.emit("error", error);
     }
   }
 
@@ -328,45 +369,47 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
     console.log(`[OpenAI] Received message: ${message.type}`);
 
     switch (message.type) {
-      case 'session.created':
-        this.isSessionCreated = true;
-        console.log('[OpenAI] Session created successfully');
+      case "session.created":
+        this.sessionCreated = true;
+        console.log("[OpenAI] Session created successfully");
         break;
 
-      case 'session.updated':
-        console.log('[OpenAI] Session configuration updated');
+      case "session.updated":
+        console.log("[OpenAI] Session configuration updated");
         break;
 
-      case 'conversation.created':
-        console.log('[OpenAI] Conversation created');
+      case "conversation.created":
+        console.log("[OpenAI] Conversation created");
         break;
 
-      case 'input_audio_buffer.committed':
-        console.log('[OpenAI] Audio buffer committed successfully');
+      case "input_audio_buffer.committed":
+        console.log("[OpenAI] Audio buffer committed successfully");
         break;
 
-      case 'input_audio_buffer.cleared':
-        console.log('[OpenAI] Audio buffer cleared');
+      case "input_audio_buffer.cleared":
+        console.log("[OpenAI] Audio buffer cleared");
         break;
 
-      case 'input_audio_buffer.speech_started':
-        console.log('[OpenAI] Speech detected - started');
-        this.emit('speech_started');
+      case "input_audio_buffer.speech_started":
+        console.log("[OpenAI] Speech detected - started");
+        this.emit("speech_started");
         break;
 
-      case 'input_audio_buffer.speech_stopped':
-        console.log('[OpenAI] Speech detected - stopped');
-        this.emit('speech_stopped');
+      case "input_audio_buffer.speech_stopped":
+        console.log("[OpenAI] Speech detected - stopped");
+        this.emit("speech_stopped");
         // Automatically commit when speech stops (if using server VAD)
         this.commitAudio();
         break;
 
-      case 'conversation.item.created':
-        if (message.item?.role === 'user' && message.item?.content) {
+      case "conversation.item.created":
+        if (message.item?.role === "user" && message.item?.content) {
           // User transcript
-          const transcript = message.item.content.find((c: any) => c.type === 'input_text');
+          const transcript = message.item.content.find(
+            (c: any) => c.type === "input_text",
+          );
           if (transcript?.text) {
-            this.emit('transcript', {
+            this.emit("transcript", {
               text: transcript.text,
               confidence: 1.0,
               isFinal: true,
@@ -376,16 +419,16 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
         }
         break;
 
-      case 'response.created':
-        console.log('[OpenAI] Response started');
-        this.responseInProgress = true;
-        this.emit('response_start');
+      case "response.created":
+        console.log("[OpenAI] Response started");
+        this.responding = true;
+        this.emit("response_start");
         break;
 
-      case 'response.audio_transcript.delta':
+      case "response.audio_transcript.delta":
         // Incremental transcript
         if (message.delta) {
-          this.emit('transcript', {
+          this.emit("transcript", {
             text: message.delta,
             confidence: 1.0,
             isFinal: false,
@@ -394,10 +437,10 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
         }
         break;
 
-      case 'response.audio_transcript.done':
+      case "response.audio_transcript.done":
         // Final transcript
         if (message.transcript) {
-          this.emit('transcript', {
+          this.emit("transcript", {
             text: message.transcript,
             confidence: 1.0,
             isFinal: true,
@@ -406,34 +449,34 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
         }
         break;
 
-      case 'response.audio.delta':
+      case "response.audio.delta":
         // Audio chunk from assistant
         if (message.delta) {
           // OpenAI sends base64 encoded PCM16 audio
-          const audioBuffer = Buffer.from(message.delta, 'base64');
+          const audioBuffer = Buffer.from(message.delta, "base64");
 
-          this.emit('audio', {
+          this.emit("audio", {
             data: audioBuffer,
-            format: 'pcm',
+            format: "pcm",
             sampleRate: 24000, // OpenAI uses 24kHz for PCM16
           } as AudioChunk);
         }
         break;
 
-      case 'response.audio.done':
-        console.log('[OpenAI] Audio response complete');
+      case "response.audio.done":
+        console.log("[OpenAI] Audio response complete");
         break;
 
-      case 'response.done':
-        console.log('[OpenAI] Response complete');
-        this.responseInProgress = false;
-        this.emit('response_end');
+      case "response.done":
+        console.log("[OpenAI] Response complete");
+        this.responding = false;
+        this.emit("response_end");
         break;
 
-      case 'conversation.item.input_audio_transcription.completed':
+      case "conversation.item.input_audio_transcription.completed":
         // User's audio transcription completed
         if (message.transcript) {
-          this.emit('user_transcript', {
+          this.emit("user_transcript", {
             text: message.transcript,
             confidence: 1.0,
             isFinal: true,
@@ -442,17 +485,20 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
         }
         break;
 
-      case 'conversation.item.input_audio_transcription.failed':
-        console.error('[OpenAI] Transcription failed:', message.error);
+      case "conversation.item.input_audio_transcription.failed":
+        console.error("[OpenAI] Transcription failed:", message.error);
         break;
 
-      case 'rate_limits.updated':
-        console.log('[OpenAI] Rate limits updated:', message.rate_limits);
+      case "rate_limits.updated":
+        console.log("[OpenAI] Rate limits updated:", message.rate_limits);
         break;
 
-      case 'error':
-        console.error('[OpenAI] Error from API:', message.error);
-        this.emit('error', new Error(message.error?.message || 'Unknown error from OpenAI'));
+      case "error":
+        console.error("[OpenAI] Error from API:", message.error);
+        this.emit(
+          "error",
+          new Error(message.error?.message || "Unknown error from OpenAI"),
+        );
         break;
 
       default:
@@ -467,12 +513,14 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
 
-    console.log(`[OpenAI] Attempting reconnection (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${delay}ms...`);
+    console.log(
+      `[OpenAI] Attempting reconnection (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${delay}ms...`,
+    );
 
     setTimeout(() => {
       if (this.sessionId) {
         this.connect(this.sessionId).catch((error) => {
-          console.error('[OpenAI] Reconnection failed:', error);
+          console.error("[OpenAI] Reconnection failed:", error);
         });
       }
     }, delay);
@@ -487,9 +535,9 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
     this.pingInterval = setInterval(() => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         // Connection is healthy
-        console.log('[OpenAI] Connection health check: OK');
+        console.log("[OpenAI] Connection health check: OK");
       } else {
-        console.warn('[OpenAI] Connection health check: Not connected');
+        console.warn("[OpenAI] Connection health check: Not connected");
         if (this.pingInterval) {
           clearInterval(this.pingInterval);
           this.pingInterval = null;
@@ -501,35 +549,38 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
   /**
    * Create a response programmatically
    */
-  async createResponse(text?: string, generateAudio: boolean = true): Promise<void> {
+  async createResponse(
+    text?: string,
+    generateAudio: boolean = true,
+  ): Promise<void> {
     if (!this.connected || !this.ws) {
-      throw new Error('Not connected to OpenAI Realtime API');
+      throw new Error("Not connected to OpenAI Realtime API");
     }
 
     try {
       if (text) {
         // Create response with specific text
         this.sendMessage({
-          type: 'response.create',
+          type: "response.create",
           response: {
             modalities: generateAudio ? ["text", "audio"] : ["text"],
-            instructions: text
-          }
+            instructions: text,
+          },
         });
       } else {
         // Create response based on current conversation context
         this.sendMessage({
-          type: 'response.create',
+          type: "response.create",
           response: {
-            modalities: ["text", "audio"]
-          }
+            modalities: ["text", "audio"],
+          },
         });
       }
 
-      console.log('[OpenAI] Response creation requested');
+      console.log("[OpenAI] Response creation requested");
     } catch (error) {
-      console.error('[OpenAI] Failed to create response:', error);
-      this.emit('error', error);
+      console.error("[OpenAI] Failed to create response:", error);
+      this.emit("error", error);
       throw error;
     }
   }

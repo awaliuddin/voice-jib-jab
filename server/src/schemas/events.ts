@@ -3,13 +3,13 @@
  */
 
 export type EventSource =
-  | 'client'
-  | 'orchestrator'
-  | 'laneA'
-  | 'laneB'
-  | 'laneC'
-  | 'provider'
-  | 'retriever';
+  | "client"
+  | "orchestrator"
+  | "laneA"
+  | "laneB"
+  | "laneC"
+  | "provider"
+  | "retriever";
 
 export interface BaseEvent {
   event_id: string;
@@ -29,12 +29,17 @@ export interface TranscriptDeltaPayload {
 }
 
 export interface TranscriptEvent extends BaseEvent {
-  type: 'transcript.delta' | 'transcript.final';
+  type: "transcript.delta" | "transcript.final";
   payload: TranscriptDeltaPayload;
 }
 
 // Policy Events
-export type PolicyDecision = 'allow' | 'rewrite' | 'refuse' | 'escalate' | 'cancel_output';
+export type PolicyDecision =
+  | "allow"
+  | "rewrite"
+  | "refuse"
+  | "escalate"
+  | "cancel_output";
 
 export interface PolicyDecisionPayload {
   decision: PolicyDecision;
@@ -45,18 +50,18 @@ export interface PolicyDecisionPayload {
 }
 
 export interface PolicyEvent extends BaseEvent {
-  type: 'policy.decision';
-  source: 'laneC';
+  type: "policy.decision";
+  source: "laneC";
   payload: PolicyDecisionPayload;
 }
 
 // Lane Arbitration Events
-export type Lane = 'none' | 'A' | 'B' | 'fallback';
+export type Lane = "none" | "A" | "B" | "fallback";
 export type LaneTransitionCause =
-  | 'b_first_audio_ready'
-  | 'policy_cancel'
-  | 'user_barge_in'
-  | 'response_done';
+  | "b_first_audio_ready"
+  | "policy_cancel"
+  | "user_barge_in"
+  | "response_done";
 
 export interface LaneOwnerChangePayload {
   from: Lane;
@@ -65,22 +70,25 @@ export interface LaneOwnerChangePayload {
 }
 
 export interface LaneEvent extends BaseEvent {
-  type: 'lane.owner_changed';
-  source: 'orchestrator';
+  type: "lane.owner_changed";
+  source: "orchestrator";
   payload: LaneOwnerChangePayload;
 }
 
 // Audio Events
 export interface AudioChunkPayload {
-  chunk: Buffer;
-  format: 'pcm' | 'opus';
-  sample_rate: number;
-  lane: Lane;
+  chunk?: Buffer;
+  data?: Buffer;
+  format?: "pcm" | "opus";
+  sample_rate?: number;
+  sampleRate?: number;
+  lane?: Lane;
+  size?: number;
 }
 
 export interface AudioEvent extends BaseEvent {
-  type: 'audio.chunk' | 'audio.start' | 'audio.end';
-  payload: AudioChunkPayload | { lane: Lane };
+  type: "audio.chunk" | "audio.start" | "audio.end";
+  payload: AudioChunkPayload | { lane?: Lane };
 }
 
 // Tool Events
@@ -97,7 +105,7 @@ export interface ToolResultPayload {
 }
 
 export interface ToolEvent extends BaseEvent {
-  type: 'tool.call' | 'tool.result';
+  type: "tool.call" | "tool.result";
   payload: ToolCallPayload | ToolResultPayload;
 }
 
@@ -119,15 +127,34 @@ export interface RAGResultPayload {
 }
 
 export interface RAGEvent extends BaseEvent {
-  type: 'rag.query' | 'rag.result';
-  source: 'laneB' | 'retriever';
+  type: "rag.query" | "rag.result";
+  source: "laneB" | "retriever";
   payload: RAGQueryPayload | RAGResultPayload;
 }
 
 // Session Events
 export interface SessionEvent extends BaseEvent {
-  type: 'session.start' | 'session.end' | 'session.error';
-  source: 'orchestrator';
+  type: "session.start" | "session.end" | "session.error";
+  source: "orchestrator";
+  payload: Record<string, unknown>;
+}
+
+// User Events (barge-in, transcripts from speech recognition)
+export interface UserTranscriptPayload {
+  text: string;
+  confidence: number;
+  isFinal: boolean;
+  timestamp: number;
+}
+
+export interface UserTranscriptEvent extends BaseEvent {
+  type: "transcript" | "user_transcript";
+  payload: UserTranscriptPayload;
+}
+
+export interface UserBargeInEvent extends BaseEvent {
+  type: "user.barge_in";
+  source: "client";
   payload: Record<string, unknown>;
 }
 
@@ -139,4 +166,6 @@ export type Event =
   | AudioEvent
   | ToolEvent
   | RAGEvent
-  | SessionEvent;
+  | SessionEvent
+  | UserTranscriptEvent
+  | UserBargeInEvent;

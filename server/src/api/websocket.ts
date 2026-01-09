@@ -2,13 +2,13 @@
  * WebSocket server for real-time voice communication
  */
 
-import { WebSocketServer, WebSocket } from 'ws';
-import { v4 as uuidv4 } from 'uuid';
-import { sessionManager } from '../orchestrator/SessionManager.js';
-import { eventBus } from '../orchestrator/EventBus.js';
-import { OpenAIRealtimeAdapter } from '../providers/OpenAIRealtimeAdapter.js';
-import { config } from '../config/index.js';
-import { Event } from '../schemas/events.js';
+import { WebSocketServer, WebSocket } from "ws";
+import { v4 as uuidv4 } from "uuid";
+import { sessionManager } from "../orchestrator/SessionManager.js";
+import { eventBus } from "../orchestrator/EventBus.js";
+import { OpenAIRealtimeAdapter } from "../providers/OpenAIRealtimeAdapter.js";
+import { config } from "../config/index.js";
+import { Event } from "../schemas/events.js";
 
 interface ClientConnection {
   ws: WebSocket;
@@ -24,12 +24,12 @@ export class VoiceWebSocketServer {
     this.wss = new WebSocketServer({ server });
     this.connections = new Map();
 
-    this.wss.on('connection', this.handleConnection.bind(this));
-    console.log('[WebSocket] Server initialized');
+    this.wss.on("connection", this.handleConnection.bind(this));
+    console.log("[WebSocket] Server initialized");
   }
 
   private async handleConnection(ws: WebSocket): Promise<void> {
-    console.log('[WebSocket] New client connected');
+    console.log("[WebSocket] New client connected");
 
     // Create session
     const session = sessionManager.createSession({
@@ -54,13 +54,13 @@ export class VoiceWebSocketServer {
     this.setupProviderHandlers(connection);
 
     // Setup WebSocket handlers
-    ws.on('message', (data) => this.handleMessage(connection, data));
-    ws.on('close', () => this.handleClose(connection));
-    ws.on('error', (error) => this.handleError(connection, error));
+    ws.on("message", (data) => this.handleMessage(connection, data));
+    ws.on("close", () => this.handleClose(connection));
+    ws.on("error", (error) => this.handleError(connection, error));
 
     // Send session ready
     this.sendToClient(ws, {
-      type: 'session.ready',
+      type: "session.ready",
       sessionId: session.id,
       timestamp: Date.now(),
     });
@@ -70,21 +70,21 @@ export class VoiceWebSocketServer {
     const { ws, sessionId, providerAdapter } = connection;
 
     // Forward audio from provider to client
-    providerAdapter.on('audio', (chunk) => {
+    providerAdapter.on("audio", (chunk) => {
       const event: Event = {
         event_id: uuidv4(),
         session_id: sessionId,
         t_ms: Date.now(),
-        source: 'provider',
-        type: 'audio.chunk',
+        source: "provider",
+        type: "audio.chunk",
         payload: chunk,
       };
 
       eventBus.emit(event);
 
       this.sendToClient(ws, {
-        type: 'audio.chunk',
-        data: chunk.data.toString('base64'),
+        type: "audio.chunk",
+        data: chunk.data.toString("base64"),
         format: chunk.format,
         sampleRate: chunk.sampleRate,
         timestamp: Date.now(),
@@ -92,9 +92,9 @@ export class VoiceWebSocketServer {
     });
 
     // Handle transcripts
-    providerAdapter.on('transcript', (segment) => {
+    providerAdapter.on("transcript", (segment) => {
       this.sendToClient(ws, {
-        type: 'transcript',
+        type: "transcript",
         text: segment.text,
         confidence: segment.confidence,
         isFinal: segment.isFinal,
@@ -105,17 +105,17 @@ export class VoiceWebSocketServer {
         event_id: uuidv4(),
         session_id: sessionId,
         t_ms: Date.now(),
-        source: 'provider',
-        type: 'transcript',
+        source: "provider",
+        type: "transcript",
         payload: segment,
       };
       eventBus.emit(event);
     });
 
     // Handle user transcripts (from speech recognition)
-    providerAdapter.on('user_transcript', (segment) => {
+    providerAdapter.on("user_transcript", (segment) => {
       this.sendToClient(ws, {
-        type: 'user_transcript',
+        type: "user_transcript",
         text: segment.text,
         confidence: segment.confidence,
         isFinal: segment.isFinal,
@@ -126,43 +126,43 @@ export class VoiceWebSocketServer {
         event_id: uuidv4(),
         session_id: sessionId,
         t_ms: Date.now(),
-        source: 'client',
-        type: 'user_transcript',
+        source: "client",
+        type: "user_transcript",
         payload: segment,
       };
       eventBus.emit(event);
     });
 
     // Handle speech detection events
-    providerAdapter.on('speech_started', () => {
+    providerAdapter.on("speech_started", () => {
       this.sendToClient(ws, {
-        type: 'speech.started',
+        type: "speech.started",
         timestamp: Date.now(),
       });
     });
 
-    providerAdapter.on('speech_stopped', () => {
+    providerAdapter.on("speech_stopped", () => {
       this.sendToClient(ws, {
-        type: 'speech.stopped',
+        type: "speech.stopped",
         timestamp: Date.now(),
       });
     });
 
     // Handle response start/end
-    providerAdapter.on('response_start', () => {
-      sessionManager.updateSessionState(sessionId, 'responding');
+    providerAdapter.on("response_start", () => {
+      sessionManager.updateSessionState(sessionId, "responding");
 
       this.sendToClient(ws, {
-        type: 'response.start',
+        type: "response.start",
         timestamp: Date.now(),
       });
     });
 
-    providerAdapter.on('response_end', () => {
-      sessionManager.updateSessionState(sessionId, 'listening');
+    providerAdapter.on("response_end", () => {
+      sessionManager.updateSessionState(sessionId, "listening");
 
       this.sendToClient(ws, {
-        type: 'response.end',
+        type: "response.end",
         timestamp: Date.now(),
       });
 
@@ -170,19 +170,19 @@ export class VoiceWebSocketServer {
         event_id: uuidv4(),
         session_id: sessionId,
         t_ms: Date.now(),
-        source: 'provider',
-        type: 'audio.end',
+        source: "provider",
+        type: "audio.end",
         payload: {},
       };
       eventBus.emit(event);
     });
 
     // Handle errors
-    providerAdapter.on('error', (error) => {
+    providerAdapter.on("error", (error) => {
       console.error(`[Provider] Error in session ${sessionId}:`, error);
 
       this.sendToClient(ws, {
-        type: 'error',
+        type: "error",
         error: error.message,
         timestamp: Date.now(),
       });
@@ -191,7 +191,7 @@ export class VoiceWebSocketServer {
 
   private async handleMessage(
     connection: ClientConnection,
-    data: Buffer | ArrayBuffer | Buffer[]
+    data: Buffer | ArrayBuffer | Buffer[],
   ): Promise<void> {
     const { ws, sessionId, providerAdapter } = connection;
 
@@ -199,16 +199,31 @@ export class VoiceWebSocketServer {
       const message = JSON.parse(data.toString());
 
       switch (message.type) {
-        case 'session.start':
+        case "session.start":
           await providerAdapter.connect(sessionId);
-          sessionManager.updateSessionState(sessionId, 'listening');
+          sessionManager.updateSessionState(sessionId, "listening");
+          // Notify client that OpenAI connection is ready
+          this.sendToClient(ws, {
+            type: "provider.ready",
+            timestamp: Date.now(),
+          });
           break;
 
-        case 'audio.chunk':
+        case "audio.chunk":
+          // Only forward audio if provider is connected
+          if (!providerAdapter.isConnected()) {
+            // Silently drop audio chunks while not connected
+            // This prevents error spam during connection setup
+            console.log(
+              "[WebSocket] Dropping audio chunk: provider not connected",
+            );
+            return;
+          }
+
           // Forward audio to provider
           await providerAdapter.sendAudio({
-            data: Buffer.from(message.data, 'base64'),
-            format: message.format || 'pcm',
+            data: Buffer.from(message.data, "base64"),
+            format: message.format || "pcm",
             sampleRate: message.sampleRate || 24000,
           });
 
@@ -217,8 +232,8 @@ export class VoiceWebSocketServer {
             event_id: uuidv4(),
             session_id: sessionId,
             t_ms: Date.now(),
-            source: 'client',
-            type: 'audio.chunk',
+            source: "client",
+            type: "audio.chunk",
             payload: { size: message.data.length },
           };
           eventBus.emit(audioEvent);
@@ -226,7 +241,7 @@ export class VoiceWebSocketServer {
           sessionManager.touchSession(sessionId);
           break;
 
-        case 'user.barge_in':
+        case "user.barge_in":
           // Cancel current response
           await providerAdapter.cancel();
 
@@ -234,18 +249,18 @@ export class VoiceWebSocketServer {
             event_id: uuidv4(),
             session_id: sessionId,
             t_ms: Date.now(),
-            source: 'client',
-            type: 'user.barge_in',
+            source: "client",
+            type: "user.barge_in",
             payload: {},
           };
           eventBus.emit(bargeInEvent);
 
-          sessionManager.updateSessionState(sessionId, 'listening');
+          sessionManager.updateSessionState(sessionId, "listening");
           break;
 
-        case 'session.end':
+        case "session.end":
           await providerAdapter.disconnect();
-          sessionManager.endSession(sessionId, 'user_ended');
+          sessionManager.endSession(sessionId, "user_ended");
           ws.close();
           break;
 
@@ -255,8 +270,8 @@ export class VoiceWebSocketServer {
     } catch (error) {
       console.error(`[WebSocket] Error handling message:`, error);
       this.sendToClient(ws, {
-        type: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        type: "error",
+        error: error instanceof Error ? error.message : "Unknown error",
         timestamp: Date.now(),
       });
     }
@@ -268,19 +283,22 @@ export class VoiceWebSocketServer {
     console.log(`[WebSocket] Client disconnected: ${sessionId}`);
 
     providerAdapter.disconnect().catch(console.error);
-    sessionManager.endSession(sessionId, 'connection_closed');
+    sessionManager.endSession(sessionId, "connection_closed");
     this.connections.delete(ws);
   }
 
   private handleError(connection: ClientConnection, error: Error): void {
-    console.error(`[WebSocket] Error in session ${connection.sessionId}:`, error);
+    console.error(
+      `[WebSocket] Error in session ${connection.sessionId}:`,
+      error,
+    );
 
     const event: Event = {
       event_id: uuidv4(),
       session_id: connection.sessionId,
       t_ms: Date.now(),
-      source: 'orchestrator',
-      type: 'session.error',
+      source: "orchestrator",
+      type: "session.error",
       payload: { error: error.message },
     };
     eventBus.emit(event);

@@ -3,11 +3,17 @@
  * Coordinates audio capture, playback, and server communication
  */
 
-import { MicrophoneCapture } from '../audio/MicrophoneCapture';
-import { AudioPlayback } from '../audio/AudioPlayback';
-import { WebSocketClient } from '../events/WebSocketClient';
+import { MicrophoneCapture } from "../audio/MicrophoneCapture";
+import { AudioPlayback } from "../audio/AudioPlayback";
+import { WebSocketClient } from "../events/WebSocketClient";
 
-export type SessionState = 'idle' | 'initializing' | 'connected' | 'talking' | 'listening' | 'error';
+export type SessionState =
+  | "idle"
+  | "initializing"
+  | "connected"
+  | "talking"
+  | "listening"
+  | "error";
 
 export interface LatencyMetrics {
   ttfb: number | null;
@@ -19,7 +25,7 @@ export class SessionManager {
   private wsClient: WebSocketClient;
   private micCapture: MicrophoneCapture;
   private audioPlayback: AudioPlayback;
-  private state: SessionState = 'idle';
+  private state: SessionState = "idle";
   private sessionId: string | null = null;
   private metrics: LatencyMetrics = {
     ttfb: null,
@@ -38,7 +44,7 @@ export class SessionManager {
   }
 
   async initialize(): Promise<void> {
-    this.setState('initializing');
+    this.setState("initializing");
 
     try {
       // Initialize components
@@ -53,29 +59,41 @@ export class SessionManager {
 
       // Setup audio playback callback
       this.audioPlayback.setOnPlaybackEnd(() => {
-        if (this.state === 'listening') {
-          this.setState('connected');
+        if (this.state === "listening") {
+          this.setState("connected");
         }
       });
 
-      this.setState('connected');
-      console.log('[SessionManager] Initialized successfully');
+      this.setState("connected");
+      console.log("[SessionManager] Initialized successfully");
     } catch (error) {
-      console.error('[SessionManager] Initialization failed:', error);
-      this.setState('error');
+      console.error("[SessionManager] Initialization failed:", error);
+      this.setState("error");
       throw error;
     }
   }
 
   private setupWebSocketHandlers(): void {
     // Session ready
-    this.wsClient.on('session.ready', (message) => {
+    this.wsClient.on("session.ready", (message) => {
       this.sessionId = message.sessionId;
       console.log(`[SessionManager] Session ready: ${this.sessionId}`);
     });
 
+    // Provider (OpenAI) connected
+    this.wsClient.on("provider.ready", () => {
+      console.log("[SessionManager] Provider connection ready");
+      // OpenAI is now ready to receive audio
+    });
+
+    // Response started - AI is about to speak
+    this.wsClient.on("response.start", () => {
+      console.log("[SessionManager] AI response starting");
+      this.setState("listening");
+    });
+
     // Audio chunk from server
-    this.wsClient.on('audio.chunk', async (message) => {
+    this.wsClient.on("audio.chunk", async (message) => {
       // Record TTFB if this is first chunk
       if (this.firstAudioChunkTime === 0) {
         this.firstAudioChunkTime = Date.now();
@@ -87,73 +105,102 @@ export class SessionManager {
 
       try {
         const pcm16Data = Uint8Array.from(atob(message.data), (c) =>
-          c.charCodeAt(0)
+          c.charCodeAt(0),
         ).buffer;
         await this.audioPlayback.enqueueAudio(pcm16Data);
 
-        if (this.state !== 'listening') {
-          this.setState('listening');
+        if (this.state !== "listening") {
+          this.setState("listening");
         }
       } catch (error) {
-        console.error('[SessionManager] Error playing audio:', error);
+        console.error("[SessionManager] Error playing audio:", error);
       }
     });
 
     // Response end
-    this.wsClient.on('response.end', () => {
-      console.log('[SessionManager] Response ended');
+    this.wsClient.on("response.end", () => {
+      console.log("[SessionManager] Response ended");
       this.firstAudioChunkTime = 0;
 
-      if (this.state === 'listening') {
-        this.setState('connected');
+      // Transition to connected when response ends
+      // This allows the user to start talking again
+      if (this.state === "listening" || this.state === "talking") {
+        this.setState("connected");
       }
     });
 
-    // Error
-    this.wsClient.on('error', (message) => {
-      console.error('[SessionManager] Server error:', message.error);
-      this.setState('error');
+    // Error - handle based on error type
+    this.wsClient.on("error", (message) => {
+      console.error("[SessionManager] Server error:", message.error);
+
+      // Only transition to error state for fatal/connection errors
+      // Recoverable errors like "buffer too small" or temporary OpenAI issues
+      // should not disable the entire UI
+      const fatalErrors = [
+        "connection failed",
+        "authentication failed",
+        "invalid api key",
+        "websocket error",
+      ];
+
+      const errorLower = (message.error || "").toLowerCase();
+      const isFatalError = fatalErrors.some((fatal) =>
+        errorLower.includes(fatal),
+      );
+
+      if (isFatalError) {
+        this.setState("error");
+      } else {
+        // For non-fatal errors, log but don't change state
+        console.warn("[SessionManager] Non-fatal error, continuing...");
+      }
+    });
+
+    // Handle connection failure event from WebSocketClient
+    this.wsClient.on("connection.failed", () => {
+      console.error("[SessionManager] Connection failed after max retries");
+      this.setState("error");
     });
   }
 
   startTalking(): void {
-    if (this.state !== 'connected') {
-      console.warn('[SessionManager] Cannot start talking, not connected');
+    if (this.state !== "connected") {
+      console.warn("[SessionManager] Cannot start talking, not connected");
       return;
     }
 
     // Send session start
-    this.wsClient.send({ type: 'session.start' });
+    this.wsClient.send({ type: "session.start" });
 
     // Start capturing microphone
     this.micCapture.start((audioChunk) => {
       const pcm16Buffer = MicrophoneCapture.float32ToPCM16(audioChunk);
       const base64Data = btoa(
-        String.fromCharCode(...new Uint8Array(pcm16Buffer))
+        String.fromCharCode(...new Uint8Array(pcm16Buffer)),
       );
 
       this.wsClient.send({
-        type: 'audio.chunk',
+        type: "audio.chunk",
         data: base64Data,
-        format: 'pcm',
+        format: "pcm",
         sampleRate: 24000,
       });
     });
 
-    this.setState('talking');
-    console.log('[SessionManager] Started talking');
+    this.setState("talking");
+    console.log("[SessionManager] Started talking");
   }
 
   stopTalking(): void {
-    if (this.state !== 'talking') {
+    if (this.state !== "talking") {
       return;
     }
 
     this.micCapture.stop();
     this.lastUserSpeechEnd = Date.now();
-    this.setState('connected');
+    this.setState("connected");
 
-    console.log('[SessionManager] Stopped talking');
+    console.log("[SessionManager] Stopped talking");
   }
 
   /**
@@ -174,30 +221,31 @@ export class SessionManager {
     this.notifyMetricsUpdate();
 
     // Notify server
-    this.wsClient.send({ type: 'user.barge_in' });
+    this.wsClient.send({ type: "user.barge_in" });
 
     console.log(`[SessionManager] Barge-in stop time: ${bargeInStop}ms`);
 
-    // Restart talking
-    if (this.state === 'listening') {
+    // Transition to connected state first, then start talking
+    if (this.state === "listening") {
+      this.setState("connected");
       this.startTalking();
     }
   }
 
   disconnect(): void {
-    if (this.state === 'idle') {
+    if (this.state === "idle") {
       return;
     }
 
-    this.wsClient.send({ type: 'session.end' });
+    this.wsClient.send({ type: "session.end" });
     this.wsClient.disconnect();
     this.micCapture.cleanup();
     this.audioPlayback.cleanup();
 
-    this.setState('idle');
+    this.setState("idle");
     this.sessionId = null;
 
-    console.log('[SessionManager] Disconnected');
+    console.log("[SessionManager] Disconnected");
   }
 
   private setState(newState: SessionState): void {
