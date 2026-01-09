@@ -47,22 +47,28 @@
       "rag-integration"
     ],
     "features": {
-      "completed": [],
-      "in_progress": [
+      "completed": [
         {
           "id": "feat-init",
           "name": "NXTG-Forge Initialization",
-          "status": "in_progress",
-          "started_at": "2026-01-08T23:52:00Z"
+          "status": "completed",
+          "started_at": "2026-01-08T23:52:00Z",
+          "completed_at": "2026-01-08T23:59:00Z",
+          "description": "Initialized project with NXTG-Forge infrastructure"
         }
       ],
-      "planned": [
+      "in_progress": [
         {
           "id": "feat-001",
           "name": "Voice Loop MVP",
           "priority": "critical",
-          "description": "Browser mic → WebSocket → OpenAI Realtime → Audio playback"
-        },
+          "status": "in_progress",
+          "started_at": "2026-01-09T00:05:00Z",
+          "assigned_agents": ["forge-planner", "forge-builder"],
+          "spec_file": ".claude/features/feat-001-voice-loop-mvp-spec.md"
+        }
+      ],
+      "planned": [
         {
           "id": "feat-002",
           "name": "Lane Arbitration",
@@ -121,11 +127,20 @@
       "last_run": null
     }
   },
-  "checkpoints": [],
+  "checkpoints": [
+    {
+      "id": "cp-init",
+      "timestamp": "2026-01-08T23:59:00Z",
+      "description": "Initial NXTG-Forge setup for Voice Jib-Jab",
+      "file": ".claude/checkpoints/cp-init.json",
+      "git_commit": "e6fec71"
+    }
+  ],
   "last_session": {
     "id": "init-001",
     "started": "2026-01-08T23:52:00Z",
+    "completed": "2026-01-08T23:59:00Z",
     "task": "Initialize NXTG-Forge",
-    "status": "in_progress"
+    "status": "completed"
   }
 }
