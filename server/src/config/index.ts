@@ -4,9 +4,37 @@
 
 import { config as loadEnv } from 'dotenv';
 import { resolve } from 'path';
+import { existsSync } from 'fs';
 
-// Load .env file
-loadEnv({ path: resolve(process.cwd(), '.env') });
+// Determine the project root directory
+// When running from server/ directory, we need to look in parent directory
+const currentDir = process.cwd();
+const parentDir = resolve(currentDir, '..');
+
+// Try multiple locations for .env file
+const envPaths = [
+  resolve(parentDir, '.env'),  // Project root (most common)
+  resolve(currentDir, '.env'), // Current directory (fallback)
+];
+
+// Find and load the first existing .env file
+let envLoaded = false;
+for (const envPath of envPaths) {
+  if (existsSync(envPath)) {
+    const result = loadEnv({ path: envPath });
+    if (!result.error) {
+      console.log(`✓ Loaded environment variables from: ${envPath}`);
+      envLoaded = true;
+      break;
+    }
+  }
+}
+
+if (!envLoaded) {
+  console.warn('⚠ No .env file found in expected locations:');
+  envPaths.forEach(p => console.warn(`  - ${p}`));
+  console.warn('Continuing with environment variables from shell/system...');
+}
 
 export interface ServerConfig {
   port: number;
