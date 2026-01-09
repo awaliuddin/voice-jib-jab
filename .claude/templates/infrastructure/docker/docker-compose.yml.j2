@@ -1,0 +1,55 @@
+# {{ project_name }} - Docker Compose
+
+version: '3.8'
+
+services:
+  # Backend API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://{{ database_user | default('user') }}:{{ database_password | default('password') }}@db:5432/{{ database_name | default('app_db') }}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./src:/app/src
+    restart: unless-stopped
+
+{% if database == 'postgresql' %}
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER={{ database_user | default('user') }}
+      - POSTGRES_PASSWORD={{ database_password | default('password') }}
+      - POSTGRES_DB={{ database_name | default('app_db') }}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+{% endif %}
+
+{% if cache == 'redis' %}
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+{% endif %}
+
+volumes:
+{% if database == 'postgresql' %}
+  postgres_data:
+{% endif %}
+{% if cache == 'redis' %}
+  redis_data:
+{% endif %}

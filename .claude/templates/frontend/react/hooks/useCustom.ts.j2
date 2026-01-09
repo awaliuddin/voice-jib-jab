@@ -1,0 +1,39 @@
+import { useState, useEffect } from 'react'
+
+/**
+ * use{{ hook_name | default('Custom') | pascal_case }} Hook
+ *
+ * {{ hook_description | default('A custom React hook') }}
+ */
+export function use{{ hook_name | default('Custom') | pascal_case }}() {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState<boolean>(false)
+  const [error, setError] = useState<Error | null>(null)
+
+  useEffect(() => {
+    // Add your custom logic here
+    setLoading(true)
+
+    // Simulate async operation
+    setTimeout(() => {
+      setData({ message: 'Hook initialized' })
+      setLoading(false)
+    }, 1000)
+  }, [])
+
+  const refetch = () => {
+    setLoading(true)
+    // Refetch logic
+    setTimeout(() => {
+      setData({ message: 'Data refetched' })
+      setLoading(false)
+    }, 1000)
+  }
+
+  return {
+    data,
+    loading,
+    error,
+    refetch
+  }
+}

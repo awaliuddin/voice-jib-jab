@@ -1,0 +1,29 @@
+{
+  "version": "3.0.0",
+  "theme": "dark",
+  "editor": {
+    "tab_size": 2,
+    "insert_spaces": true,
+    "auto_save": true,
+    "format_on_save": false
+  },
+  "terminal": {
+    "font_size": 14,
+    "cursor_blink": true
+  },
+  "notifications": {
+    "enabled": true,
+    "sound": false,
+    "desktop": true
+  },
+  "ai": {
+    "auto_suggestions": true,
+    "inline_completions": false,
+    "code_review_on_save": false
+  },
+  "workspace": {
+    "auto_open_files": [],
+    "sidebar_visible": true,
+    "panel_visible": true
+  }
+}

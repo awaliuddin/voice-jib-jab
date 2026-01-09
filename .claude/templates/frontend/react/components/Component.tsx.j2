@@ -1,0 +1,33 @@
+import { FC } from 'react'
+
+interface {{ component_name | default('Example') | pascal_case }}Props {
+  title?: string
+  description?: string
+  onAction?: () => void
+}
+
+/**
+ * {{ component_name | default('Example') }} Component
+ *
+ * {{ component_description | default('A reusable component') }}
+ */
+export const {{ component_name | default('Example') | pascal_case }}: FC<{{ component_name | default('Example') | pascal_case }}Props> = ({
+  title = 'Default Title',
+  description,
+  onAction
+}) => {
+  return (
+    <div className="{{ component_name | default('example') | kebab_case }}">
+      <h2>{title}</h2>
+      {description && <p>{description}</p>}
+
+      {onAction && (
+        <button onClick={onAction}>
+          Click Me
+        </button>
+      )}
+    </div>
+  )
+}
+
+export default {{ component_name | default('Example') | pascal_case }}

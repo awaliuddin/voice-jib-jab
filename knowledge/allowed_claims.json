@@ -1,0 +1,37 @@
+{
+  "allowed_claims": [
+    {
+      "id": "CLAIM-001",
+      "claim": "Voice Jib-Jab uses lane-based orchestration",
+      "category": "architecture",
+      "evidence_ids": ["NXTG-002"],
+      "approved_by": "architecture-team",
+      "approved_date": "2026-01-08"
+    },
+    {
+      "id": "CLAIM-002",
+      "claim": "The system targets sub-400ms response times",
+      "category": "performance",
+      "evidence_ids": ["NXTG-004"],
+      "disclaimer_ids": ["DISC-002"],
+      "approved_by": "product-team",
+      "approved_date": "2026-01-08"
+    },
+    {
+      "id": "CLAIM-003",
+      "claim": "Voice Jib-Jab works in any modern web browser",
+      "category": "compatibility",
+      "evidence_ids": ["NXTG-003"],
+      "approved_by": "product-team",
+      "approved_date": "2026-01-08"
+    }
+  ],
+  "disallowed_patterns": [
+    "guaranteed",
+    "100% accurate",
+    "never fails",
+    "certified medical",
+    "certified legal",
+    "financial advice"
+  ]
+}

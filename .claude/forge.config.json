@@ -1,0 +1,143 @@
+{
+  "forge": {
+    "version": "3.0.0",
+    "name": "NXTG-Forge",
+    "description": "Professional development framework with intelligent agents"
+  },
+  "project": {
+    "type": "auto-detect",
+    "root": ".",
+    "src_dir": "src",
+    "test_dir": "tests",
+    "docs_dir": "docs"
+  },
+  "agents": {
+    "enabled": true,
+    "auto_assign": true,
+    "available": [
+      "lead-architect",
+      "backend-master",
+      "cli-artisan",
+      "platform-builder",
+      "integration-specialist",
+      "qa-sentinel"
+    ],
+    "default_agent": "lead-architect",
+    "collaboration_enabled": true
+  },
+  "workflows": {
+    "enabled": true,
+    "default_workflow": "feature-pipeline",
+    "workflows": {
+      "feature": "feature-pipeline.sh",
+      "deploy": "deploy-pipeline.sh",
+      "review": "code-review.sh",
+      "tdd": "tdd-cycle.sh",
+      "refactor": "refactor-bot.sh"
+    }
+  },
+  "checkpoints": {
+    "enabled": true,
+    "auto_checkpoint": true,
+    "retention": {
+      "max_count": 50,
+      "max_age_days": 90,
+      "keep_named": true,
+      "keep_releases": true,
+      "compression": true
+    },
+    "triggers": {
+      "feature_complete": true,
+      "before_deploy": true,
+      "every_n_commits": 10,
+      "every_n_hours": 24
+    }
+  },
+  "testing": {
+    "framework": "auto-detect",
+    "coverage_threshold": 80,
+    "run_on_save": false,
+    "run_on_commit": true,
+    "parallel": true
+  },
+  "quality": {
+    "linting": {
+      "enabled": true,
+      "auto_fix": false,
+      "fail_on_error": true
+    },
+    "formatting": {
+      "enabled": true,
+      "auto_format": false
+    },
+    "complexity": {
+      "max_complexity": 10,
+      "warn_threshold": 7
+    },
+    "security": {
+      "scan_dependencies": true,
+      "scan_code": true,
+      "fail_on_high": true
+    }
+  },
+  "documentation": {
+    "auto_generate": false,
+    "formats": ["markdown", "html"],
+    "include_examples": true
+  },
+  "integrations": {
+    "github": {
+      "enabled": false,
+      "auto_create_pr": false,
+      "auto_assign_reviewers": false
+    },
+    "slack": {
+      "enabled": false,
+      "notify_on_deploy": false,
+      "notify_on_failure": false
+    },
+    "monitoring": {
+      "enabled": false,
+      "provider": "sentry"
+    }
+  },
+  "hooks": {
+    "enabled": true,
+    "pre_task": true,
+    "post_task": true,
+    "on_error": true,
+    "on_file_change": true,
+    "state_sync": true
+  },
+  "state_management": {
+    "enabled": true,
+    "sync_interval": 300,
+    "backup_enabled": true,
+    "version_history": true
+  },
+  "gap_analysis": {
+    "enabled": true,
+    "auto_analyze": true,
+    "frequency": "daily",
+    "scopes": ["security", "testing", "documentation"],
+    "severity_weights": {
+      "critical": 10,
+      "high": 7,
+      "medium": 4,
+      "low": 2
+    }
+  },
+  "templates": {
+    "enabled": true,
+    "template_dir": ".claude/templates",
+    "custom_templates": {}
+  },
+  "ai": {
+    "model": "claude-sonnet-4",
+    "temperature": 0.7,
+    "max_tokens": 4000,
+    "code_generation": true,
+    "code_review": true,
+    "architecture_suggestions": true
+  }
+}

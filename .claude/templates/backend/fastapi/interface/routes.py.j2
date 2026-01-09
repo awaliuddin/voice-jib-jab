@@ -1,0 +1,146 @@
+"""
+API Routes: {{ entity_name | default('Example') }}
+
+REST API endpoints for {{ entity_name | default('example') }} resources
+"""
+
+from fastapi import APIRouter, HTTPException, Depends, status
+from typing import List
+from pydantic import BaseModel
+
+router = APIRouter(
+    prefix="/{{ entity_name | default('examples') | snake_case }}",
+    tags=["{{ entity_name | default('examples') | snake_case }}"]
+)
+
+
+# Request/Response models
+class {{ entity_name | default('Example') | pascal_case }}Create(BaseModel):
+    """Request model for creating {{ entity_name | default('example') }}"""
+    name: str
+    description: str | None = None
+
+
+class {{ entity_name | default('Example') | pascal_case }}Update(BaseModel):
+    """Request model for updating {{ entity_name | default('example') }}"""
+    name: str | None = None
+    description: str | None = None
+    is_active: bool | None = None
+
+
+class {{ entity_name | default('Example') | pascal_case }}Response(BaseModel):
+    """Response model for {{ entity_name | default('example') }}"""
+    id: int
+    name: str
+    description: str | None
+    is_active: bool
+
+    class Config:
+        orm_mode = True
+
+
+@router.get("/", response_model=List[{{ entity_name | default('Example') | pascal_case }}Response])
+async def list_{{ entity_name | default('examples') | snake_case }}(
+    skip: int = 0,
+    limit: int = 100
+):
+    """
+    List all {{ entity_name | default('examples') }}
+
+    Args:
+        skip: Number of records to skip
+        limit: Maximum records to return
+
+    Returns:
+        List of {{ entity_name | default('examples') }}
+    """
+    # TODO: Implement using use case
+    return []
+
+
+@router.post("/", response_model={{ entity_name | default('Example') | pascal_case }}Response, status_code=status.HTTP_201_CREATED)
+async def create_{{ entity_name | default('example') | snake_case }}(
+    data: {{ entity_name | default('Example') | pascal_case }}Create
+):
+    """
+    Create a new {{ entity_name | default('example') }}
+
+    Args:
+        data: {{ entity_name | default('Example') }} data
+
+    Returns:
+        Created {{ entity_name | default('example') }}
+    """
+    # TODO: Implement using use case
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Not yet implemented"
+    )
+
+
+@router.get("/{{{ entity_name | default('example') | snake_case }}_id}", response_model={{ entity_name | default('Example') | pascal_case }}Response)
+async def get_{{ entity_name | default('example') | snake_case }}(
+    {{ entity_name | default('example') | snake_case }}_id: int
+):
+    """
+    Get {{ entity_name | default('example') }} by ID
+
+    Args:
+        {{ entity_name | default('example') | snake_case }}_id: ID of {{ entity_name | default('example') }} to retrieve
+
+    Returns:
+        {{ entity_name | default('Example') }} details
+
+    Raises:
+        HTTPException: 404 if not found
+    """
+    # TODO: Implement using use case
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="{{ entity_name | default('Example') | pascal_case }} not found"
+    )
+
+
+@router.put("/{{{ entity_name | default('example') | snake_case }}_id}", response_model={{ entity_name | default('Example') | pascal_case }}Response)
+async def update_{{ entity_name | default('example') | snake_case }}(
+    {{ entity_name | default('example') | snake_case }}_id: int,
+    data: {{ entity_name | default('Example') | pascal_case }}Update
+):
+    """
+    Update {{ entity_name | default('example') }}
+
+    Args:
+        {{ entity_name | default('example') | snake_case }}_id: ID of {{ entity_name | default('example') }} to update
+        data: Update data
+
+    Returns:
+        Updated {{ entity_name | default('example') }}
+
+    Raises:
+        HTTPException: 404 if not found
+    """
+    # TODO: Implement using use case
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="{{ entity_name | default('Example') | pascal_case }} not found"
+    )
+
+
+@router.delete("/{{{ entity_name | default('example') | snake_case }}_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_{{ entity_name | default('example') | snake_case }}(
+    {{ entity_name | default('example') | snake_case }}_id: int
+):
+    """
+    Delete {{ entity_name | default('example') }}
+
+    Args:
+        {{ entity_name | default('example') | snake_case }}_id: ID of {{ entity_name | default('example') }} to delete
+
+    Raises:
+        HTTPException: 404 if not found
+    """
+    # TODO: Implement using use case
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="{{ entity_name | default('Example') | pascal_case }} not found"
+    )

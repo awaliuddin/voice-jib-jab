@@ -1,0 +1,100 @@
+"""
+Use Case: {{ usecase_name | default('Example') }}
+
+Application layer business logic
+"""
+
+from typing import List, Optional
+from datetime import datetime
+
+
+class {{ usecase_name | default('Example') | pascal_case }}UseCase:
+    """
+    Use case for {{ usecase_name | default('example') }} operations
+
+    Orchestrates domain logic and infrastructure services
+    """
+
+    def __init__(self, repository):
+        """
+        Initialize use case with dependencies
+
+        Args:
+            repository: Repository for data access
+        """
+        self.repository = repository
+
+    async def execute(self, input_data: dict) -> dict:
+        """
+        Execute the use case
+
+        Args:
+            input_data: Input parameters for the use case
+
+        Returns:
+            Result of the operation
+
+        Raises:
+            ValueError: If input validation fails
+        """
+        # Validate input
+        if not input_data:
+            raise ValueError("Input data is required")
+
+        # Execute business logic
+        result = await self.repository.save(input_data)
+
+        return result
+
+    async def get_by_id(self, entity_id: int) -> Optional[dict]:
+        """
+        Retrieve entity by ID
+
+        Args:
+            entity_id: ID of the entity to retrieve
+
+        Returns:
+            Entity data if found, None otherwise
+        """
+        return await self.repository.find_by_id(entity_id)
+
+    async def get_all(self, skip: int = 0, limit: int = 100) -> List[dict]:
+        """
+        Retrieve all entities with pagination
+
+        Args:
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            List of entities
+        """
+        return await self.repository.find_all(skip=skip, limit=limit)
+
+    async def update(self, entity_id: int, update_data: dict) -> Optional[dict]:
+        """
+        Update an entity
+
+        Args:
+            entity_id: ID of the entity to update
+            update_data: Fields to update
+
+        Returns:
+            Updated entity if successful, None if not found
+        """
+        # Add updated_at timestamp
+        update_data["updated_at"] = datetime.utcnow()
+
+        return await self.repository.update(entity_id, update_data)
+
+    async def delete(self, entity_id: int) -> bool:
+        """
+        Delete an entity
+
+        Args:
+            entity_id: ID of the entity to delete
+
+        Returns:
+            True if deleted, False if not found
+        """
+        return await self.repository.delete(entity_id)

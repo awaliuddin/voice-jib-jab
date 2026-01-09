@@ -1,0 +1,88 @@
+{
+  "$schema": "https://claude.ai/schemas/config.json",
+  "version": "1.0.0",
+  "project": {
+    "name": "Voice Jib-Jab",
+    "description": "NextGen AI Voice Orchestrator with lane-based architecture",
+    "type": "web-app",
+    "version": "0.1.0"
+  },
+  "development": {
+    "client": {
+      "language": "typescript",
+      "framework": "react",
+      "version": "18.2.0",
+      "build_tool": "vite",
+      "package_manager": "npm"
+    },
+    "server": {
+      "language": "typescript",
+      "runtime": "node",
+      "version": "20+",
+      "framework": "express",
+      "package_manager": "npm"
+    },
+    "coding_standards": ".claude/skills/coding-standards.md",
+    "architecture": ".claude/skills/architecture.md"
+  },
+  "testing": {
+    "strategy": ".claude/skills/testing-strategy.md",
+    "coverage_target": 85,
+    "coverage_minimum": 80,
+    "frameworks": {
+      "client": "vitest",
+      "server": "jest",
+      "e2e": "playwright"
+    }
+  },
+  "agents": {
+    "orchestration": {
+      "enabled": true,
+      "max_parallel": 3
+    },
+    "available_agents": [
+      "forge-orchestrator",
+      "forge-detective",
+      "forge-planner",
+      "forge-builder",
+      "forge-guardian"
+    ]
+  },
+  "skills": {
+    "enabled": true,
+    "auto_load": [
+      "architecture",
+      "coding-standards",
+      "domain-knowledge",
+      "lane-system",
+      "voice-ux"
+    ],
+    "directories": [
+      ".claude/skills/core",
+      ".claude/skills/domain"
+    ]
+  },
+  "context": {
+    "include_patterns": [
+      "client/src/**/*.{ts,tsx}",
+      "server/src/**/*.ts",
+      "tests/**/*.{ts,tsx}",
+      ".claude/**/*.md",
+      "docs/**/*.md",
+      "package.json",
+      "tsconfig.json"
+    ],
+    "exclude_patterns": [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/*.min.js",
+      ".next/**",
+      "coverage/**"
+    ]
+  },
+  "safety": {
+    "require_tests_for_commit": true,
+    "prevent_force_push_main": true
+  }
+}

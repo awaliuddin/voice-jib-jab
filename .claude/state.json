@@ -1,0 +1,131 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "voice-jib-jab",
+    "type": "web-app",
+    "created_at": "2026-01-08T23:52:00Z",
+    "last_updated": "2026-01-08T23:52:00Z",
+    "forge_version": "1.0.0",
+    "nxtg_forge_enabled": true
+  },
+  "spec": {
+    "status": "approved",
+    "file": "docs/PROJECT-SPEC.md",
+    "source": "spec-jib-jab.md",
+    "last_modified": "2026-01-08T23:52:00Z"
+  },
+  "architecture": {
+    "pattern": "lane-based-orchestrator",
+    "planes": ["experience", "control"],
+    "lanes": ["reflex", "reasoned", "control"],
+    "client": {
+      "framework": "react",
+      "language": "typescript",
+      "build_tool": "vite"
+    },
+    "server": {
+      "runtime": "node",
+      "language": "typescript",
+      "framework": "express"
+    },
+    "realtime": {
+      "transport": "websocket",
+      "voice_provider": "openai-realtime"
+    },
+    "rag": {
+      "vector_store": "chromadb",
+      "knowledge_pack": "NextGen AI Knowledge Pack"
+    }
+  },
+  "development": {
+    "current_phase": "initialization",
+    "phases_completed": [],
+    "phases_remaining": [
+      "voice-loop-mvp",
+      "lane-arbitration",
+      "control-plane",
+      "rag-integration"
+    ],
+    "features": {
+      "completed": [],
+      "in_progress": [
+        {
+          "id": "feat-init",
+          "name": "NXTG-Forge Initialization",
+          "status": "in_progress",
+          "started_at": "2026-01-08T23:52:00Z"
+        }
+      ],
+      "planned": [
+        {
+          "id": "feat-001",
+          "name": "Voice Loop MVP",
+          "priority": "critical",
+          "description": "Browser mic → WebSocket → OpenAI Realtime → Audio playback"
+        },
+        {
+          "id": "feat-002",
+          "name": "Lane Arbitration",
+          "priority": "critical",
+          "description": "Implement 3-lane system with state machine"
+        },
+        {
+          "id": "feat-003",
+          "name": "Control Plane",
+          "priority": "high",
+          "description": "PolicyGate, audit trail, latency tracking"
+        },
+        {
+          "id": "feat-004",
+          "name": "RAG Integration",
+          "priority": "high",
+          "description": "Vector store + NextGen AI knowledge retrieval"
+        }
+      ]
+    }
+  },
+  "agents": {
+    "active": [],
+    "available": [
+      "forge-orchestrator",
+      "forge-detective",
+      "forge-planner",
+      "forge-builder",
+      "forge-guardian"
+    ],
+    "history": []
+  },
+  "mcp_servers": {
+    "configured": [],
+    "recommended": [
+      {
+        "name": "github",
+        "reason": "Repository and issue tracking",
+        "priority": "high"
+      },
+      {
+        "name": "openai",
+        "reason": "OpenAI Realtime API integration",
+        "priority": "critical"
+      }
+    ]
+  },
+  "quality": {
+    "tests": {
+      "unit": {"total": 0, "passing": 0, "coverage": 0},
+      "integration": {"total": 0, "passing": 0, "coverage": 0},
+      "e2e": {"total": 0, "passing": 0, "coverage": 0}
+    },
+    "linting": {
+      "issues": 0,
+      "last_run": null
+    }
+  },
+  "checkpoints": [],
+  "last_session": {
+    "id": "init-001",
+    "started": "2026-01-08T23:52:00Z",
+    "task": "Initialize NXTG-Forge",
+    "status": "in_progress"
+  }
+}

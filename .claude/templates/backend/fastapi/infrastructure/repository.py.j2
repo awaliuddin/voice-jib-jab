@@ -1,0 +1,118 @@
+"""
+Repository: {{ entity_name | default('Example') }}
+
+Data access layer for {{ entity_name | default('example') }} entities
+"""
+
+from typing import List, Optional
+from sqlalchemy import select, update, delete
+from sqlalchemy.ext.asyncio import AsyncSession
+
+
+class {{ entity_name | default('Example') | pascal_case }}Repository:
+    """
+    Repository for {{ entity_name | default('Example') }} data access
+
+    Implements the Repository pattern for database operations
+    """
+
+    def __init__(self, session: AsyncSession):
+        """
+        Initialize repository with database session
+
+        Args:
+            session: SQLAlchemy async session
+        """
+        self.session = session
+
+    async def save(self, entity_data: dict) -> dict:
+        """
+        Save a new entity
+
+        Args:
+            entity_data: Entity data to save
+
+        Returns:
+            Saved entity with generated ID
+        """
+        # TODO: Implement actual database save
+        # This is a placeholder implementation
+        entity_data["id"] = 1  # Placeholder
+        return entity_data
+
+    async def find_by_id(self, entity_id: int) -> Optional[dict]:
+        """
+        Find entity by ID
+
+        Args:
+            entity_id: ID to search for
+
+        Returns:
+            Entity if found, None otherwise
+        """
+        # TODO: Implement actual database query
+        # stmt = select({{ entity_name | default('Example') | pascal_case }}Model).where(
+        #     {{ entity_name | default('Example') | pascal_case }}Model.id == entity_id
+        # )
+        # result = await self.session.execute(stmt)
+        # return result.scalar_one_or_none()
+
+        return None  # Placeholder
+
+    async def find_all(self, skip: int = 0, limit: int = 100) -> List[dict]:
+        """
+        Find all entities with pagination
+
+        Args:
+            skip: Number of records to skip
+            limit: Maximum records to return
+
+        Returns:
+            List of entities
+        """
+        # TODO: Implement actual database query
+        # stmt = select({{ entity_name | default('Example') | pascal_case }}Model).offset(skip).limit(limit)
+        # result = await self.session.execute(stmt)
+        # return result.scalars().all()
+
+        return []  # Placeholder
+
+    async def update(self, entity_id: int, update_data: dict) -> Optional[dict]:
+        """
+        Update an entity
+
+        Args:
+            entity_id: ID of entity to update
+            update_data: Fields to update
+
+        Returns:
+            Updated entity if found, None otherwise
+        """
+        # TODO: Implement actual database update
+        return None  # Placeholder
+
+    async def delete(self, entity_id: int) -> bool:
+        """
+        Delete an entity
+
+        Args:
+            entity_id: ID of entity to delete
+
+        Returns:
+            True if deleted, False if not found
+        """
+        # TODO: Implement actual database delete
+        return False  # Placeholder
+
+    async def find_by_criteria(self, criteria: dict) -> List[dict]:
+        """
+        Find entities matching criteria
+
+        Args:
+            criteria: Search criteria
+
+        Returns:
+            List of matching entities
+        """
+        # TODO: Implement dynamic query building
+        return []  # Placeholder

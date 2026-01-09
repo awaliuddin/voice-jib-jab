@@ -1,0 +1,59 @@
+"""
+{{ project_name }} - Main Application
+
+FastAPI application entry point
+"""
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+import uvicorn
+
+# Import routers
+# from src.interface.routes import api_router
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan events"""
+    # Startup
+    print("🚀 Starting {{ project_name }}...")
+    yield
+    # Shutdown
+    print("👋 Shutting down {{ project_name }}...")
+
+app = FastAPI(
+    title="{{ project_name }}",
+    description="API for {{ project_name }}",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure appropriately for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+# app.include_router(api_router, prefix="/api/v1")
+
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {"message": "Welcome to {{ project_name }}"}
+
+@app.get("/health")
+async def health():
+    """Health check endpoint"""
+    return {"status": "healthy"}
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True
+    )

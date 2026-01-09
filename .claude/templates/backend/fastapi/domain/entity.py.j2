@@ -1,0 +1,38 @@
+"""
+Domain Entity: {{ entity_name | default('Example') }}
+
+Core business logic and domain rules
+"""
+
+from datetime import datetime
+from typing import Optional
+from pydantic import BaseModel, Field
+
+
+class {{ entity_name | default('Example') | pascal_case }}(BaseModel):
+    """
+    {{ entity_name | default('Example') }} entity
+
+    Represents {{ entity_name | default('an example') }} in the domain model
+    """
+
+    id: Optional[int] = None
+    name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    is_active: bool = True
+
+    class Config:
+        """Pydantic configuration"""
+        orm_mode = True
+        schema_extra = {
+            "example": {
+                "name": "Example {{ entity_name | default('item') }}",
+                "description": "This is an example {{ entity_name | default('item') }}",
+                "is_active": True
+            }
+        }
+
+    def __repr__(self) -> str:
+        return f"{{ entity_name | default('Example') | pascal_case }}(id={self.id}, name={self.name})"

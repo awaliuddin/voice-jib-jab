@@ -1,0 +1,22 @@
+{
+  "disclaimers": [
+    {
+      "id": "DISC-001",
+      "text": "This is an AI assistant. Please verify critical information independently.",
+      "category": "general",
+      "required_for": ["medical", "legal", "financial"]
+    },
+    {
+      "id": "DISC-002",
+      "text": "Performance targets are goals and may vary based on network conditions.",
+      "category": "performance",
+      "required_for": ["performance_claims"]
+    },
+    {
+      "id": "DISC-003",
+      "text": "This system is in beta and should not be used for emergency situations.",
+      "category": "beta",
+      "required_for": ["all_sessions"]
+    }
+  ]
+}

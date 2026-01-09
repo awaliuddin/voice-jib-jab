@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      },
+      "description": "GitHub integration for issue tracking and repository management",
+      "auto_detected": true,
+      "detection_reason": "Project uses git and will benefit from GitHub integration"
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/axw/projects/voice-jib-jab"],
+      "description": "Local filesystem access for project files",
+      "auto_detected": true,
+      "detection_reason": "Required for accessing project files"
+    }
+  },
+  "recommended_servers": [
+    {
+      "name": "openai",
+      "reason": "Project uses OpenAI Realtime API",
+      "priority": "critical",
+      "setup_instructions": "Configure OPENAI_API_KEY in .env file"
+    },
+    {
+      "name": "postgres",
+      "reason": "May be needed for audit trail persistence",
+      "priority": "medium",
+      "setup_instructions": "Install when ready for production audit storage"
+    }
+  ]
+}

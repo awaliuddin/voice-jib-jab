@@ -1,0 +1,5 @@
+{"id": "NXTG-001", "text": "NextGen AI is a voice assistant orchestration platform using lane-based architecture.", "source": "internal", "timestamp": "2026-01-08", "category": "product"}
+{"id": "NXTG-002", "text": "The system uses three lanes: Reflex for acknowledgements, Reasoned for substantive responses, and Control for policy enforcement.", "source": "architecture-doc", "timestamp": "2026-01-08", "category": "architecture"}
+{"id": "NXTG-003", "text": "Voice Jib-Jab is browser-first and requires no mobile app installation.", "source": "product-spec", "timestamp": "2026-01-08", "category": "product"}
+{"id": "NXTG-004", "text": "The platform targets sub-400ms time-to-first-byte for responsive voice interactions.", "source": "performance-targets", "timestamp": "2026-01-08", "category": "performance"}
+{"id": "NXTG-005", "text": "All responses are grounded in retrieved facts using retrieval-augmented generation (RAG).", "source": "architecture-doc", "timestamp": "2026-01-08", "category": "technology"}
