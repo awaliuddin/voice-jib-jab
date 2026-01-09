@@ -38,10 +38,9 @@
     }
   },
   "development": {
-    "current_phase": "initialization",
-    "phases_completed": [],
+    "current_phase": "voice-loop-mvp",
+    "phases_completed": ["initialization"],
     "phases_remaining": [
-      "voice-loop-mvp",
       "lane-arbitration",
       "control-plane",
       "rag-integration"
@@ -55,19 +54,22 @@
           "started_at": "2026-01-08T23:52:00Z",
           "completed_at": "2026-01-08T23:59:00Z",
           "description": "Initialized project with NXTG-Forge infrastructure"
-        }
-      ],
-      "in_progress": [
+        },
         {
           "id": "feat-001",
           "name": "Voice Loop MVP",
           "priority": "critical",
-          "status": "in_progress",
+          "status": "completed",
           "started_at": "2026-01-09T00:05:00Z",
+          "completed_at": "2026-01-09T00:30:00Z",
           "assigned_agents": ["forge-planner", "forge-builder"],
-          "spec_file": ".claude/features/feat-001-voice-loop-mvp-spec.md"
+          "spec_file": ".claude/features/feat-001-voice-loop-mvp-spec.md",
+          "description": "Implemented foundational voice loop: mic → WebSocket → OpenAI Realtime → audio playback with barge-in",
+          "tests": "pending",
+          "coverage": 0
         }
       ],
+      "in_progress": [],
       "planned": [
         {
           "id": "feat-002",
@@ -134,6 +136,13 @@
       "description": "Initial NXTG-Forge setup for Voice Jib-Jab",
       "file": ".claude/checkpoints/cp-init.json",
       "git_commit": "e6fec71"
+    },
+    {
+      "id": "cp-feat-001",
+      "timestamp": "2026-01-09T00:30:00Z",
+      "description": "Voice Loop MVP completed",
+      "file": ".claude/checkpoints/cp-feat-001.json",
+      "git_commit": "960f509"
     }
   ],
   "last_session": {
