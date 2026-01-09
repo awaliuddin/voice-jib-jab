@@ -196,10 +196,30 @@ export class SessionManager {
       return;
     }
 
-    // Send session start
-    this.wsClient.send({ type: "session.start" });
+    this.setState("talking");
+    console.log("[SessionManager] Connecting to OpenAI...");
 
-    // Start capturing microphone
+    // Send session start and wait for provider.ready
+    const providerReady = new Promise<void>((resolve) => {
+      const handler = () => {
+        this.wsClient.off("provider.ready", handler);
+        resolve();
+      };
+      this.wsClient.on("provider.ready", handler);
+
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        this.wsClient.off("provider.ready", handler);
+        resolve(); // Resolve anyway to avoid hanging
+      }, 10000);
+    });
+
+    this.wsClient.send({ type: "session.start" });
+    await providerReady;
+
+    console.log("[SessionManager] OpenAI ready, starting audio capture");
+
+    // Now start capturing microphone - OpenAI is ready
     this.micCapture.start((audioChunk) => {
       const pcm16Buffer = MicrophoneCapture.float32ToPCM16(audioChunk);
       const base64Data = btoa(
@@ -214,7 +234,6 @@ export class SessionManager {
       });
     });
 
-    this.setState("talking");
     console.log("[SessionManager] Started talking");
   }
 
