@@ -75,6 +75,11 @@ function App() {
     sessionManager.bargeIn();
   };
 
+  const handleEndCall = () => {
+    sessionManager.disconnect();
+    setState("idle");
+  };
+
   return (
     <div className="app">
       <header className="app-header">
@@ -105,11 +110,19 @@ function App() {
         />
 
         <div className="app-controls">
+          {state !== "idle" && (
+            <button
+              className="app-controls__button app-controls__button--end"
+              onClick={handleEndCall}
+            >
+              End Call
+            </button>
+          )}
           <button
             className="app-controls__button"
             onClick={() => setShowDebug(!showDebug)}
           >
-            {showDebug ? "🔇 Hide Debug" : "🔊 Show Debug"}
+            {showDebug ? "Hide Debug" : "Show Debug"}
           </button>
         </div>
       </main>
