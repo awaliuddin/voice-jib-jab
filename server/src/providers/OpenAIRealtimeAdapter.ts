@@ -54,6 +54,10 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
   private responding: boolean = false;
   private audioBuffer: Buffer = Buffer.alloc(0);
 
+  // TTFB drift prevention: Max buffer size (5 seconds of audio at 24kHz PCM16)
+  private readonly MAX_AUDIO_BUFFER_SIZE = 24000 * 2 * 5; // 240KB
+  private readonly MAX_MESSAGE_QUEUE_SIZE = 50;
+
   constructor(config: ProviderConfig) {
     super(config);
   }
@@ -209,7 +213,19 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
       // Accumulate audio for potential processing
       this.audioBuffer = Buffer.concat([this.audioBuffer, chunk.data]);
 
-      console.log(`[OpenAI] Sent audio chunk: ${chunk.data.length} bytes`);
+      // TTFB drift prevention: Prevent audio buffer from growing too large
+      if (this.audioBuffer.length > this.MAX_AUDIO_BUFFER_SIZE) {
+        console.warn(
+          `[OpenAI] Audio buffer exceeded max size (${this.audioBuffer.length} bytes), clearing oldest data`,
+        );
+        // Keep only the most recent 2 seconds of audio
+        const keepSize = 24000 * 2 * 2; // 2 seconds
+        this.audioBuffer = this.audioBuffer.subarray(-keepSize);
+      }
+
+      console.log(
+        `[OpenAI] Sent audio chunk: ${chunk.data.length} bytes (buffer: ${this.audioBuffer.length})`,
+      );
     } catch (error) {
       console.error("[OpenAI] Failed to send audio:", error);
       this.emit("error", error);
@@ -349,7 +365,13 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
    */
   private sendMessage(message: RealtimeMessage): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      // Queue message if not connected
+      // Queue message if not connected, but prevent queue from growing too large
+      if (this.messageQueue.length >= this.MAX_MESSAGE_QUEUE_SIZE) {
+        console.warn(
+          `[OpenAI] Message queue full (${this.messageQueue.length}), dropping oldest message`,
+        );
+        this.messageQueue.shift(); // Remove oldest
+      }
       this.messageQueue.push(message);
       return;
     }
@@ -405,6 +427,8 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
 
       case "input_audio_buffer.speech_started":
         console.log("[OpenAI] Speech detected - started");
+        // Clear local audio buffer on new speech to prevent stale data accumulation
+        this.audioBuffer = Buffer.alloc(0);
         this.emit("speech_started");
         break;
 
@@ -517,6 +541,10 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
 
       case "error":
         console.error("[OpenAI] Error from API:", message.error);
+        // Reset responding flag on error to prevent stuck state (TTFB drift fix)
+        this.responding = false;
+        // Clear audio buffer on error to prevent backlog
+        this.audioBuffer = Buffer.alloc(0);
         this.emit(
           "error",
           new Error(message.error?.message || "Unknown error from OpenAI"),
