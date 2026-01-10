@@ -133,7 +133,7 @@ def _is_critical_file(file_path: str) -> bool:
         "Dockerfile",
         ".github/workflows",
         ".claude/config.json",
-        ".claude/forge/state.json",
+        ".claude/state.json",
     ]
 
     return any(pattern in file_path for pattern in critical_patterns)

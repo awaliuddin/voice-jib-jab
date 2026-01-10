@@ -3,6 +3,7 @@
  *
  * Provides immediate acknowledgements while Lane B processes.
  * Uses pre-configured whitelist phrases for fast, non-committal responses.
+ * Audio is generated using OpenAI TTS API for natural speech.
  */
 
 import { EventEmitter } from "events";
@@ -10,6 +11,7 @@ import { v4 as uuidv4 } from "uuid";
 import { eventBus } from "../orchestrator/EventBus.js";
 import { getWeightedReflex } from "../config/reflexWhitelist.js";
 import { LaneAReflexEvent } from "../schemas/events.js";
+import { getTTSInstance } from "../services/OpenAITTS.js";
 
 // Local type for audio chunk emission
 interface AudioChunk {
@@ -23,20 +25,17 @@ interface AudioChunk {
  */
 export interface LaneAConfig {
   enabled: boolean;
-  useTTS: boolean; // If true, use TTS; if false, use pre-cached audio
-  ttsVoice?: string;
+  ttsVoice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
   defaultSampleRate: number;
 }
 
 const DEFAULT_CONFIG: LaneAConfig = {
   enabled: true,
-  useTTS: false, // Default to pre-cached for speed
   defaultSampleRate: 24000,
 };
 
 /**
  * Pre-cached audio for common reflexes (PCM16 @ 24kHz)
- * In production, these would be loaded from actual audio files
  */
 interface CachedAudio {
   utterance: string;
@@ -51,23 +50,21 @@ export class LaneA extends EventEmitter {
   private isPlaying: boolean = false;
   private playbackTimer: NodeJS.Timeout | null = null;
   private currentUtterance: string | null = null;
+  private initialized: boolean = false;
 
   constructor(sessionId: string, config: Partial<LaneAConfig> = {}) {
     super();
     this.sessionId = sessionId;
     this.config = { ...DEFAULT_CONFIG, ...config };
 
-    // Initialize audio cache with synthesized placeholder audio
+    // Start async initialization
     this.initializeAudioCache();
   }
 
   /**
-   * Initialize the audio cache with placeholder audio
-   * In production, this would load actual pre-recorded audio files
+   * Initialize the audio cache with real TTS audio from OpenAI
    */
-  private initializeAudioCache(): void {
-    // For now, we'll generate silence as placeholder
-    // Real implementation would load pre-recorded or TTS-generated audio
+  private async initializeAudioCache(): Promise<void> {
     const reflexPhrases = [
       "Got it",
       "One moment",
@@ -77,18 +74,52 @@ export class LaneA extends EventEmitter {
       "I hear you",
     ];
 
-    for (const phrase of reflexPhrases) {
-      // Generate ~500ms of silence (24000 * 0.5 * 2 bytes = 24000 bytes)
-      const durationMs = 500;
+    try {
+      const tts = getTTSInstance();
+      const audioMap = await tts.preloadPhrases(reflexPhrases);
+
+      // Convert to our cache format
+      for (const [key, audioData] of audioMap) {
+        // Calculate duration: PCM16 @ 24kHz = 48000 bytes per second
+        const durationMs = (audioData.length / 48000) * 1000;
+
+        this.audioCache.set(key, {
+          utterance: reflexPhrases.find((p) => p.toLowerCase() === key) || key,
+          audioData,
+          durationMs,
+        });
+      }
+
+      this.initialized = true;
+      console.log(
+        `[LaneA] Audio cache initialized with ${this.audioCache.size} reflexes`,
+      );
+    } catch (error) {
+      console.error("[LaneA] Failed to initialize TTS audio:", error);
+      // Fall back to minimal placeholder if TTS fails completely
+      this.initializeFallbackAudio(reflexPhrases);
+    }
+  }
+
+  /**
+   * Fallback audio initialization if TTS fails
+   */
+  private initializeFallbackAudio(phrases: string[]): void {
+    console.warn("[LaneA] Using fallback placeholder audio");
+
+    for (const phrase of phrases) {
+      const durationMs = 300;
       const samples = Math.floor(
         (this.config.defaultSampleRate * durationMs) / 1000,
       );
-      const audioData = Buffer.alloc(samples * 2); // PCM16 = 2 bytes per sample
+      const audioData = Buffer.alloc(samples * 2);
 
-      // Add a tiny click at start to confirm audio is playing (for debugging)
-      // In production, this would be actual audio
-      audioData.writeInt16LE(1000, 0);
-      audioData.writeInt16LE(-1000, 2);
+      // Generate a simple tone instead of silence
+      for (let i = 0; i < samples; i++) {
+        const t = i / this.config.defaultSampleRate;
+        const sample = Math.sin(2 * Math.PI * 440 * t) * 0.3 * 32767;
+        audioData.writeInt16LE(Math.round(sample), i * 2);
+      }
 
       this.audioCache.set(phrase.toLowerCase(), {
         utterance: phrase,
@@ -97,8 +128,9 @@ export class LaneA extends EventEmitter {
       });
     }
 
+    this.initialized = true;
     console.log(
-      `[LaneA] Audio cache initialized with ${this.audioCache.size} reflexes`,
+      `[LaneA] Fallback audio cache initialized with ${this.audioCache.size} reflexes`,
     );
   }
 
@@ -168,7 +200,7 @@ export class LaneA extends EventEmitter {
   }
 
   /**
-   * Get audio for an utterance (from cache or TTS)
+   * Get audio for an utterance (from cache or generate via TTS)
    */
   private async getAudio(utterance: string): Promise<CachedAudio | null> {
     const cached = this.audioCache.get(utterance.toLowerCase());
@@ -176,14 +208,30 @@ export class LaneA extends EventEmitter {
       return cached;
     }
 
-    if (this.config.useTTS) {
-      // TTS integration would go here
-      // For now, return null to indicate no audio
-      console.log(`[LaneA] TTS not implemented for: "${utterance}"`);
+    // Generate via TTS if not cached
+    try {
+      console.log(`[LaneA] Generating TTS for uncached phrase: "${utterance}"`);
+      const tts = getTTSInstance();
+      const audioData = await tts.generateSpeech(utterance);
+      const durationMs = (audioData.length / 48000) * 1000;
+
+      const audio: CachedAudio = {
+        utterance,
+        audioData,
+        durationMs,
+      };
+
+      // Cache for future use
+      this.audioCache.set(utterance.toLowerCase(), audio);
+
+      return audio;
+    } catch (error) {
+      console.error(
+        `[LaneA] Failed to generate TTS for "${utterance}":`,
+        error,
+      );
       return null;
     }
-
-    return null;
   }
 
   /**
@@ -246,18 +294,36 @@ export class LaneA extends EventEmitter {
   /**
    * Preload audio for specific phrases (for faster playback)
    */
-  preloadAudio(phrases: string[]): void {
-    // In production, this would trigger TTS or load audio files
+  async preloadAudio(phrases: string[]): Promise<void> {
     console.log(`[LaneA] Preloading ${phrases.length} phrases`);
+    const tts = getTTSInstance();
+    const audioMap = await tts.preloadPhrases(phrases);
+
+    for (const [key, audioData] of audioMap) {
+      const durationMs = (audioData.length / 48000) * 1000;
+      this.audioCache.set(key, {
+        utterance: phrases.find((p) => p.toLowerCase() === key) || key,
+        audioData,
+        durationMs,
+      });
+    }
   }
 
   /**
-   * Set TTS configuration for dynamic generation
+   * Set TTS voice for dynamic generation
    */
-  setTTSConfig(enabled: boolean, voice?: string): void {
-    this.config.useTTS = enabled;
-    if (voice) {
-      this.config.ttsVoice = voice;
-    }
+  setVoice(
+    voice: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer",
+  ): void {
+    this.config.ttsVoice = voice;
+    const tts = getTTSInstance();
+    tts.setVoice(voice);
+  }
+
+  /**
+   * Check if TTS audio is ready
+   */
+  isReady(): boolean {
+    return this.initialized;
   }
 }

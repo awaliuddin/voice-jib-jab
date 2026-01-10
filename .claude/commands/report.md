@@ -233,7 +233,7 @@ Why it happened:
    {error_detail}
 
 How to fix:
-   1. Check if state file exists: ls .claude/forge/state.json
+   1. Check if state file exists: ls .claude/state.json
    2. Verify git repository: git status
    3. Try brief report: /report --brief
    4. Re-initialize if needed: /init --upgrade

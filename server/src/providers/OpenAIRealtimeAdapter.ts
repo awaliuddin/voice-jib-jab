@@ -249,14 +249,18 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
 
       console.log("[OpenAI] Audio buffer committed");
 
-      // Trigger response generation after committing audio
-      this.sendMessage({
-        type: "response.create",
-        response: {
-          modalities: ["text", "audio"],
-        },
-      });
-      console.log("[OpenAI] Response requested");
+      // Only trigger response if not already responding (prevents race condition)
+      if (!this.responding) {
+        this.sendMessage({
+          type: "response.create",
+          response: {
+            modalities: ["text", "audio"],
+          },
+        });
+        console.log("[OpenAI] Response requested");
+      } else {
+        console.log("[OpenAI] Skipping response.create: already responding");
+      }
     } catch (error) {
       console.error("[OpenAI] Failed to commit audio:", error);
     }
@@ -407,8 +411,8 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
       case "input_audio_buffer.speech_stopped":
         console.log("[OpenAI] Speech detected - stopped");
         this.emit("speech_stopped");
-        // Automatically commit when speech stops (if using server VAD)
-        this.commitAudio();
+        // Note: With server VAD enabled, OpenAI automatically commits the buffer
+        // Do NOT call commitAudio() here - it would send an empty buffer commit
         break;
 
       case "conversation.item.created":
@@ -480,6 +484,15 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
         console.log("[OpenAI] Response complete");
         this.responding = false;
         this.emit("response_end");
+        break;
+
+      // Handle common message types that don't require action (silence warnings)
+      case "response.output_item.added":
+      case "response.output_item.done":
+      case "response.content_part.added":
+      case "response.content_part.done":
+      case "conversation.item.input_audio_transcription.delta":
+        // These are informational - no action needed
         break;
 
       case "conversation.item.input_audio_transcription.completed":

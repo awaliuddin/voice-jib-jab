@@ -306,9 +306,9 @@ Test the hook:
 python .claude/hooks/session-start.md
 
 # Test ready state (temporarily rename orchestrator)
-mv .claude/forge/state.json .claude/forge/state.json.bak
+mv .claude/state.json .claude/state.json.bak
 python .claude/hooks/session-start.md
-mv .claude/forge/state.json.bak .claude/forge/state.json
+mv .claude/state.json.bak .claude/state.json
 
 # Test not installed state (no output expected)
 mv .claude/agents .claude/agents.bak

@@ -246,7 +246,7 @@ reporter = SessionReporter(Path.cwd())
 should_show_result = reporter.should_display_report_on_startup()
 if should_show_result.unwrap_or(False):
     # Get last session ID from state
-    with open(".claude/forge/state.json") as f:
+    with open(".claude/state.json") as f:
         state = json.load(f)
     session_id = state.get("last_session", {}).get("id")
 

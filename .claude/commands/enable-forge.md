@@ -145,7 +145,7 @@ If menu doesn't display:
 
 1. Verify orchestrator agent exists: `ls .claude/agents/agent-forge-orchestrator.md`
 2. Check agent file is valid markdown: `head -20 .claude/agents/agent-forge-orchestrator.md`
-3. Verify state file exists: `ls .claude/forge/state.json`
+3. Verify state file exists: `ls .claude/state.json`
 4. Re-initialize: `/init --upgrade`
 
 ## Implementation Note
