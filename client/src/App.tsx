@@ -8,6 +8,7 @@ import {
   SessionManager,
   SessionState,
   LatencyMetrics,
+  LaneInfo,
 } from "./state/SessionManager";
 import { TalkButton } from "./ui/TalkButton";
 import { DebugOverlay } from "./ui/DebugOverlay";
@@ -25,6 +26,10 @@ function App() {
   });
   const [showDebug, setShowDebug] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [laneInfo, setLaneInfo] = useState<LaneInfo>({
+    owner: "none",
+    state: "IDLE",
+  });
 
   useEffect(() => {
     // Setup callbacks
@@ -38,6 +43,10 @@ function App() {
 
     sessionManager.setOnMetricsUpdate((newMetrics) => {
       setMetrics(newMetrics);
+    });
+
+    sessionManager.setOnLaneChange((newLaneInfo) => {
+      setLaneInfo(newLaneInfo);
     });
 
     // Auto-initialize on mount with small delay for DOM stability
@@ -127,7 +136,12 @@ function App() {
         </div>
       </main>
 
-      <DebugOverlay state={state} metrics={metrics} isVisible={showDebug} />
+      <DebugOverlay
+        state={state}
+        metrics={metrics}
+        laneInfo={laneInfo}
+        isVisible={showDebug}
+      />
 
       <footer className="app-footer">
         <p>Built with NXTG-Forge • Lane-based Architecture</p>

@@ -1,19 +1,24 @@
 /**
  * WebSocket server for real-time voice communication
+ * With Lane Arbitration support
  */
 
 import { WebSocketServer, WebSocket } from "ws";
 import { v4 as uuidv4 } from "uuid";
 import { sessionManager } from "../orchestrator/SessionManager.js";
 import { eventBus } from "../orchestrator/EventBus.js";
-import { OpenAIRealtimeAdapter } from "../providers/OpenAIRealtimeAdapter.js";
+import { LaneArbitrator } from "../orchestrator/LaneArbitrator.js";
+import { LaneA } from "../lanes/LaneA.js";
+import { LaneB } from "../lanes/LaneB.js";
 import { config } from "../config/index.js";
 import { Event } from "../schemas/events.js";
 
 interface ClientConnection {
   ws: WebSocket;
   sessionId: string;
-  providerAdapter: OpenAIRealtimeAdapter;
+  laneArbitrator: LaneArbitrator;
+  laneA: LaneA;
+  laneB: LaneB;
 }
 
 export class VoiceWebSocketServer {
@@ -36,22 +41,40 @@ export class VoiceWebSocketServer {
       connectedAt: new Date().toISOString(),
     });
 
-    // Create provider adapter
-    const providerAdapter = new OpenAIRealtimeAdapter({
-      apiKey: config.openai.apiKey,
-      model: config.openai.model,
+    // Create Lane B (wraps OpenAI adapter)
+    const laneB = new LaneB(session.id, {
+      providerConfig: {
+        apiKey: config.openai.apiKey,
+        model: config.openai.model,
+      },
+    });
+
+    // Create Lane A (reflex engine)
+    const laneA = new LaneA(session.id, {
+      enabled: true,
+    });
+
+    // Create Lane Arbitrator
+    const laneArbitrator = new LaneArbitrator(session.id, {
+      laneAEnabled: true,
+      minDelayBeforeReflexMs: 150,
+      maxReflexDurationMs: 2000,
+      preemptThresholdMs: 300,
+      transitionGapMs: 10,
     });
 
     // Store connection
     const connection: ClientConnection = {
       ws,
       sessionId: session.id,
-      providerAdapter,
+      laneArbitrator,
+      laneA,
+      laneB,
     };
     this.connections.set(ws, connection);
 
-    // Setup provider event handlers
-    this.setupProviderHandlers(connection);
+    // Setup lane event handlers
+    this.setupLaneHandlers(connection);
 
     // Setup WebSocket handlers
     ws.on("message", (data) => this.handleMessage(connection, data));
@@ -66,121 +89,238 @@ export class VoiceWebSocketServer {
     });
   }
 
-  private setupProviderHandlers(connection: ClientConnection): void {
-    const { ws, sessionId, providerAdapter } = connection;
+  private setupLaneHandlers(connection: ClientConnection): void {
+    const { ws, sessionId, laneArbitrator, laneA, laneB } = connection;
 
-    // Forward audio from provider to client
-    providerAdapter.on("audio", (chunk) => {
-      const event: Event = {
-        event_id: uuidv4(),
-        session_id: sessionId,
-        t_ms: Date.now(),
-        source: "provider",
-        type: "audio.chunk",
-        payload: chunk,
-      };
+    // ============== Lane Arbitrator Events ==============
 
-      eventBus.emit(event);
+    // Handle state changes
+    laneArbitrator.on(
+      "state_change",
+      (transition: { from: string; to: string; cause: string }) => {
+        console.log(
+          `[WebSocket] Lane state: ${transition.from} -> ${transition.to}`,
+        );
 
+        // Notify client of lane state change
+        this.sendToClient(ws, {
+          type: "lane.state_changed",
+          from: transition.from,
+          to: transition.to,
+          cause: transition.cause,
+          timestamp: Date.now(),
+        });
+      },
+    );
+
+    // Handle ownership changes
+    laneArbitrator.on(
+      "owner_change",
+      (change: { from: string; to: string; cause: string }) => {
+        this.sendToClient(ws, {
+          type: "lane.owner_changed",
+          from: change.from,
+          to: change.to,
+          cause: change.cause,
+          timestamp: Date.now(),
+        });
+      },
+    );
+
+    // Play Lane A reflex
+    laneArbitrator.on("play_reflex", () => {
+      laneA.playReflex();
+    });
+
+    // Stop Lane A reflex
+    laneArbitrator.on("stop_reflex", () => {
+      laneA.stop();
+    });
+
+    // Play Lane B (audio already flowing from adapter)
+    laneArbitrator.on("play_lane_b", () => {
+      // Lane B audio is already flowing - this is just a signal
+      console.log("[WebSocket] Lane B audio playback started");
+    });
+
+    // Stop Lane B
+    laneArbitrator.on("stop_lane_b", () => {
+      laneB.cancel();
+    });
+
+    // Response complete
+    laneArbitrator.on("response_complete", () => {
+      sessionManager.updateSessionState(sessionId, "listening");
       this.sendToClient(ws, {
-        type: "audio.chunk",
-        data: chunk.data.toString("base64"),
-        format: chunk.format,
-        sampleRate: chunk.sampleRate,
+        type: "response.end",
         timestamp: Date.now(),
       });
     });
 
-    // Handle transcripts
-    providerAdapter.on("transcript", (segment) => {
-      this.sendToClient(ws, {
-        type: "transcript",
-        text: segment.text,
-        confidence: segment.confidence,
-        isFinal: segment.isFinal,
-        timestamp: segment.timestamp,
-      });
+    // ============== Lane A Events ==============
 
-      const event: Event = {
-        event_id: uuidv4(),
-        session_id: sessionId,
-        t_ms: Date.now(),
-        source: "provider",
-        type: "transcript",
-        payload: segment,
-      };
-      eventBus.emit(event);
+    // Forward Lane A audio to client
+    laneA.on(
+      "audio",
+      (chunk: { data: Buffer; format: string; sampleRate: number }) => {
+        const event: Event = {
+          event_id: uuidv4(),
+          session_id: sessionId,
+          t_ms: Date.now(),
+          source: "laneA",
+          type: "audio.chunk",
+          payload: { ...chunk, lane: "A" },
+        };
+        eventBus.emit(event);
+
+        this.sendToClient(ws, {
+          type: "audio.chunk",
+          data: chunk.data.toString("base64"),
+          format: chunk.format,
+          sampleRate: chunk.sampleRate,
+          lane: "A",
+          timestamp: Date.now(),
+        });
+      },
+    );
+
+    laneA.on("stopped", () => {
+      console.log("[WebSocket] Lane A stopped");
     });
 
-    // Handle user transcripts (from speech recognition)
-    providerAdapter.on("user_transcript", (segment) => {
-      this.sendToClient(ws, {
-        type: "user_transcript",
-        text: segment.text,
-        confidence: segment.confidence,
-        isFinal: segment.isFinal,
-        timestamp: segment.timestamp,
-      });
+    // ============== Lane B Events ==============
 
-      const event: Event = {
-        event_id: uuidv4(),
-        session_id: sessionId,
-        t_ms: Date.now(),
-        source: "client",
-        type: "user_transcript",
-        payload: segment,
-      };
-      eventBus.emit(event);
+    // Handle first audio ready - preempt Lane A
+    laneB.on("first_audio_ready", (data: { latencyMs: number }) => {
+      console.log(`[WebSocket] Lane B first audio ready (${data.latencyMs}ms)`);
+      laneArbitrator.onLaneBReady();
     });
 
-    // Handle speech detection events
-    providerAdapter.on("speech_started", () => {
+    // Forward Lane B audio to client (only when Lane B owns audio)
+    laneB.on(
+      "audio",
+      (chunk: { data: Buffer; format: string; sampleRate: number }) => {
+        // Only forward if Lane B owns audio
+        if (
+          laneArbitrator.getCurrentOwner() !== "B" &&
+          laneArbitrator.getState() !== "B_RESPONDING"
+        ) {
+          return;
+        }
+
+        const event: Event = {
+          event_id: uuidv4(),
+          session_id: sessionId,
+          t_ms: Date.now(),
+          source: "laneB",
+          type: "audio.chunk",
+          payload: { ...chunk, lane: "B" },
+        };
+        eventBus.emit(event);
+
+        this.sendToClient(ws, {
+          type: "audio.chunk",
+          data: chunk.data.toString("base64"),
+          format: chunk.format,
+          sampleRate: chunk.sampleRate,
+          lane: "B",
+          timestamp: Date.now(),
+        });
+      },
+    );
+
+    // Handle transcripts from Lane B
+    laneB.on(
+      "transcript",
+      (segment: {
+        text: string;
+        confidence: number;
+        isFinal: boolean;
+        timestamp: number;
+      }) => {
+        this.sendToClient(ws, {
+          type: "transcript",
+          text: segment.text,
+          confidence: segment.confidence,
+          isFinal: segment.isFinal,
+          timestamp: segment.timestamp,
+        });
+
+        const event: Event = {
+          event_id: uuidv4(),
+          session_id: sessionId,
+          t_ms: Date.now(),
+          source: "laneB",
+          type: "transcript",
+          payload: segment,
+        };
+        eventBus.emit(event);
+      },
+    );
+
+    // Handle user transcripts
+    laneB.on(
+      "user_transcript",
+      (segment: {
+        text: string;
+        confidence: number;
+        isFinal: boolean;
+        timestamp: number;
+      }) => {
+        this.sendToClient(ws, {
+          type: "user_transcript",
+          text: segment.text,
+          confidence: segment.confidence,
+          isFinal: segment.isFinal,
+          timestamp: segment.timestamp,
+        });
+
+        const event: Event = {
+          event_id: uuidv4(),
+          session_id: sessionId,
+          t_ms: Date.now(),
+          source: "client",
+          type: "user_transcript",
+          payload: segment,
+        };
+        eventBus.emit(event);
+      },
+    );
+
+    // Handle speech detection
+    laneB.on("speech_started", () => {
       this.sendToClient(ws, {
         type: "speech.started",
         timestamp: Date.now(),
       });
     });
 
-    providerAdapter.on("speech_stopped", () => {
+    laneB.on("speech_stopped", () => {
       this.sendToClient(ws, {
         type: "speech.stopped",
         timestamp: Date.now(),
       });
+      // Signal arbitrator that user speech ended
+      laneArbitrator.onUserSpeechEnded();
     });
 
-    // Handle response start/end
-    providerAdapter.on("response_start", () => {
+    // Handle response lifecycle
+    laneB.on("response_start", () => {
       sessionManager.updateSessionState(sessionId, "responding");
-
       this.sendToClient(ws, {
         type: "response.start",
         timestamp: Date.now(),
       });
     });
 
-    providerAdapter.on("response_end", () => {
-      sessionManager.updateSessionState(sessionId, "listening");
-
-      this.sendToClient(ws, {
-        type: "response.end",
-        timestamp: Date.now(),
-      });
-
-      const event: Event = {
-        event_id: uuidv4(),
-        session_id: sessionId,
-        t_ms: Date.now(),
-        source: "provider",
-        type: "audio.end",
-        payload: {},
-      };
-      eventBus.emit(event);
+    laneB.on("response_end", () => {
+      // Signal arbitrator that Lane B is done
+      laneArbitrator.onLaneBDone();
     });
 
     // Handle errors
-    providerAdapter.on("error", (error) => {
-      console.error(`[Provider] Error in session ${sessionId}:`, error);
-
+    laneB.on("error", (error: Error) => {
+      console.error(`[LaneB] Error in session ${sessionId}:`, error);
       this.sendToClient(ws, {
         type: "error",
         error: error.message,
@@ -193,16 +333,19 @@ export class VoiceWebSocketServer {
     connection: ClientConnection,
     data: Buffer | ArrayBuffer | Buffer[],
   ): Promise<void> {
-    const { ws, sessionId, providerAdapter } = connection;
+    const { ws, sessionId, laneArbitrator, laneB } = connection;
 
     try {
       const message = JSON.parse(data.toString());
 
       switch (message.type) {
         case "session.start":
-          await providerAdapter.connect(sessionId);
+          // Connect Lane B (which connects to OpenAI)
+          await laneB.connect();
+          // Start the arbitrator
+          laneArbitrator.startSession();
           sessionManager.updateSessionState(sessionId, "listening");
-          // Notify client that OpenAI connection is ready
+          // Notify client that provider is ready
           this.sendToClient(ws, {
             type: "provider.ready",
             timestamp: Date.now(),
@@ -210,18 +353,16 @@ export class VoiceWebSocketServer {
           break;
 
         case "audio.chunk":
-          // Only forward audio if provider is connected
-          if (!providerAdapter.isConnected()) {
-            // Silently drop audio chunks while not connected
-            // This prevents error spam during connection setup
+          // Only forward audio if Lane B is connected
+          if (!laneB.isConnected()) {
             console.log(
-              "[WebSocket] Dropping audio chunk: provider not connected",
+              "[WebSocket] Dropping audio chunk: Lane B not connected",
             );
             return;
           }
 
-          // Forward audio to provider
-          await providerAdapter.sendAudio({
+          // Forward audio to Lane B
+          await laneB.sendAudio({
             data: Buffer.from(message.data, "base64"),
             format: message.format || "pcm",
             sampleRate: message.sampleRate || 24000,
@@ -243,13 +384,13 @@ export class VoiceWebSocketServer {
 
         case "audio.commit":
           // User released Talk button - commit audio buffer to trigger response
-          console.log("[WebSocket] Committing audio buffer");
-          await providerAdapter.commitAudio();
+          console.log("[WebSocket] Committing audio buffer via Lane B");
+          await laneB.commitAudio();
           break;
 
         case "user.barge_in":
-          // Cancel current response
-          await providerAdapter.cancel();
+          // Handle barge-in through arbitrator
+          laneArbitrator.onUserBargeIn();
 
           const bargeInEvent: Event = {
             event_id: uuidv4(),
@@ -265,7 +406,8 @@ export class VoiceWebSocketServer {
           break;
 
         case "session.end":
-          await providerAdapter.disconnect();
+          laneArbitrator.endSession();
+          await laneB.disconnect();
           sessionManager.endSession(sessionId, "user_ended");
           ws.close();
           break;
@@ -284,11 +426,12 @@ export class VoiceWebSocketServer {
   }
 
   private handleClose(connection: ClientConnection): void {
-    const { ws, sessionId, providerAdapter } = connection;
+    const { ws, sessionId, laneArbitrator, laneB } = connection;
 
     console.log(`[WebSocket] Client disconnected: ${sessionId}`);
 
-    providerAdapter.disconnect().catch(console.error);
+    laneArbitrator.endSession();
+    laneB.disconnect().catch(console.error);
     sessionManager.endSession(sessionId, "connection_closed");
     this.connections.delete(ws);
   }

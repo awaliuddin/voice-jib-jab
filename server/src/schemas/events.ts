@@ -61,7 +61,8 @@ export type LaneTransitionCause =
   | "b_first_audio_ready"
   | "policy_cancel"
   | "user_barge_in"
-  | "response_done";
+  | "response_done"
+  | "user_speech_ended";
 
 export interface LaneOwnerChangePayload {
   from: Lane;
@@ -69,11 +70,34 @@ export interface LaneOwnerChangePayload {
   cause: LaneTransitionCause;
 }
 
-export interface LaneEvent extends BaseEvent {
+export interface LaneBReadyPayload {
+  latency_ms: number;
+}
+
+export interface LaneAReflexPayload {
+  utterance: string;
+}
+
+export interface LaneOwnerChangedEvent extends BaseEvent {
   type: "lane.owner_changed";
   source: "orchestrator";
   payload: LaneOwnerChangePayload;
 }
+
+export interface LaneBReadyEvent extends BaseEvent {
+  type: "lane.b_ready";
+  source: "laneB";
+  payload: LaneBReadyPayload;
+}
+
+export interface LaneAReflexEvent extends BaseEvent {
+  type: "lane.a_reflex";
+  source: "laneA";
+  payload: LaneAReflexPayload;
+}
+
+// Legacy alias
+export type LaneEvent = LaneOwnerChangedEvent;
 
 // Audio Events
 export interface AudioChunkPayload {
@@ -162,7 +186,9 @@ export interface UserBargeInEvent extends BaseEvent {
 export type Event =
   | TranscriptEvent
   | PolicyEvent
-  | LaneEvent
+  | LaneOwnerChangedEvent
+  | LaneBReadyEvent
+  | LaneAReflexEvent
   | AudioEvent
   | ToolEvent
   | RAGEvent

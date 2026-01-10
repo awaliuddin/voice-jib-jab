@@ -15,10 +15,24 @@ export type SessionState =
   | "listening"
   | "error";
 
+export type LaneOwner = "none" | "A" | "B";
+export type LaneState =
+  | "IDLE"
+  | "LISTENING"
+  | "A_PLAYING"
+  | "B_RESPONDING"
+  | "B_PLAYING"
+  | "ENDED";
+
 export interface LatencyMetrics {
   ttfb: number | null;
   turnLatency: number | null;
   bargeInStop: number | null;
+}
+
+export interface LaneInfo {
+  owner: LaneOwner;
+  state: LaneState;
 }
 
 export class SessionManager {
@@ -32,10 +46,15 @@ export class SessionManager {
     turnLatency: null,
     bargeInStop: null,
   };
+  private laneInfo: LaneInfo = {
+    owner: "none",
+    state: "IDLE",
+  };
   private lastUserSpeechEnd: number = 0;
   private firstAudioChunkTime: number = 0;
   private onStateChange: ((state: SessionState) => void) | null = null;
   private onMetricsUpdate: ((metrics: LatencyMetrics) => void) | null = null;
+  private onLaneChange: ((laneInfo: LaneInfo) => void) | null = null;
 
   constructor(wsUrl: string) {
     this.wsClient = new WebSocketClient(wsUrl);
@@ -180,6 +199,24 @@ export class SessionManager {
     this.wsClient.on("connection.failed", () => {
       console.error("[SessionManager] Connection failed after max retries");
       this.setState("error");
+    });
+
+    // Lane state changed
+    this.wsClient.on("lane.state_changed", (message) => {
+      console.log(
+        `[SessionManager] Lane state: ${message.from} -> ${message.to} (${message.cause})`,
+      );
+      this.laneInfo.state = message.to as LaneState;
+      this.notifyLaneChange();
+    });
+
+    // Lane owner changed
+    this.wsClient.on("lane.owner_changed", (message) => {
+      console.log(
+        `[SessionManager] Lane owner: ${message.from} -> ${message.to} (${message.cause})`,
+      );
+      this.laneInfo.owner = message.to as LaneOwner;
+      this.notifyLaneChange();
     });
   }
 
@@ -332,5 +369,19 @@ export class SessionManager {
 
   isAudioPlaying(): boolean {
     return this.audioPlayback.isActive();
+  }
+
+  getLaneInfo(): LaneInfo {
+    return { ...this.laneInfo };
+  }
+
+  setOnLaneChange(callback: (laneInfo: LaneInfo) => void): void {
+    this.onLaneChange = callback;
+  }
+
+  private notifyLaneChange(): void {
+    if (this.onLaneChange) {
+      this.onLaneChange({ ...this.laneInfo });
+    }
   }
 }
