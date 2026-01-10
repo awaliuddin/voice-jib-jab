@@ -68,6 +68,7 @@ export class LaneArbitrator extends EventEmitter {
   private reflexTimeoutTimer: NodeJS.Timeout | null = null;
   private speechEndTime: number | null = null;
   private bReadyTime: number | null = null;
+  private responseInProgress: boolean = false; // Guards against overlapping response cycles
 
   constructor(sessionId: string, config: Partial<LaneArbitratorConfig> = {}) {
     super();
@@ -116,6 +117,7 @@ export class LaneArbitrator extends EventEmitter {
    */
   endSession(): void {
     this.clearTimers();
+    this.responseInProgress = false;
     this.transition("ENDED", "session_end");
     console.log(`[LaneArbitrator] Session ended: ${this.sessionId}`);
   }
@@ -124,6 +126,14 @@ export class LaneArbitrator extends EventEmitter {
    * Handle user speech ended - triggers Lane A or waits for Lane B
    */
   onUserSpeechEnded(): void {
+    // Guard against overlapping response cycles
+    if (this.responseInProgress) {
+      console.log(
+        `[LaneArbitrator] Ignoring speech end: response already in progress`,
+      );
+      return;
+    }
+
     if (this.state !== "LISTENING") {
       console.warn(
         `[LaneArbitrator] Unexpected speech end in state: ${this.state}`,
@@ -131,6 +141,8 @@ export class LaneArbitrator extends EventEmitter {
       return;
     }
 
+    // Mark response cycle as in progress
+    this.responseInProgress = true;
     this.speechEndTime = Date.now();
     console.log(`[LaneArbitrator] User speech ended at ${this.speechEndTime}`);
 
@@ -236,6 +248,10 @@ export class LaneArbitrator extends EventEmitter {
     console.log(`[LaneArbitrator] Lane B response complete`);
     this.transitionLaneOwner("B", "none", "response_done");
     this.transition("LISTENING", "response_done");
+
+    // Clear the response cycle guard - ready for next utterance
+    this.responseInProgress = false;
+
     this.emit("response_complete");
   }
 
@@ -254,6 +270,9 @@ export class LaneArbitrator extends EventEmitter {
       this.emit("stop_lane_b");
       this.transitionLaneOwner("B", "none", "user_barge_in");
     }
+
+    // Clear the response cycle guard - barge-in cancels current cycle
+    this.responseInProgress = false;
 
     // Return to listening
     if (this.state !== "IDLE" && this.state !== "ENDED") {

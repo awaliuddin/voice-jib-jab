@@ -8,7 +8,7 @@ import { vi } from "vitest";
 // Mock Web Audio API
 class MockAudioContext {
   state = "running";
-  sampleRate = 24000;
+  sampleRate = 48000; // Native browser rate (browsers don't support 24kHz)
   destination = {};
   currentTime = 0;
 
@@ -71,6 +71,13 @@ class MockMediaStream {
         stop: vi.fn(),
         kind: "audio",
         enabled: true,
+        getSettings: () => ({
+          sampleRate: 48000,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        }),
       },
     ];
   }

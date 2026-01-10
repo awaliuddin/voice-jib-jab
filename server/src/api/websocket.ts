@@ -200,11 +200,9 @@ export class VoiceWebSocketServer {
     laneB.on(
       "audio",
       (chunk: { data: Buffer; format: string; sampleRate: number }) => {
-        // Only forward if Lane B owns audio
-        if (
-          laneArbitrator.getCurrentOwner() !== "B" &&
-          laneArbitrator.getState() !== "B_RESPONDING"
-        ) {
+        // Only forward when Lane B strictly owns audio output
+        // During B_RESPONDING, Lane A may still be playing - don't forward yet
+        if (laneArbitrator.getCurrentOwner() !== "B") {
           return;
         }
 

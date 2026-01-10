@@ -6,25 +6,25 @@
  */
 
 export const REFLEX_WHITELIST: string[] = [
-  // Short acknowledgements
-  "Got it",
-  "One moment",
-  "Sure thing",
-  "Working on it",
-  "Let me check",
-  "I hear you",
+  // Natural acknowledgement sounds (very short, immediate)
+  "Mmhmm",
+  "Mhm",
+  "Mm",
+  "Hmm",
 
-  // Medium acknowledgements
-  "Let me think about that",
-  "Give me just a moment",
-  "Let me look into that",
-  "One second, please",
+  // Short affirmations (natural sounding)
+  "Yeah",
+  "Yep",
+  "Uh huh",
 
-  // Confirmation phrases
-  "Understood",
-  "On it",
+  // Thinking sounds
+  "Mmm",
+  "Hmm hmm",
+
+  // Very brief words (still natural)
+  "Oh",
+  "Ah",
   "Okay",
-  "Alright",
 ];
 
 /**

@@ -24,12 +24,12 @@ describe("MicrophoneCapture", () => {
     it("should request microphone permissions", async () => {
       await micCapture.initialize();
 
+      // Note: We no longer request a specific sampleRate - we use native rate and resample to 24kHz
       expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: 24000,
         },
       });
     });
