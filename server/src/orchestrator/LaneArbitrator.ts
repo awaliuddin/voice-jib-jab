@@ -238,10 +238,24 @@ export class LaneArbitrator extends EventEmitter {
    * Handle Lane B response complete
    */
   onLaneBDone(): void {
+    // Handle response completion from any active state
+    // This can happen if manual commit triggered response without VAD
+    if (this.state === "LISTENING" || this.state === "B_RESPONDING") {
+      console.log(
+        `[LaneArbitrator] Lane B done in ${this.state} (likely manual commit without VAD)`,
+      );
+      // Already in or transitioning to LISTENING, just reset guard
+      this.responseInProgress = false;
+      this.emit("response_complete");
+      return;
+    }
+
     if (this.state !== "B_PLAYING") {
       console.warn(
         `[LaneArbitrator] Unexpected B done in state: ${this.state}`,
       );
+      // Still reset guard to prevent stuck state
+      this.responseInProgress = false;
       return;
     }
 

@@ -9,7 +9,10 @@
 import { EventEmitter } from "events";
 import { v4 as uuidv4 } from "uuid";
 import { eventBus } from "../orchestrator/EventBus.js";
-import { getWeightedReflex } from "../config/reflexWhitelist.js";
+import {
+  getWeightedReflex,
+  REFLEX_WHITELIST,
+} from "../config/reflexWhitelist.js";
 import { LaneAReflexEvent } from "../schemas/events.js";
 import { getTTSInstance } from "../services/OpenAITTS.js";
 
@@ -65,14 +68,8 @@ export class LaneA extends EventEmitter {
    * Initialize the audio cache with real TTS audio from OpenAI
    */
   private async initializeAudioCache(): Promise<void> {
-    const reflexPhrases = [
-      "Got it",
-      "One moment",
-      "Sure thing",
-      "Working on it",
-      "Let me check",
-      "I hear you",
-    ];
+    // Use phrases from config - these are the natural sounds like "Mmhmm", "Yeah", etc.
+    const reflexPhrases = REFLEX_WHITELIST;
 
     try {
       const tts = getTTSInstance();

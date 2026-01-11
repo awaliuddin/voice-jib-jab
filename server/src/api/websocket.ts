@@ -383,6 +383,13 @@ export class VoiceWebSocketServer {
         case "audio.commit":
           // User released Talk button - commit audio buffer to trigger response
           console.log("[WebSocket] Committing audio buffer via Lane B");
+
+          // Trigger state transition if still in LISTENING state
+          // This handles the case where VAD didn't fire (manual push-to-talk mode)
+          if (laneArbitrator.getState() === "LISTENING") {
+            laneArbitrator.onUserSpeechEnded();
+          }
+
           await laneB.commitAudio();
           break;
 
