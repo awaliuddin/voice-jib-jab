@@ -57,6 +57,7 @@ export class SessionManager {
   };
   private lastUserSpeechEnd: number = 0;
   private firstAudioChunkTime: number = 0;
+  private providerSessionActive: boolean = false; // Track if OpenAI session is active
   private onStateChange: ((state: SessionState) => void) | null = null;
   private onMetricsUpdate: ((metrics: LatencyMetrics) => void) | null = null;
   private onLaneChange: ((laneInfo: LaneInfo) => void) | null = null;
@@ -245,6 +246,15 @@ export class SessionManager {
       return;
     }
 
+    // Stop any playing audio to prevent feedback loop
+    // (microphone picking up speaker output and sending to OpenAI)
+    if (this.audioPlayback.isActive()) {
+      console.log("[SessionManager] Stopping audio playback before capturing");
+      this.audioPlayback.stop();
+      // Notify server of implicit barge-in
+      this.wsClient.send({ type: "user.barge_in" });
+    }
+
     // Ensure microphone is initialized (lazy init on first use)
     const micReady = await this.ensureMicrophoneInitialized();
     if (!micReady) {
@@ -253,32 +263,42 @@ export class SessionManager {
     }
 
     this.setState("talking");
-    console.log("[SessionManager] Connecting to OpenAI...");
 
-    // Send session start and wait for provider.ready
-    const providerReady = new Promise<void>((resolve) => {
-      const handler = () => {
-        this.wsClient.off("provider.ready", handler);
-        resolve();
-      };
-      this.wsClient.on("provider.ready", handler);
+    // Only initialize OpenAI session on first talk
+    // Subsequent talks reuse the existing session
+    if (!this.providerSessionActive) {
+      console.log("[SessionManager] Connecting to OpenAI...");
 
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        this.wsClient.off("provider.ready", handler);
-        resolve(); // Resolve anyway to avoid hanging
-      }, 10000);
-    });
+      // Send session start and wait for provider.ready
+      const providerReady = new Promise<void>((resolve) => {
+        const handler = () => {
+          this.wsClient.off("provider.ready", handler);
+          this.providerSessionActive = true;
+          resolve();
+        };
+        this.wsClient.on("provider.ready", handler);
 
-    // Send session start with fingerprint for persistent memory
-    this.wsClient.send({
-      type: "session.start",
-      fingerprint: this.fingerprint,
-      userAgent: navigator.userAgent,
-    });
-    await providerReady;
+        // Timeout after 10 seconds
+        setTimeout(() => {
+          this.wsClient.off("provider.ready", handler);
+          resolve(); // Resolve anyway to avoid hanging
+        }, 10000);
+      });
 
-    console.log("[SessionManager] OpenAI ready, starting audio capture");
+      // Send session start with fingerprint for persistent memory
+      this.wsClient.send({
+        type: "session.start",
+        fingerprint: this.fingerprint,
+        userAgent: navigator.userAgent,
+      });
+      await providerReady;
+
+      console.log("[SessionManager] OpenAI session ready");
+    } else {
+      console.log("[SessionManager] Reusing existing OpenAI session");
+    }
+
+    console.log("[SessionManager] Starting audio capture");
 
     // Now start capturing microphone - OpenAI is ready
     this.micCapture.start((audioChunk) => {
@@ -355,6 +375,7 @@ export class SessionManager {
 
     this.setState("idle");
     this.sessionId = null;
+    this.providerSessionActive = false;
 
     console.log("[SessionManager] Disconnected");
   }

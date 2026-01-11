@@ -449,11 +449,19 @@ export class VoiceWebSocketServer {
             }
           }
 
-          // Connect Lane B (which connects to OpenAI)
-          await laneB.connect();
-          // Start the arbitrator
-          laneArbitrator.startSession();
-          sessionManager.updateSessionState(sessionId, "listening");
+          // Only connect Lane B if not already connected
+          // This prevents creating duplicate OpenAI sessions
+          if (!laneB.isConnected()) {
+            console.log("[WebSocket] Connecting to OpenAI...");
+            await laneB.connect();
+            // Start the arbitrator
+            laneArbitrator.startSession();
+            sessionManager.updateSessionState(sessionId, "listening");
+          } else {
+            console.log(
+              "[WebSocket] OpenAI already connected, reusing session",
+            );
+          }
 
           // Notify client that provider is ready with context info
           this.sendToClient(ws, {
