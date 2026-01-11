@@ -53,6 +53,7 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
   private pingInterval: NodeJS.Timeout | null = null;
   private responding: boolean = false;
   private audioBuffer: Buffer = Buffer.alloc(0);
+  private conversationContext: string | null = null;
 
   // TTFB drift prevention: Max buffer size (5 seconds of audio at 24kHz PCM16)
   private readonly MAX_AUDIO_BUFFER_SIZE = 24000 * 2 * 5; // 240KB
@@ -60,6 +61,24 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
 
   constructor(config: ProviderConfig) {
     super(config);
+  }
+
+  /**
+   * Set conversation context from previous sessions
+   * This will be included in the system instructions
+   */
+  setConversationContext(context: string): void {
+    this.conversationContext = context;
+    console.log(
+      `[OpenAI] Conversation context set (${context.length} characters)`,
+    );
+  }
+
+  /**
+   * Get the current conversation context
+   */
+  getConversationContext(): string | null {
+    return this.conversationContext;
   }
 
   async connect(sessionId: string): Promise<void> {
@@ -152,13 +171,36 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
 
   /**
    * Create and configure the session
+   * Incorporates conversation context if available for cross-session memory
    */
   private createSession(): void {
+    // Build system instructions with optional conversation context
+    let instructions =
+      this.config.systemInstructions ||
+      "You are a helpful voice assistant. Please be concise and natural in your responses.";
+
+    // Inject conversation context for returning users
+    if (this.conversationContext) {
+      instructions = `${instructions}
+
+## Previous Conversation Context
+
+You are speaking with a returning user. Here is a summary of your previous conversations with them. Use this context to provide a personalized, continuous experience. Reference previous topics naturally when relevant, but don't force it.
+
+${this.conversationContext}
+
+## Current Conversation
+
+Continue the conversation naturally, keeping in mind the previous context.`;
+
+      console.log(
+        "[OpenAI] Injecting conversation context into system instructions",
+      );
+    }
+
     const sessionConfig: SessionConfig = {
       modalities: ["text", "audio"],
-      instructions:
-        this.config.systemInstructions ||
-        "You are a helpful voice assistant. Please be concise and natural in your responses.",
+      instructions,
       voice: "alloy",
       input_audio_format: "pcm16",
       output_audio_format: "pcm16",

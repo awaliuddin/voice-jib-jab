@@ -2,19 +2,19 @@
  * Configuration loader for Voice Jib-Jab server
  */
 
-import { config as loadEnv } from 'dotenv';
-import { resolve } from 'path';
-import { existsSync } from 'fs';
+import { config as loadEnv } from "dotenv";
+import { resolve } from "path";
+import { existsSync } from "fs";
 
 // Determine the project root directory
 // When running from server/ directory, we need to look in parent directory
 const currentDir = process.cwd();
-const parentDir = resolve(currentDir, '..');
+const parentDir = resolve(currentDir, "..");
 
 // Try multiple locations for .env file
 const envPaths = [
-  resolve(parentDir, '.env'),  // Project root (most common)
-  resolve(currentDir, '.env'), // Current directory (fallback)
+  resolve(parentDir, ".env"), // Project root (most common)
+  resolve(currentDir, ".env"), // Current directory (fallback)
 ];
 
 // Find and load the first existing .env file
@@ -31,9 +31,9 @@ for (const envPath of envPaths) {
 }
 
 if (!envLoaded) {
-  console.warn('⚠ No .env file found in expected locations:');
-  envPaths.forEach(p => console.warn(`  - ${p}`));
-  console.warn('Continuing with environment variables from shell/system...');
+  console.warn("⚠ No .env file found in expected locations:");
+  envPaths.forEach((p) => console.warn(`  - ${p}`));
+  console.warn("Continuing with environment variables from shell/system...");
 }
 
 export interface ServerConfig {
@@ -48,6 +48,7 @@ export interface ServerConfig {
     enableRAG: boolean;
     enablePolicyGate: boolean;
     enableAuditTrail: boolean;
+    enablePersistentMemory: boolean;
   };
   latency: {
     ttfbTargetP50: number;
@@ -58,6 +59,12 @@ export interface ServerConfig {
     enablePIIRedaction: boolean;
     storeRawAudio: boolean;
     maxSessionDurationMinutes: number;
+  };
+  storage: {
+    databasePath: string;
+    enableWalMode: boolean;
+    maxHistoryTurns: number;
+    maxSummaryLength: number;
   };
 }
 
@@ -72,7 +79,7 @@ function getEnvVar(key: string, defaultValue?: string): string {
 function getEnvBool(key: string, defaultValue: boolean): boolean {
   const value = process.env[key];
   if (!value) return defaultValue;
-  return value.toLowerCase() === 'true';
+  return value.toLowerCase() === "true";
 }
 
 function getEnvNumber(key: string, defaultValue: number): number {
@@ -86,26 +93,36 @@ function getEnvNumber(key: string, defaultValue: number): number {
 }
 
 export const config: ServerConfig = {
-  port: getEnvNumber('PORT', 3000),
-  nodeEnv: getEnvVar('NODE_ENV', 'development'),
+  port: getEnvNumber("PORT", 3000),
+  nodeEnv: getEnvVar("NODE_ENV", "development"),
   openai: {
-    apiKey: getEnvVar('OPENAI_API_KEY'),
-    model: getEnvVar('OPENAI_MODEL', 'gpt-realtime'),
+    apiKey: getEnvVar("OPENAI_API_KEY"),
+    model: getEnvVar("OPENAI_MODEL", "gpt-realtime"),
   },
   features: {
-    enableLaneA: getEnvBool('ENABLE_LANE_A', true),
-    enableRAG: getEnvBool('ENABLE_RAG', true),
-    enablePolicyGate: getEnvBool('ENABLE_POLICY_GATE', true),
-    enableAuditTrail: getEnvBool('ENABLE_AUDIT_TRAIL', true),
+    enableLaneA: getEnvBool("ENABLE_LANE_A", true),
+    enableRAG: getEnvBool("ENABLE_RAG", true),
+    enablePolicyGate: getEnvBool("ENABLE_POLICY_GATE", true),
+    enableAuditTrail: getEnvBool("ENABLE_AUDIT_TRAIL", true),
+    enablePersistentMemory: getEnvBool("ENABLE_PERSISTENT_MEMORY", true),
   },
   latency: {
-    ttfbTargetP50: getEnvNumber('TTFB_TARGET_P50', 400),
-    ttfbTargetP95: getEnvNumber('TTFB_TARGET_P95', 900),
-    bargeInTargetP95: getEnvNumber('BARGE_IN_TARGET_P95', 250),
+    ttfbTargetP50: getEnvNumber("TTFB_TARGET_P50", 400),
+    ttfbTargetP95: getEnvNumber("TTFB_TARGET_P95", 900),
+    bargeInTargetP95: getEnvNumber("BARGE_IN_TARGET_P95", 250),
   },
   safety: {
-    enablePIIRedaction: getEnvBool('ENABLE_PII_REDACTION', true),
-    storeRawAudio: getEnvBool('STORE_RAW_AUDIO', false),
-    maxSessionDurationMinutes: getEnvNumber('MAX_SESSION_DURATION_MINUTES', 30),
+    enablePIIRedaction: getEnvBool("ENABLE_PII_REDACTION", true),
+    storeRawAudio: getEnvBool("STORE_RAW_AUDIO", false),
+    maxSessionDurationMinutes: getEnvNumber("MAX_SESSION_DURATION_MINUTES", 30),
+  },
+  storage: {
+    databasePath: getEnvVar(
+      "DATABASE_PATH",
+      resolve(parentDir, "data", "voice-jib-jab.db"),
+    ),
+    enableWalMode: getEnvBool("DATABASE_WAL_MODE", true),
+    maxHistoryTurns: getEnvNumber("MAX_HISTORY_TURNS", 20),
+    maxSummaryLength: getEnvNumber("MAX_SUMMARY_LENGTH", 2000),
   },
 };

@@ -23,6 +23,7 @@ export class LaneB extends EventEmitter {
   private firstAudioEmitted: boolean = false;
   private responseStartTime: number | null = null;
   private firstAudioTime: number | null = null;
+  private conversationContext: string | null = null;
 
   constructor(sessionId: string, config: LaneBConfig) {
     super();
@@ -30,6 +31,22 @@ export class LaneB extends EventEmitter {
     this.adapter = new OpenAIRealtimeAdapter(config.providerConfig);
 
     this.setupAdapterHandlers();
+  }
+
+  /**
+   * Set conversation context from previous sessions
+   * This will be injected into the system prompt when connecting
+   */
+  setConversationContext(context: string): void {
+    this.conversationContext = context;
+    console.log(`[LaneB] Conversation context set (${context.length} chars)`);
+  }
+
+  /**
+   * Get the current conversation context
+   */
+  getConversationContext(): string | null {
+    return this.conversationContext;
   }
 
   /**
@@ -106,8 +123,13 @@ export class LaneB extends EventEmitter {
 
   /**
    * Connect to the provider
+   * If conversation context is set, it will be injected into the session
    */
   async connect(): Promise<void> {
+    // Pass conversation context to adapter if available
+    if (this.conversationContext) {
+      this.adapter.setConversationContext(this.conversationContext);
+    }
     await this.adapter.connect(this.sessionId);
     console.log(`[LaneB] Connected for session: ${this.sessionId}`);
   }

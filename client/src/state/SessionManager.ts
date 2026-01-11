@@ -1,11 +1,13 @@
 /**
  * Client-side Session Manager
  * Coordinates audio capture, playback, and server communication
+ * With persistent memory support via fingerprinting
  */
 
 import { MicrophoneCapture } from "../audio/MicrophoneCapture";
 import { AudioPlayback } from "../audio/AudioPlayback";
 import { WebSocketClient } from "../events/WebSocketClient";
+import { getPersistedFingerprint } from "../utils/fingerprint";
 
 export type SessionState =
   | "idle"
@@ -41,6 +43,9 @@ export class SessionManager {
   private audioPlayback: AudioPlayback;
   private state: SessionState = "idle";
   private sessionId: string | null = null;
+  private fingerprint: string | null = null;
+  private isReturningUser: boolean = false;
+  private previousSessionCount: number = 0;
   private metrics: LatencyMetrics = {
     ttfb: null,
     turnLatency: null,
@@ -66,6 +71,12 @@ export class SessionManager {
     this.setState("initializing");
 
     try {
+      // Generate fingerprint for persistent memory
+      this.fingerprint = await getPersistedFingerprint();
+      console.log(
+        `[SessionManager] Fingerprint: ${this.fingerprint.substring(0, 16)}...`,
+      );
+
       // Initialize WebSocket and audio playback first
       // Microphone is initialized lazily when user starts talking
       await Promise.all([
@@ -120,9 +131,17 @@ export class SessionManager {
     });
 
     // Provider (OpenAI) connected
-    this.wsClient.on("provider.ready", () => {
+    this.wsClient.on("provider.ready", (message) => {
       console.log("[SessionManager] Provider connection ready");
-      // OpenAI is now ready to receive audio
+      // Capture returning user info for persistent memory
+      this.isReturningUser = message.isReturningUser || false;
+      this.previousSessionCount = message.previousSessionCount || 0;
+
+      if (this.isReturningUser) {
+        console.log(
+          `[SessionManager] Welcome back! ${this.previousSessionCount} previous sessions detected.`,
+        );
+      }
     });
 
     // Response started - AI is about to speak
@@ -251,7 +270,12 @@ export class SessionManager {
       }, 10000);
     });
 
-    this.wsClient.send({ type: "session.start" });
+    // Send session start with fingerprint for persistent memory
+    this.wsClient.send({
+      type: "session.start",
+      fingerprint: this.fingerprint,
+      userAgent: navigator.userAgent,
+    });
     await providerReady;
 
     console.log("[SessionManager] OpenAI ready, starting audio capture");
@@ -383,5 +407,26 @@ export class SessionManager {
     if (this.onLaneChange) {
       this.onLaneChange({ ...this.laneInfo });
     }
+  }
+
+  /**
+   * Check if this is a returning user with conversation history
+   */
+  getIsReturningUser(): boolean {
+    return this.isReturningUser;
+  }
+
+  /**
+   * Get the number of previous sessions for this user
+   */
+  getPreviousSessionCount(): number {
+    return this.previousSessionCount;
+  }
+
+  /**
+   * Get the current fingerprint (for debugging)
+   */
+  getFingerprint(): string | null {
+    return this.fingerprint;
   }
 }

@@ -1,6 +1,6 @@
 /**
  * WebSocket server for real-time voice communication
- * With Lane Arbitration support
+ * With Lane Arbitration support and Persistent Memory
  */
 
 import { WebSocketServer, WebSocket } from "ws";
@@ -12,13 +12,22 @@ import { LaneA } from "../lanes/LaneA.js";
 import { LaneB } from "../lanes/LaneB.js";
 import { config } from "../config/index.js";
 import { Event } from "../schemas/events.js";
+import {
+  getDatabase,
+  getTranscriptStore,
+  getSessionHistory,
+  SessionContext,
+} from "../storage/index.js";
 
 interface ClientConnection {
   ws: WebSocket;
   sessionId: string;
+  userId: string | null;
+  fingerprint: string | null;
   laneArbitrator: LaneArbitrator;
   laneA: LaneA;
   laneB: LaneB;
+  sessionContext: SessionContext | null;
 }
 
 export class VoiceWebSocketServer {
@@ -28,6 +37,16 @@ export class VoiceWebSocketServer {
   constructor(server: any) {
     this.wss = new WebSocketServer({ server });
     this.connections = new Map();
+
+    // Initialize storage if persistent memory is enabled
+    if (config.features.enablePersistentMemory) {
+      try {
+        getDatabase({ path: config.storage.databasePath });
+        console.log("[WebSocket] Persistent memory storage initialized");
+      } catch (error) {
+        console.error("[WebSocket] Failed to initialize storage:", error);
+      }
+    }
 
     this.wss.on("connection", this.handleConnection.bind(this));
     console.log("[WebSocket] Server initialized");
@@ -67,9 +86,12 @@ export class VoiceWebSocketServer {
     const connection: ClientConnection = {
       ws,
       sessionId: session.id,
+      userId: null,
+      fingerprint: null,
       laneArbitrator,
       laneA,
       laneB,
+      sessionContext: null,
     };
     this.connections.set(ws, connection);
 
@@ -227,7 +249,7 @@ export class VoiceWebSocketServer {
       },
     );
 
-    // Handle transcripts from Lane B
+    // Handle transcripts from Lane B (assistant responses)
     laneB.on(
       "transcript",
       (segment: {
@@ -243,6 +265,24 @@ export class VoiceWebSocketServer {
           isFinal: segment.isFinal,
           timestamp: segment.timestamp,
         });
+
+        // Persist assistant transcript to database
+        if (config.features.enablePersistentMemory && segment.isFinal) {
+          try {
+            const transcriptStore = getTranscriptStore();
+            transcriptStore.save({
+              sessionId,
+              userId: connection.userId || undefined,
+              role: "assistant",
+              content: segment.text,
+              confidence: segment.confidence,
+              timestampMs: segment.timestamp,
+              isFinal: segment.isFinal,
+            });
+          } catch (error) {
+            console.error("[WebSocket] Failed to persist transcript:", error);
+          }
+        }
 
         const event: Event = {
           event_id: uuidv4(),
@@ -272,6 +312,27 @@ export class VoiceWebSocketServer {
           isFinal: segment.isFinal,
           timestamp: segment.timestamp,
         });
+
+        // Persist user transcript to database
+        if (config.features.enablePersistentMemory && segment.isFinal) {
+          try {
+            const transcriptStore = getTranscriptStore();
+            transcriptStore.save({
+              sessionId,
+              userId: connection.userId || undefined,
+              role: "user",
+              content: segment.text,
+              confidence: segment.confidence,
+              timestampMs: segment.timestamp,
+              isFinal: segment.isFinal,
+            });
+          } catch (error) {
+            console.error(
+              "[WebSocket] Failed to persist user transcript:",
+              error,
+            );
+          }
+        }
 
         const event: Event = {
           event_id: uuidv4(),
@@ -338,14 +399,69 @@ export class VoiceWebSocketServer {
 
       switch (message.type) {
         case "session.start":
+          // Handle user identification and session context
+          if (config.features.enablePersistentMemory) {
+            try {
+              const sessionHistory = getSessionHistory();
+
+              // Get or create user from fingerprint
+              const fingerprint = message.fingerprint || `anon-${sessionId}`;
+              connection.fingerprint = fingerprint;
+
+              const user = sessionHistory.getOrCreateUser(fingerprint, {
+                userAgent: message.userAgent,
+                createdFromSession: sessionId,
+              });
+              connection.userId = user.id;
+
+              // Record this session in the database
+              sessionHistory.recordSession(sessionId, user.id, {
+                connectedAt: new Date().toISOString(),
+              });
+
+              // Retrieve conversation context for returning users
+              const context = sessionHistory.getSessionContext(
+                user.id,
+                sessionId,
+              );
+              connection.sessionContext = context;
+
+              if (context.isReturningUser) {
+                console.log(
+                  `[WebSocket] Returning user: ${user.id} (${context.previousSessionCount} previous sessions)`,
+                );
+              } else {
+                console.log(`[WebSocket] New user: ${user.id}`);
+              }
+
+              // Inject context into Lane B if we have history
+              if (context.conversationSummary) {
+                laneB.setConversationContext(context.conversationSummary);
+                console.log(
+                  "[WebSocket] Injected conversation context into session",
+                );
+              }
+            } catch (error) {
+              console.error(
+                "[WebSocket] Failed to setup session context:",
+                error,
+              );
+            }
+          }
+
           // Connect Lane B (which connects to OpenAI)
           await laneB.connect();
           // Start the arbitrator
           laneArbitrator.startSession();
           sessionManager.updateSessionState(sessionId, "listening");
-          // Notify client that provider is ready
+
+          // Notify client that provider is ready with context info
           this.sendToClient(ws, {
             type: "provider.ready",
+            isReturningUser:
+              connection.sessionContext?.isReturningUser || false,
+            previousSessionCount:
+              connection.sessionContext?.previousSessionCount || 0,
             timestamp: Date.now(),
           });
           break;
@@ -411,6 +527,34 @@ export class VoiceWebSocketServer {
           break;
 
         case "session.end":
+          // Save conversation summary before ending
+          if (config.features.enablePersistentMemory && connection.userId) {
+            try {
+              const sessionHistory = getSessionHistory();
+              const transcriptStore = getTranscriptStore();
+
+              const summary = sessionHistory.generateSessionSummary(sessionId);
+              const turnCount = transcriptStore.getSessionTurnCount(sessionId);
+
+              if (summary && turnCount > 0) {
+                sessionHistory.saveConversationSummary(
+                  connection.userId,
+                  sessionId,
+                  summary,
+                  turnCount,
+                );
+              }
+
+              sessionHistory.endSession(sessionId, "user_ended");
+              transcriptStore.cleanupNonFinal(sessionId);
+            } catch (error) {
+              console.error(
+                "[WebSocket] Failed to save session summary:",
+                error,
+              );
+            }
+          }
+
           laneArbitrator.endSession();
           await laneB.disconnect();
           sessionManager.endSession(sessionId, "user_ended");
@@ -431,9 +575,41 @@ export class VoiceWebSocketServer {
   }
 
   private handleClose(connection: ClientConnection): void {
-    const { ws, sessionId, laneArbitrator, laneB } = connection;
+    const { ws, sessionId, userId, laneArbitrator, laneB } = connection;
 
     console.log(`[WebSocket] Client disconnected: ${sessionId}`);
+
+    // Save conversation summary before closing
+    if (config.features.enablePersistentMemory && userId) {
+      try {
+        const sessionHistory = getSessionHistory();
+        const transcriptStore = getTranscriptStore();
+
+        // Generate and save conversation summary
+        const summary = sessionHistory.generateSessionSummary(sessionId);
+        const turnCount = transcriptStore.getSessionTurnCount(sessionId);
+
+        if (summary && turnCount > 0) {
+          sessionHistory.saveConversationSummary(
+            userId,
+            sessionId,
+            summary,
+            turnCount,
+          );
+          console.log(
+            `[WebSocket] Saved conversation summary (${turnCount} turns)`,
+          );
+        }
+
+        // Mark session as ended in database
+        sessionHistory.endSession(sessionId, "connection_closed");
+
+        // Cleanup non-final transcripts
+        transcriptStore.cleanupNonFinal(sessionId);
+      } catch (error) {
+        console.error("[WebSocket] Failed to save session summary:", error);
+      }
+    }
 
     laneArbitrator.endSession();
     laneB.disconnect().catch(console.error);
