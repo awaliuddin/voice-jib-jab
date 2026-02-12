@@ -1,0 +1,23 @@
+{
+  "id": "T-005",
+  "title": "Implement PIIRedactor Stub",
+  "description": "Implement a PIIRedactor stub in Lane C that can scan transcript or response metadata for potential PII and redact or flag as configured. Ensure redacted content is used in audit logs and tool calls as appropriate.",
+  "status": "completed",
+  "assigned_to": "codex",
+  "task_type": "implement",
+  "depends_on": [
+    "T-002"
+  ],
+  "locked_files": [
+    "server/src/insurance/policy_gate.ts"
+  ],
+  "acceptance_criteria": [
+    "PIIRedactor scans input text for PII patterns (stubbed)",
+    "Redacted output is used for audit and tool call events",
+    "Policy decision events include PII reason_codes when detected",
+    "Stub supports future expansion with more robust detection"
+  ],
+  "created_at": "2026-02-12T00:36:50.777800901Z",
+  "updated_at": "2026-02-12T01:21:18.042939519Z",
+  "completed_at": "2026-02-12T01:21:18.042939342Z"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "T-009",
+  "title": "Implement Retrieval Tool and Facts Pack Injection in Lane B",
+  "description": "Implement the tool call in Lane B ReasoningEngine to retrieve facts packs from the retrieval service and inject them into the instruction set for responses about NextGen AI. Ensure citations are included for audit.",
+  "status": "completed",
+  "assigned_to": "codex",
+  "task_type": "implement",
+  "depends_on": [
+    "T-008"
+  ],
+  "locked_files": [
+    "server/src/lanes/LaneB.ts"
+  ],
+  "acceptance_criteria": [
+    "Lane B can call the retrieval service with transcript queries",
+    "Facts pack is injected into Lane B's instruction set",
+    "Structured citations are included in Lane B's internal audit events",
+    "Responses about NextGen AI use retrieved facts consistently"
+  ],
+  "created_at": "2026-02-12T00:36:50.777803730Z",
+  "updated_at": "2026-02-12T01:12:03.395208511Z",
+  "completed_at": "2026-02-12T01:12:03.395208380Z"
+}

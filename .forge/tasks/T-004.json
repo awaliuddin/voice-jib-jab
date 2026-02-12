@@ -1,0 +1,24 @@
+{
+  "id": "T-004",
+  "title": "Implement AllowedClaimsRegistry Stub",
+  "description": "Implement the AllowedClaimsRegistry as a stub service that can match claims in transcript or response metadata against an approved claims list. Integrate with Lane C ClaimsChecker and ensure it emits the correct policy decision events.",
+  "status": "completed",
+  "assigned_to": "codex",
+  "task_type": "implement",
+  "depends_on": [
+    "T-002"
+  ],
+  "locked_files": [
+    "server/src/insurance/allowed_claims_registry.ts",
+    "knowledge/allowed_claims.json"
+  ],
+  "acceptance_criteria": [
+    "AllowedClaimsRegistry can load and match claims from allowed_claims.json",
+    "ClaimsChecker uses AllowedClaimsRegistry to check claims in input",
+    "Policy decision events include reason_codes when claims are disallowed",
+    "Stub supports future hardening for production"
+  ],
+  "created_at": "2026-02-12T00:36:50.777800303Z",
+  "updated_at": "2026-02-12T01:14:13.497818978Z",
+  "completed_at": "2026-02-12T01:14:13.497818828Z"
+}

@@ -41,11 +41,20 @@ export type PolicyDecision =
   | "escalate"
   | "cancel_output";
 
+export type FallbackMode =
+  | "auto"
+  | "ask_clarifying_question"
+  | "refuse_politely"
+  | "switch_to_text_summary"
+  | "escalate_to_human"
+  | "offer_email_or_link";
+
 export interface PolicyDecisionPayload {
   decision: PolicyDecision;
   reason_codes: string[];
   safe_rewrite?: string;
   required_disclaimer_id?: string;
+  fallback_mode?: FallbackMode;
   severity: number;
 }
 
@@ -115,6 +124,20 @@ export interface AudioEvent extends BaseEvent {
   payload: AudioChunkPayload | { lane?: Lane };
 }
 
+// Response Metadata Events
+export interface ResponseMetadataPayload {
+  phase: "start" | "end";
+  ttfb_ms?: number;
+  total_ms?: number;
+  voice_mode?: "push-to-talk" | "open-mic";
+}
+
+export interface ResponseMetadataEvent extends BaseEvent {
+  type: "response.metadata";
+  source: "laneB";
+  payload: ResponseMetadataPayload;
+}
+
 // Tool Events
 export interface ToolCallPayload {
   tool_name: string;
@@ -148,12 +171,35 @@ export interface RAGResultPayload {
     timestamp: string;
   }>;
   disclaimers: string[];
+  citations?: Array<{
+    id: string;
+    source: string;
+    timestamp: string;
+    text?: string;
+  }>;
 }
 
 export interface RAGEvent extends BaseEvent {
   type: "rag.query" | "rag.result";
   source: "laneB" | "retriever";
   payload: RAGQueryPayload | RAGResultPayload;
+}
+
+// Fallback Events (Orchestrator)
+export interface FallbackEventPayload {
+  mode: FallbackMode;
+  decision?: PolicyDecision;
+  reason_codes?: string[];
+  utterance?: string;
+  output?: "audio" | "text";
+  status?: "started" | "completed";
+  reason?: "done" | "stopped";
+}
+
+export interface FallbackEvent extends BaseEvent {
+  type: "fallback.started" | "fallback.completed";
+  source: "orchestrator";
+  payload: FallbackEventPayload;
 }
 
 // Session Events
@@ -182,6 +228,68 @@ export interface UserBargeInEvent extends BaseEvent {
   payload: Record<string, unknown>;
 }
 
+// Control / Audit Events (Lane C)
+export interface ControlAuditPayload {
+  evaluationId: string;
+  role: "user" | "assistant";
+  textSnippet: string;
+  decision: PolicyDecision;
+  reasonCodes: string[];
+  severity: number;
+  checksRun: string[];
+  durationMs: number;
+}
+
+export interface ControlAuditEvent extends BaseEvent {
+  type: "control.audit";
+  source: "laneC";
+  payload: ControlAuditPayload;
+}
+
+// Control / Override Events (Lane C)
+export interface ControlOverridePayload {
+  evaluationId: string;
+  originalDecision: PolicyDecision;
+  effectiveDecision: PolicyDecision;
+  reasonCodes: string[];
+  severity: number;
+  cancelThreshold: number;
+}
+
+export interface ControlOverrideEvent extends BaseEvent {
+  type: "control.override";
+  source: "laneC";
+  payload: ControlOverridePayload;
+}
+
+// Control / Metrics Events (Lane C)
+export interface ControlMetricsPayload {
+  evaluationCount: number;
+  allowCount: number;
+  rewriteCount: number;
+  refuseCount: number;
+  escalateCount: number;
+  cancelCount: number;
+  avgDurationMs: number;
+  maxDurationMs: number;
+}
+
+export interface ArbitratorAuditEvent extends BaseEvent {
+  type: "arbitration.state.transition" | "arbitration.owner.transition";
+  source: "orchestrator";
+  payload: {
+    from: string;
+    to: string;
+    trigger: string;
+  };
+}
+
+export interface ControlMetricsEvent extends BaseEvent {
+  type: "control.metrics";
+  source: "laneC";
+  payload: ControlMetricsPayload;
+}
+
 // Union type for all events
 export type Event =
   | TranscriptEvent
@@ -190,8 +298,14 @@ export type Event =
   | LaneBReadyEvent
   | LaneAReflexEvent
   | AudioEvent
+  | ResponseMetadataEvent
   | ToolEvent
   | RAGEvent
   | SessionEvent
   | UserTranscriptEvent
-  | UserBargeInEvent;
+  | UserBargeInEvent
+  | ControlAuditEvent
+  | ControlOverrideEvent
+  | ControlMetricsEvent
+  | FallbackEvent
+  | ArbitratorAuditEvent;

@@ -1,0 +1,25 @@
+{
+  "id": "T-003",
+  "title": "Implement Policy Cancel Output and Fallback Trigger",
+  "description": "Extend the Lane C ControlEngine and LaneArbitrator to support policy cancel events that immediately stop Lane B audio and trigger fallback handling. Ensure the fallback planner is invoked and the correct arbitration state transitions occur.",
+  "status": "completed",
+  "assigned_to": "codex",
+  "task_type": "implement",
+  "depends_on": [
+    "T-002"
+  ],
+  "locked_files": [
+    "server/src/lanes/laneC_control.ts",
+    "server/src/orchestrator/LaneArbitrator.ts",
+    "server/src/insurance/fallback_planner.ts"
+  ],
+  "acceptance_criteria": [
+    "Policy cancel event from Lane C stops Lane B audio playback",
+    "FallbackPlanner is invoked when cancel_output is triggered",
+    "LaneArbitrator transitions to FALLBACK_PLAYING state",
+    "Session resumes listening after fallback completes"
+  ],
+  "created_at": "2026-02-12T00:36:50.777799542Z",
+  "updated_at": "2026-02-12T01:21:27.463687763Z",
+  "completed_at": "2026-02-12T01:21:27.463687605Z"
+}

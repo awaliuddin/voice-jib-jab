@@ -8,12 +8,24 @@
 import { EventEmitter } from "events";
 import { OpenAIRealtimeAdapter } from "../providers/OpenAIRealtimeAdapter.js";
 import { ProviderConfig, AudioChunk } from "../providers/ProviderAdapter.js";
+import { formatDisclaimerBlock } from "../retrieval/DisclaimerLookup.js";
+import { RAGPipeline } from "../retrieval/RAGPipeline.js";
+import { retrievalService } from "../retrieval/index.js";
+import { PIIRedactor } from "../insurance/policy_gate.js";
 
 /**
  * Lane B configuration
  */
 export interface LaneBConfig {
   providerConfig: ProviderConfig;
+  rag?: {
+    enabled: boolean;
+    topK?: number;
+  };
+  safety?: {
+    enablePIIRedaction?: boolean;
+    piiRedactionMode?: "redact" | "flag";
+  };
 }
 
 export class LaneB extends EventEmitter {
@@ -24,11 +36,42 @@ export class LaneB extends EventEmitter {
   private responseStartTime: number | null = null;
   private firstAudioTime: number | null = null;
   private conversationContext: string | null = null;
+  private requiredDisclaimerIds: string[] = [];
+  private ragPipeline: RAGPipeline | null = null;
 
   constructor(sessionId: string, config: LaneBConfig) {
     super();
     this.sessionId = sessionId;
     this.adapter = new OpenAIRealtimeAdapter(config.providerConfig);
+
+    if (config.rag?.enabled) {
+      const piiEnabled = config.safety?.enablePIIRedaction ?? true;
+      const piiMode = config.safety?.piiRedactionMode ?? "redact";
+      const piiRedactor =
+        piiEnabled && piiMode === "redact"
+          ? new PIIRedactor({ mode: piiMode })
+          : null;
+
+      this.ragPipeline = new RAGPipeline(sessionId, retrievalService, {
+        topK: config.rag.topK,
+        piiRedactor,
+        redactToolCalls: piiEnabled && piiMode === "redact",
+      });
+
+      this.adapter.setResponseInstructionsProvider((transcript) => {
+        if (!this.ragPipeline) return null;
+        const context = this.ragPipeline.buildResponseContext(transcript);
+        if (
+          context.factsPack?.facts?.length &&
+          context.factsPack.disclaimers?.length
+        ) {
+          this.setRequiredDisclaimers(context.factsPack.disclaimers);
+        }
+        return context.instructions;
+      });
+
+      console.log("[LaneB] RAG pipeline enabled");
+    }
 
     this.setupAdapterHandlers();
   }
@@ -47,6 +90,29 @@ export class LaneB extends EventEmitter {
    */
   getConversationContext(): string | null {
     return this.conversationContext;
+  }
+
+  /**
+   * Set disclaimer IDs that must be appended to the next assistant response.
+   */
+  setRequiredDisclaimers(disclaimerIds: string[]): void {
+    this.requiredDisclaimerIds = Array.from(
+      new Set(disclaimerIds.filter((id) => id)),
+    );
+  }
+
+  /**
+   * Clear any pending disclaimer requirements.
+   */
+  clearRequiredDisclaimers(): void {
+    this.requiredDisclaimerIds = [];
+  }
+
+  /**
+   * Get the currently required disclaimer IDs.
+   */
+  getRequiredDisclaimers(): string[] {
+    return [...this.requiredDisclaimerIds];
   }
 
   /**
@@ -73,9 +139,10 @@ export class LaneB extends EventEmitter {
       this.emit("audio", chunk);
     });
 
-    // Forward transcripts
+    // Forward transcripts (append disclaimers when required)
     this.adapter.on("transcript", (segment) => {
-      this.emit("transcript", segment);
+      const updatedSegment = this.applyDisclaimersToTranscript(segment);
+      this.emit("transcript", updatedSegment);
     });
 
     this.adapter.on("user_transcript", (segment) => {
@@ -94,6 +161,7 @@ export class LaneB extends EventEmitter {
     this.adapter.on("response_end", () => {
       this.isResponding = false;
       this.firstAudioEmitted = false;
+      this.requiredDisclaimerIds = [];
 
       const totalMs = this.responseStartTime
         ? Date.now() - this.responseStartTime
@@ -151,9 +219,10 @@ export class LaneB extends EventEmitter {
 
   /**
    * Commit audio buffer and trigger response
+   * Returns true if commit was sent, false if skipped due to guards
    */
-  async commitAudio(): Promise<void> {
-    await this.adapter.commitAudio();
+  async commitAudio(): Promise<boolean> {
+    return await this.adapter.commitAudio();
   }
 
   /**
@@ -163,6 +232,7 @@ export class LaneB extends EventEmitter {
     await this.adapter.cancel();
     this.isResponding = false;
     this.firstAudioEmitted = false;
+    this.requiredDisclaimerIds = [];
     console.log(`[LaneB] Response cancelled`);
   }
 
@@ -202,5 +272,71 @@ export class LaneB extends EventEmitter {
    */
   getAdapter(): OpenAIRealtimeAdapter {
     return this.adapter;
+  }
+
+  /**
+   * Set the voice interaction mode
+   * @param mode - 'push-to-talk' or 'open-mic'
+   */
+  setVoiceMode(mode: "push-to-talk" | "open-mic"): void {
+    this.adapter.setVoiceMode(mode);
+    console.log(`[LaneB] Voice mode set to: ${mode}`);
+  }
+
+  /**
+   * Get the current voice mode
+   */
+  getVoiceMode(): "push-to-talk" | "open-mic" {
+    return this.adapter.getVoiceMode();
+  }
+
+  /**
+   * Append any required disclaimers to the final transcript.
+   * Disclaimers are consumed after use to avoid repeat append.
+   */
+  private applyDisclaimersToTranscript(
+    segment: {
+      text: string;
+      confidence: number;
+      isFinal: boolean;
+      timestamp: number;
+    },
+  ):
+    | {
+        text: string;
+        confidence: number;
+        isFinal: boolean;
+        timestamp: number;
+      }
+    | typeof segment {
+    if (!segment.isFinal || !this.isResponding) {
+      return segment;
+    }
+
+    if (this.requiredDisclaimerIds.length === 0) {
+      return segment;
+    }
+
+    const { text: disclaimerText, missing } = formatDisclaimerBlock(
+      this.requiredDisclaimerIds,
+    );
+
+    // Consume disclaimers regardless of lookup success to avoid loops
+    this.requiredDisclaimerIds = [];
+
+    if (missing.length > 0) {
+      console.warn(
+        `[LaneB] Missing disclaimer IDs: ${missing.join(", ")}`,
+      );
+    }
+
+    if (!disclaimerText) {
+      return segment;
+    }
+
+    return {
+      ...segment,
+      text: `${segment.text}\n\n${disclaimerText}`,
+    };
   }
 }

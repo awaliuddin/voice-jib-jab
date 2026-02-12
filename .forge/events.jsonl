@@ -1,0 +1,41 @@
+{"timestamp":"2026-02-11T01:17:44.961034009Z","event_type":"plan_created","task_id":null,"agent":null,"message":"Forge initialized for project: voice-jib-jab","metadata":null}
+{"timestamp":"2026-02-11T01:21:11.322504242Z","event_type":"plan_created","task_id":null,"agent":null,"message":"Plan generated from spec-jib-jab.md: 17 tasks","metadata":null}
+{"timestamp":"2026-02-11T01:42:45.448576628Z","event_type":"task_started","task_id":"T-001","agent":"claude","message":"Task T-001 started","metadata":null}
+{"timestamp":"2026-02-11T01:42:57.322657062Z","event_type":"task_failed","task_id":"T-001","agent":"claude","message":"Task T-001 failed (exit code: 1)","metadata":null}
+{"timestamp":"2026-02-11T02:05:55.520549924Z","event_type":"task_started","task_id":"T-001","agent":"claude","message":"Task T-001 started","metadata":null}
+{"timestamp":"2026-02-11T02:09:59.319389016Z","event_type":"task_completed","task_id":"T-001","agent":"claude","message":"Task T-001 completed (exit code: 0)","metadata":null}
+{"timestamp":"2026-02-11T16:22:20.983863686Z","event_type":"plan_created","task_id":null,"agent":null,"message":"Plan generated from spec-jib-jab.md: 17 tasks","metadata":null}
+{"timestamp":"2026-02-11T17:08:47.971859649Z","event_type":"plan_created","task_id":null,"agent":null,"message":"Plan generated from spec-jib-jab.md: 9 tasks","metadata":null}
+{"timestamp":"2026-02-11T17:14:05.101195390Z","event_type":"task_started","task_id":"T-001","agent":"claude","message":"Task T-001 started","metadata":null}
+{"timestamp":"2026-02-11T17:20:04.336523442Z","event_type":"task_completed","task_id":"T-001","agent":"claude","message":"Task T-001 completed (exit code: 0)","metadata":null}
+{"timestamp":"2026-02-11T17:45:02.669514843Z","event_type":"task_completed","task_id":"T-003","agent":"claude","message":"T-003 completed by claude (exit 0)","metadata":null}
+{"timestamp":"2026-02-11T17:46:00.343653506Z","event_type":"task_completed","task_id":"T-011","agent":"claude","message":"T-011 completed by claude (exit 0)","metadata":null}
+{"timestamp":"2026-02-11T17:52:46.838940966Z","event_type":"task_completed","task_id":"T-002","agent":"codex","message":"T-002 completed by codex (exit 0)","metadata":null}
+{"timestamp":"2026-02-11T17:53:22.183493833Z","event_type":"task_completed","task_id":"T-004","agent":"codex","message":"T-004 completed by codex (exit 0)","metadata":null}
+{"timestamp":"2026-02-11T17:55:58.374505637Z","event_type":"task_completed","task_id":"T-012","agent":"codex","message":"T-012 completed by codex (exit 0)","metadata":null}
+{"timestamp":"2026-02-11T18:05:31.609125777Z","event_type":"task_completed","task_id":"T-006","agent":"codex","message":"T-006 completed by codex (exit 0)","metadata":null}
+{"timestamp":"2026-02-11T18:06:05.114083790Z","event_type":"task_completed","task_id":"T-005","agent":"codex","message":"T-005 completed by codex (exit 0)","metadata":null}
+{"timestamp":"2026-02-11T18:06:44.058557222Z","event_type":"task_completed","task_id":"T-008","agent":"gemini","message":"T-008 completed by gemini (exit 0)","metadata":null}
+{"timestamp":"2026-02-11T18:07:30.457729837Z","event_type":"task_completed","task_id":"T-009","agent":"gemini","message":"T-009 completed by gemini (exit 0)","metadata":null}
+{"timestamp":"2026-02-11T18:18:08.620459764Z","event_type":"task_completed","task_id":"T-013","agent":"codex","message":"T-013 completed by codex (exit 0)","metadata":null}
+{"timestamp":"2026-02-11T18:18:18.681443012Z","event_type":"task_completed","task_id":"T-010","agent":"codex","message":"T-010 completed by codex (exit 0)","metadata":null}
+{"timestamp":"2026-02-11T18:20:45.311977496Z","event_type":"task_completed","task_id":"T-016","agent":"gemini","message":"T-016 completed by gemini (exit 0)","metadata":null}
+{"timestamp":"2026-02-11T18:21:56.878721320Z","event_type":"task_completed","task_id":"T-014","agent":"claude","message":"T-014 completed by claude (exit 0)","metadata":null}
+{"timestamp":"2026-02-11T18:23:31.975524818Z","event_type":"task_completed","task_id":"T-017","agent":"gemini","message":"T-017 completed by gemini (exit 0)","metadata":null}
+{"timestamp":"2026-02-11T18:24:00.222562685Z","event_type":"task_completed","task_id":"T-015","agent":"gemini","message":"T-015 completed by gemini (exit 0)","metadata":null}
+{"timestamp":"2026-02-11T19:32:02.876348041Z","event_type":"task_completed","task_id":"T-007","agent":"gemini","message":"T-007 completed by gemini (exit 0)","metadata":null}
+{"timestamp":"2026-02-12T00:36:59.897812156Z","event_type":"plan_created","task_id":null,"agent":null,"message":"Plan generated from spec-jib-jab.md: 13 tasks","metadata":null}
+{"timestamp":"2026-02-12T00:52:23.923509488Z","event_type":"task_completed","task_id":"T-001","agent":"claude","message":"T-001 completed by claude (exit 0)","metadata":null}
+{"timestamp":"2026-02-12T00:57:27.186016881Z","event_type":"task_completed","task_id":"T-010","agent":"codex","message":"T-010 completed by codex (exit 0)","metadata":null}
+{"timestamp":"2026-02-12T01:05:13.864057647Z","event_type":"task_completed","task_id":"T-008","agent":"codex","message":"T-008 completed by codex (exit 0)","metadata":null}
+{"timestamp":"2026-02-12T01:05:55.354191822Z","event_type":"task_completed","task_id":"T-002","agent":"codex","message":"T-002 completed by codex (exit 0)","metadata":null}
+{"timestamp":"2026-02-12T01:12:03.395388286Z","event_type":"task_completed","task_id":"T-009","agent":"codex","message":"T-009 completed by codex (exit 0)","metadata":null}
+{"timestamp":"2026-02-12T01:14:13.497987907Z","event_type":"task_completed","task_id":"T-004","agent":"codex","message":"T-004 completed by codex (exit 0)","metadata":null}
+{"timestamp":"2026-02-12T01:21:18.043141012Z","event_type":"task_completed","task_id":"T-005","agent":"codex","message":"T-005 completed by codex (exit 0)","metadata":null}
+{"timestamp":"2026-02-12T01:21:27.464533468Z","event_type":"task_completed","task_id":"T-003","agent":"codex","message":"T-003 completed by codex (exit 0)","metadata":null}
+{"timestamp":"2026-02-12T01:24:21.186415206Z","event_type":"task_completed","task_id":"T-006","agent":"codex","message":"T-006 completed by codex (exit 0)","metadata":null}
+{"timestamp":"2026-02-12T01:28:09.828988128Z","event_type":"task_completed","task_id":"T-013","agent":"gemini","message":"T-013 completed by gemini (exit 0)","metadata":null}
+{"timestamp":"2026-02-12T01:36:02.454318696Z","event_type":"task_completed","task_id":"T-007","agent":"codex","message":"T-007 completed by codex (exit 0)","metadata":null}
+{"timestamp":"2026-02-12T01:37:40.268208340Z","event_type":"task_completed","task_id":"T-011","agent":"gemini","message":"T-011 completed by gemini (exit 0)","metadata":null}
+{"timestamp":"2026-02-12T01:39:30.038113827Z","event_type":"task_started","task_id":null,"agent":null,"message":"Reset T-012 to pending (dashboard exiting)","metadata":null}
+{"timestamp":"2026-02-12T01:56:46.076814832Z","event_type":"task_completed","task_id":"T-012","agent":"gemini","message":"T-012 completed by gemini (exit 0)","metadata":null}

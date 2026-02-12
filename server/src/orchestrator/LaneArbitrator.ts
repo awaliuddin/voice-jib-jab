@@ -13,7 +13,9 @@ import {
   LaneTransitionCause,
   LaneBReadyEvent,
   LaneOwnerChangedEvent,
+  ArbitratorAuditEvent,
 } from "../schemas/events.js";
+import { AuditTrail } from "../insurance/audit_trail.js";
 
 /**
  * Lane Arbitrator States
@@ -24,6 +26,7 @@ export type ArbitratorState =
   | "A_PLAYING" // Lane A reflex audio playing
   | "B_RESPONDING" // Lane B processing (no audio yet)
   | "B_PLAYING" // Lane B audio playing
+  | "FALLBACK_PLAYING" // Fallback audio playing
   | "ENDED"; // Session ended
 
 /**
@@ -49,6 +52,7 @@ export interface LaneArbitratorConfig {
   maxReflexDurationMs: number;
   preemptThresholdMs: number;
   transitionGapMs: number;
+  auditTrail?: AuditTrail;
 }
 
 const DEFAULT_CONFIG: LaneArbitratorConfig = {
@@ -69,11 +73,14 @@ export class LaneArbitrator extends EventEmitter {
   private speechEndTime: number | null = null;
   private bReadyTime: number | null = null;
   private responseInProgress: boolean = false; // Guards against overlapping response cycles
+  private suppressLaneBDone: boolean = false; // Ignore next Lane B done after policy cancel
+  private auditTrail?: AuditTrail;
 
   constructor(sessionId: string, config: Partial<LaneArbitratorConfig> = {}) {
     super();
     this.sessionId = sessionId;
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.auditTrail = config.auditTrail;
   }
 
   /**
@@ -92,6 +99,8 @@ export class LaneArbitrator extends EventEmitter {
         return "A";
       case "B_PLAYING":
         return "B";
+      case "FALLBACK_PLAYING":
+        return "fallback";
       default:
         return "none";
     }
@@ -118,6 +127,11 @@ export class LaneArbitrator extends EventEmitter {
   endSession(): void {
     this.clearTimers();
     this.responseInProgress = false;
+
+    if (this.state === "FALLBACK_PLAYING") {
+      this.emit("stop_fallback");
+    }
+
     this.transition("ENDED", "session_end");
     console.log(`[LaneArbitrator] Session ended: ${this.sessionId}`);
   }
@@ -236,37 +250,110 @@ export class LaneArbitrator extends EventEmitter {
 
   /**
    * Handle Lane B response complete
+   * ENHANCED: Comprehensive case handling for all possible states
    */
   onLaneBDone(): void {
-    // Handle response completion from any active state
-    // This can happen if manual commit triggered response without VAD
-    if (this.state === "LISTENING" || this.state === "B_RESPONDING") {
+    console.log(
+      `[LaneArbitrator] Lane B done signal received ` +
+        `(state: ${this.state}, responseInProgress: ${this.responseInProgress})`,
+    );
+
+    if (this.suppressLaneBDone) {
       console.log(
-        `[LaneArbitrator] Lane B done in ${this.state} (likely manual commit without VAD)`,
+        `[LaneArbitrator] Lane B done suppressed after policy cancel`,
       );
-      // Already in or transitioning to LISTENING, just reset guard
+      this.suppressLaneBDone = false;
+      return;
+    }
+
+    if (this.state === "FALLBACK_PLAYING") {
+      console.log(
+        `[LaneArbitrator] Lane B done during fallback playback - ignoring`,
+      );
+      return;
+    }
+
+    // Case 1: Expected happy path - response completed while playing
+    if (this.state === "B_PLAYING") {
+      console.log(`[LaneArbitrator] Lane B response complete (normal flow)`);
+      this.transitionLaneOwner("B", "none", "response_done");
+      this.transition("LISTENING", "response_done");
       this.responseInProgress = false;
       this.emit("response_complete");
       return;
     }
 
-    if (this.state !== "B_PLAYING") {
-      console.warn(
-        `[LaneArbitrator] Unexpected B done in state: ${this.state}`,
+    // Case 2: Response completed before audio started playing
+    // This happens when: buffer commit failed → no state transition →
+    // but OpenAI sent response anyway (error recovery)
+    if (this.state === "LISTENING" || this.state === "B_RESPONDING") {
+      console.log(
+        `[LaneArbitrator] Lane B done in ${this.state} ` +
+          `(response completed without playback - likely commit failure or fast response)`,
       );
-      // Still reset guard to prevent stuck state
+
+      // Ensure we're in LISTENING state
+      if (this.state === "B_RESPONDING") {
+        this.transition("LISTENING", "response_done");
+      }
+
+      // Clear response guard to allow next utterance
       this.responseInProgress = false;
+
+      // Still emit completion for cleanup
+      this.emit("response_complete");
       return;
     }
 
-    console.log(`[LaneArbitrator] Lane B response complete`);
-    this.transitionLaneOwner("B", "none", "response_done");
-    this.transition("LISTENING", "response_done");
+    // Case 3: Got done in A_PLAYING (B never took over)
+    if (this.state === "A_PLAYING") {
+      console.log(
+        `[LaneArbitrator] Lane B done while A playing ` +
+          `(B completed before preempting A - unusual but valid)`,
+      );
 
-    // Clear the response cycle guard - ready for next utterance
+      // Stop Lane A since B is done
+      this.emit("stop_reflex");
+      this.transitionLaneOwner("A", "none", "response_done");
+      this.transition("LISTENING", "response_done");
+      this.responseInProgress = false;
+      this.emit("response_complete");
+      return;
+    }
+
+    // Case 4: Unexpected states (defensive)
+    console.warn(
+      `[LaneArbitrator] Lane B done in unexpected state: ${this.state} ` +
+        `(forcing reset to LISTENING)`,
+    );
+
+    // Force state to safe ground
+    this.clearTimers();
+    if (this.state !== "IDLE" && this.state !== "ENDED") {
+      this.transition("LISTENING", "response_done");
+    }
     this.responseInProgress = false;
-
     this.emit("response_complete");
+  }
+
+  /**
+   * Reset response in progress guard (for error recovery)
+   * Called when commit fails and response won't happen
+   */
+  resetResponseInProgress(): void {
+    if (this.responseInProgress) {
+      console.log(
+        `[LaneArbitrator] Resetting response cycle guard ` +
+          `(external trigger - commit likely failed)`,
+      );
+      this.responseInProgress = false;
+      this.clearTimers();
+
+      // Return to listening if not already there
+      if (this.state === "B_RESPONDING") {
+        this.transition("LISTENING", "user_speech_ended");
+      }
+    }
   }
 
   /**
@@ -283,6 +370,9 @@ export class LaneArbitrator extends EventEmitter {
     } else if (this.state === "B_PLAYING") {
       this.emit("stop_lane_b");
       this.transitionLaneOwner("B", "none", "user_barge_in");
+    } else if (this.state === "FALLBACK_PLAYING") {
+      this.emit("stop_fallback");
+      this.transitionLaneOwner("fallback", "none", "user_barge_in");
     }
 
     // Clear the response cycle guard - barge-in cancels current cycle
@@ -292,6 +382,66 @@ export class LaneArbitrator extends EventEmitter {
     if (this.state !== "IDLE" && this.state !== "ENDED") {
       this.transition("LISTENING", "user_barge_in");
     }
+  }
+
+  /**
+   * Handle policy cancel - stops any playing audio and triggers fallback.
+   */
+  onPolicyCancel(): void {
+    console.log(`[LaneArbitrator] Policy cancel during ${this.state}`);
+
+    this.clearTimers();
+
+    if (this.state === "FALLBACK_PLAYING") {
+      console.log(
+        `[LaneArbitrator] Policy cancel ignored - fallback already playing`,
+      );
+      this.suppressLaneBDone = true;
+      this.emit("stop_lane_b");
+      return;
+    }
+
+    const previousOwner = this.getCurrentOwner();
+
+    if (this.state === "A_PLAYING") {
+      this.emit("stop_reflex");
+    }
+
+    if (
+      this.state === "B_PLAYING" ||
+      this.state === "B_RESPONDING" ||
+      this.state === "A_PLAYING"
+    ) {
+      this.suppressLaneBDone = true;
+      this.emit("stop_lane_b");
+    }
+
+    // Move to fallback playback
+    if (this.state !== "IDLE" && this.state !== "ENDED") {
+      this.transitionLaneOwner(previousOwner, "fallback", "policy_cancel");
+      this.transition("FALLBACK_PLAYING", "policy_cancel");
+      this.responseInProgress = true;
+      this.emit("play_fallback");
+    }
+  }
+
+  /**
+   * Handle fallback completion - return to listening state.
+   */
+  onFallbackComplete(): void {
+    console.log(`[LaneArbitrator] Fallback playback complete`);
+
+    if (this.getCurrentOwner() === "fallback") {
+      this.transitionLaneOwner("fallback", "none", "response_done");
+    }
+
+    if (this.state !== "IDLE" && this.state !== "ENDED") {
+      this.transition("LISTENING", "response_done");
+    }
+
+    this.responseInProgress = false;
+    this.suppressLaneBDone = false;
+    this.emit("response_complete");
   }
 
   /**
@@ -320,6 +470,12 @@ export class LaneArbitrator extends EventEmitter {
       `[LaneArbitrator] ${oldState} -> ${newState} (cause: ${cause})`,
     );
 
+    this.logAuditEvent("arbitration.state.transition", {
+      from: oldState,
+      to: newState,
+      trigger: cause,
+    });
+
     this.emit("state_change", transition);
   }
 
@@ -343,6 +499,29 @@ export class LaneArbitrator extends EventEmitter {
     eventBus.emit(event);
     this.emit("owner_change", { from, to, cause });
     console.log(`[LaneArbitrator] Lane owner: ${from} -> ${to} (${cause})`);
+
+    this.logAuditEvent("arbitration.owner.transition", {
+      from,
+      to,
+      trigger: cause,
+    });
+  }
+
+  private logAuditEvent(
+    type: "arbitration.state.transition" | "arbitration.owner.transition",
+    payload: { from: string; to: string; trigger: string },
+  ) {
+    if (!this.auditTrail) return;
+
+    const event: ArbitratorAuditEvent = {
+      event_id: uuidv4(),
+      session_id: this.sessionId,
+      t_ms: Date.now(),
+      source: "orchestrator",
+      type,
+      payload,
+    };
+    this.auditTrail.log(event);
   }
 
   /**

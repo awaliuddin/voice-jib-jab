@@ -1,0 +1,23 @@
+{
+  "id": "T-006",
+  "title": "Implement AuditTrail Event Logging for Lane C",
+  "description": "Extend the AuditTrail to support structured logging of all Lane C policy decisions, overrides, and relevant session events. Ensure events are stored in append-only JSONL format and support replay for session timelines.",
+  "status": "completed",
+  "assigned_to": "codex",
+  "task_type": "implement",
+  "depends_on": [
+    "T-002"
+  ],
+  "locked_files": [
+    "server/src/insurance/audit_trail.ts"
+  ],
+  "acceptance_criteria": [
+    "AuditTrail logs all Lane C policy decisions and overrides",
+    "Events are stored in append-only JSONL files",
+    "AuditTrail supports replaying session timelines (transcript, decisions, tool calls)",
+    "AuditTrail respects configuration for transcript/audio storage"
+  ],
+  "created_at": "2026-02-12T00:36:50.777801720Z",
+  "updated_at": "2026-02-12T01:24:21.186258843Z",
+  "completed_at": "2026-02-12T01:24:21.186258684Z"
+}

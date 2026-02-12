@@ -1,0 +1,24 @@
+{
+  "id": "T-001",
+  "title": "Design Lane C ControlEngine Scaffold",
+  "description": "Design the initial scaffold for Lane C (ControlEngine), including its subcomponents: Moderator (policy classification), ClaimsChecker (AllowedClaimsRegistry match), PIIRedactor, and OverrideController. Specify interfaces, event handling, and how policy decisions are emitted to the event bus. Ensure the design supports policy cancel, audit events, and future extensibility.",
+  "status": "completed",
+  "assigned_to": "claude",
+  "task_type": "design",
+  "depends_on": [],
+  "locked_files": [
+    "server/src/lanes/laneC_control.ts",
+    "server/src/insurance/policy_gate.ts",
+    "server/src/insurance/allowed_claims_registry.ts"
+  ],
+  "acceptance_criteria": [
+    "Interfaces for Moderator, ClaimsChecker, PIIRedactor, and OverrideController are defined",
+    "ControlEngine can process transcript and response metadata events",
+    "Policy decision events (allow/refuse/escalate/cancel_output) are specified",
+    "Audit and metrics event emission is included in the design",
+    "Design supports stubbed and future-hardened implementations"
+  ],
+  "created_at": "2026-02-12T00:36:50.777784713Z",
+  "updated_at": "2026-02-12T00:52:23.923326250Z",
+  "completed_at": "2026-02-12T00:52:23.923326024Z"
+}

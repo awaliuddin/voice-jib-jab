@@ -1,0 +1,613 @@
+# Summary:
+Analyze `server/src/providers/OpenAIRealtimeAdapter.ts` to fix a race condition causing API errors and state mismatches.
+
+**1. Fix `input_audio_buffer_commit_empty` Error**
+- **Context:** The logs show an `invalid_request_error` with message: *"Error committing input audio buffer: buffer too small. Expected at least 100ms of audio, but buffer only has 0.00ms."*
+- **Root Cause:** The `input_audio_buffer.commit` event is being sent immediately upon VAD silence detection, but sometimes before enough audio chunks have actually been appended or processed by OpenAI.
+- **Action:** In the `handleMessage` or speech handling logic:
+  - Track the local duration/size of the uncommitted audio buffer.
+  - Wrap the `commit` command in a guard clause. **Only commit if the buffer > 100ms.**
+  - If the buffer is < 100ms, simply clear it without sending the commit message to OpenAI.
+
+**2. Fix State Machine Warning**
+- **Context:** Log shows `[LaneArbitrator] Unexpected B done in state: LISTENING`.
+- **Root Cause:** The `response.done` event is arriving when the system believes it is still in `LISTENING` mode, likely because the `response.created` or `speech_stopped` state transitions were missed or processed out of order due to the error in step #1.
+- **Action:** Ensure `response.done` handlers account for the `LISTENING` state gracefully, or ensure the state transitions to `RESPONDING` even if the commit fails.
+
+**3. Cleanup**
+- Silence the log noise for `conversation.item.input_audio_transcription.delta` / `.completed` unless they contain errors.
+
+Start by inspecting the speech lifecycle in `OpenAIRealtimeAdapter.ts`.
+
+# Detail:
+terminal output:
+(nxtg-voice) axw@NXTG-AI:~/projects/voice-jib-jab$ npm run dev
+
+> voice-jib-jab@0.1.0 dev
+> concurrently "npm:dev:client" "npm:dev:server"
+
+[dev:client] 
+[dev:client] > voice-jib-jab@0.1.0 dev:client
+[dev:client] > cd client && npm run dev
+[dev:client] 
+[dev:server] 
+[dev:server] > voice-jib-jab@0.1.0 dev:server
+[dev:server] > cd server && npm run dev
+[dev:server] 
+[dev:server] 
+[dev:server] > @voice-jib-jab/server@0.1.0 dev
+[dev:server] > tsx watch src/index.ts
+[dev:server] 
+[dev:client] 
+[dev:client] > @voice-jib-jab/client@0.1.0 dev
+[dev:client] > vite
+[dev:client] 
+[dev:client] 
+[dev:client]   VITE v5.4.21  ready in 336 ms
+[dev:client] 
+[dev:client]   ➜  Local:   http://localhost:5173/
+[dev:client]   ➜  Network: http://10.255.255.254:5173/
+[dev:client]   ➜  Network: http://172.27.228.219:5173/
+[dev:server] ✓ Loaded environment variables from: /home/axw/projects/voice-jib-jab/.env
+[dev:server] [WebSocket] Server initialized
+[dev:server] 
+[dev:server] ╔══════════════════════════════════════════════════════════╗
+[dev:server] ║                                                          ║
+[dev:server] ║  🎙️  Voice Jib-Jab Server                                ║
+[dev:server] ║  NextGen AI Voice Orchestrator                           ║
+[dev:server] ║                                                          ║
+[dev:server] ╚══════════════════════════════════════════════════════════╝
+[dev:server] 
+[dev:server] [Server] Listening on port 3000
+[dev:server] [Server] Environment: development
+[dev:server] [Server] WebSocket: ws://localhost:3000
+[dev:server] [Server] Health: http://localhost:3000/health
+[dev:server] [Server] Status: http://localhost:3000/status
+[dev:server] 
+[dev:server] Features:
+[dev:server]   Lane A (Reflex): ✓
+[dev:server]   RAG: ✓
+[dev:server]   Policy Gate: ✓
+[dev:server]   Audit Trail: ✓
+[dev:server] 
+[dev:server] Latency Targets:
+[dev:server]   TTFB p50: <400ms
+[dev:server]   TTFB p95: <900ms
+[dev:server]   Barge-in p95: <250ms
+[dev:server] 
+[dev:server] Ready for connections! 🚀
+[dev:server] 
+[dev:server] [WebSocket] New client connected
+[dev:server] [TTS] Preloading 6 phrases...
+[dev:server] [TTS] Generating speech for: "Got it"
+[dev:server] [TTS] Generating speech for: "One moment"
+[dev:server] [TTS] Generating speech for: "Sure thing"
+[dev:server] [TTS] Generated 24600 bytes for: "One moment" (0.51s)
+[dev:server] [TTS] Generated 26400 bytes for: "Sure thing" (0.55s)
+[dev:server] [TTS] Generated 19800 bytes for: "Got it" (0.41s)
+[dev:server] [TTS] Generating speech for: "Working on it"
+[dev:server] [TTS] Generating speech for: "Let me check"
+[dev:server] [TTS] Generating speech for: "I hear you"
+[dev:server] [TTS] Generated 30600 bytes for: "Let me check" (0.64s)
+[dev:server] [TTS] Generated 38400 bytes for: "Working on it" (0.80s)
+[dev:server] [TTS] Generated 28200 bytes for: "I hear you" (0.59s)
+[dev:server] [TTS] Preloaded 6/6 phrases
+[dev:server] [LaneA] Audio cache initialized with 6 reflexes
+[dev:server] [OpenAI] Connecting to Realtime API for session: 30348059-fdca-4e30-a8ae-54befea3f5c8
+[dev:server] [OpenAI] WebSocket connected for session: 30348059-fdca-4e30-a8ae-54befea3f5c8
+[dev:server] [OpenAI] Sent message: session.update
+[dev:server] [OpenAI] Session configuration sent
+[dev:server] [LaneB] Connected for session: 30348059-fdca-4e30-a8ae-54befea3f5c8
+[dev:server] [LaneArbitrator] IDLE -> LISTENING (cause: session_start)
+[dev:server] [WebSocket] Lane state: IDLE -> LISTENING
+[dev:server] [LaneArbitrator] Session started: 30348059-fdca-4e30-a8ae-54befea3f5c8
+[dev:server] [OpenAI] Received message: session.created
+[dev:server] [OpenAI] Session created successfully
+[dev:server] [OpenAI] Received message: session.updated
+[dev:server] [OpenAI] Session configuration updated
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 4096)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 8192)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 12288)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 16384)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 20480)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 24576)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 28672)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 32768)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 36864)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 40960)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 45056)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 49152)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 53248)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 57344)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 61440)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 65536)
+[dev:server] [WebSocket] Committing audio buffer via Lane B
+[dev:server] [OpenAI] Sent message: input_audio_buffer.commit
+[dev:server] [OpenAI] Audio buffer committed
+[dev:server] [OpenAI] Sent message: response.create
+[dev:server] [OpenAI] Response requested
+[dev:server] [OpenAI] Received message: error
+[dev:server] [OpenAI] Error from API: {
+[dev:server]   type: 'invalid_request_error',
+[dev:server]   code: 'input_audio_buffer_commit_empty',
+[dev:server]   message: 'Error committing input audio buffer: buffer too small. Expected at least 100ms of audio, but buffer only has 0.00ms of audio.',
+[dev:server]   param: null,
+[dev:server]   event_id: null
+[dev:server] }
+[dev:server] [LaneB] Error: Error: Error committing input audio buffer: buffer too small. Expected at least 100ms of audio, but buffer only has 0.00ms of audio.
+[dev:server]     at OpenAIRealtimeAdapter.handleMessage (/home/axw/projects/voice-jib-jab/server/src/providers/OpenAIRealtimeAdapter.ts:550:11)
+[dev:server]     at WebSocket.<anonymous> (/home/axw/projects/voice-jib-jab/server/src/providers/OpenAIRealtimeAdapter.ts:107:18)
+[dev:server]     at WebSocket.emit (node:events:519:28)
+[dev:server]     at Receiver.receiverOnMessage (/home/axw/projects/voice-jib-jab/node_modules/ws/lib/websocket.js:1225:20)
+[dev:server]     at Receiver.emit (node:events:519:28)
+[dev:server]     at Receiver.dataMessage (/home/axw/projects/voice-jib-jab/node_modules/ws/lib/receiver.js:596:14)
+[dev:server]     at /home/axw/projects/voice-jib-jab/node_modules/ws/lib/receiver.js:530:12
+[dev:server]     at /home/axw/projects/voice-jib-jab/node_modules/ws/lib/permessage-deflate.js:309:9
+[dev:server]     at /home/axw/projects/voice-jib-jab/node_modules/ws/lib/permessage-deflate.js:392:7
+[dev:server]     at afterWrite (node:internal/streams/writable:710:5)
+[dev:server] [LaneB] Error in session 30348059-fdca-4e30-a8ae-54befea3f5c8: Error: Error committing input audio buffer: buffer too small. Expected at least 100ms of audio, but buffer only has 0.00ms of audio.
+[dev:server]     at OpenAIRealtimeAdapter.handleMessage (/home/axw/projects/voice-jib-jab/server/src/providers/OpenAIRealtimeAdapter.ts:550:11)
+[dev:server]     at WebSocket.<anonymous> (/home/axw/projects/voice-jib-jab/server/src/providers/OpenAIRealtimeAdapter.ts:107:18)
+[dev:server]     at WebSocket.emit (node:events:519:28)
+[dev:server]     at Receiver.receiverOnMessage (/home/axw/projects/voice-jib-jab/node_modules/ws/lib/websocket.js:1225:20)
+[dev:server]     at Receiver.emit (node:events:519:28)
+[dev:server]     at Receiver.dataMessage (/home/axw/projects/voice-jib-jab/node_modules/ws/lib/receiver.js:596:14)
+[dev:server]     at /home/axw/projects/voice-jib-jab/node_modules/ws/lib/receiver.js:530:12
+[dev:server]     at /home/axw/projects/voice-jib-jab/node_modules/ws/lib/permessage-deflate.js:309:9
+[dev:server]     at /home/axw/projects/voice-jib-jab/node_modules/ws/lib/permessage-deflate.js:392:7
+[dev:server]     at afterWrite (node:internal/streams/writable:710:5)
+[dev:server] [OpenAI] Received message: response.created
+[dev:server] [OpenAI] Response started
+[dev:server] [LaneB] Response started
+[dev:server] [OpenAI] Received message: response.output_item.added
+[dev:server] [OpenAI] Received message: conversation.item.created
+[dev:server] [OpenAI] Received message: response.content_part.added
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [LaneB] First audio ready after 354ms
+[dev:server] [WebSocket] Lane B first audio ready (354ms)
+[dev:server] [LaneArbitrator] Lane B ready after 0ms
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.done
+[dev:server] [OpenAI] Audio response complete
+[dev:server] [OpenAI] Received message: response.audio_transcript.done
+[dev:server] [OpenAI] Received message: response.content_part.done
+[dev:server] [OpenAI] Received message: response.output_item.done
+[dev:server] [OpenAI] Received message: response.done
+[dev:server] [OpenAI] Response complete
+[dev:server] [LaneB] Response complete (1177ms total)
+[dev:server] [LaneArbitrator] Unexpected B done in state: LISTENING
+[dev:server] [OpenAI] Received message: rate_limits.updated
+[dev:server] [OpenAI] Rate limits updated: [
+[dev:server]   {
+[dev:server]     name: 'tokens',
+[dev:server]     limit: 800000,
+[dev:server]     remaining: 799315,
+[dev:server]     reset_seconds: 0.051
+[dev:server]   }
+[dev:server] ]
+[dev:server] [WebSocket] Client disconnected: 30348059-fdca-4e30-a8ae-54befea3f5c8
+[dev:server] [LaneArbitrator] LISTENING -> ENDED (cause: session_end)
+[dev:server] [WebSocket] Lane state: LISTENING -> ENDED
+[dev:server] [LaneArbitrator] Session ended: 30348059-fdca-4e30-a8ae-54befea3f5c8
+[dev:server] [OpenAI] Disconnected session
+[dev:server] [LaneB] Disconnected
+[dev:server] [OpenAI] WebSocket closed. Code: 1000, Reason: Client disconnect
+[dev:server] [WebSocket] New client connected
+[dev:server] [TTS] Preloading 6 phrases...
+[dev:server] [TTS] Cache hit for: "Got it"
+[dev:server] [TTS] Cache hit for: "One moment"
+[dev:server] [TTS] Cache hit for: "Sure thing"
+[dev:server] [TTS] Cache hit for: "Working on it"
+[dev:server] [TTS] Cache hit for: "Let me check"
+[dev:server] [TTS] Cache hit for: "I hear you"
+[dev:server] [TTS] Preloaded 6/6 phrases
+[dev:server] [LaneA] Audio cache initialized with 6 reflexes
+[dev:server] [WebSocket] Client disconnected: 39843960-fa17-429d-af1b-85a087152946
+[dev:server] [LaneArbitrator] IDLE -> ENDED (cause: session_end)
+[dev:server] [WebSocket] Lane state: IDLE -> ENDED
+[dev:server] [LaneArbitrator] Session ended: 39843960-fa17-429d-af1b-85a087152946
+[dev:server] [LaneB] Disconnected
+[dev:server] [WebSocket] New client connected
+[dev:server] [TTS] Preloading 6 phrases...
+[dev:server] [TTS] Cache hit for: "Got it"
+[dev:server] [TTS] Cache hit for: "One moment"
+[dev:server] [TTS] Cache hit for: "Sure thing"
+[dev:server] [TTS] Cache hit for: "Working on it"
+[dev:server] [TTS] Cache hit for: "Let me check"
+[dev:server] [TTS] Cache hit for: "I hear you"
+[dev:server] [TTS] Preloaded 6/6 phrases
+[dev:server] [LaneA] Audio cache initialized with 6 reflexes
+[dev:server] [OpenAI] Connecting to Realtime API for session: b4b78a90-78f4-4d69-a965-672dca5f1147
+[dev:server] [OpenAI] WebSocket connected for session: b4b78a90-78f4-4d69-a965-672dca5f1147
+[dev:server] [OpenAI] Sent message: session.update
+[dev:server] [OpenAI] Session configuration sent
+[dev:server] [LaneB] Connected for session: b4b78a90-78f4-4d69-a965-672dca5f1147
+[dev:server] [LaneArbitrator] IDLE -> LISTENING (cause: session_start)
+[dev:server] [WebSocket] Lane state: IDLE -> LISTENING
+[dev:server] [LaneArbitrator] Session started: b4b78a90-78f4-4d69-a965-672dca5f1147
+[dev:server] [OpenAI] Received message: session.created
+[dev:server] [OpenAI] Session created successfully
+[dev:server] [OpenAI] Received message: session.updated
+[dev:server] [OpenAI] Session configuration updated
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 4096)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 8192)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 12288)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 16384)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 20480)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 24576)
+[dev:server] [OpenAI] Received message: input_audio_buffer.speech_started
+[dev:server] [OpenAI] Speech detected - started
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 4096)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 8192)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 12288)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 16384)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 20480)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 24576)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 28672)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 32768)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 36864)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 40960)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 45056)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 49152)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 53248)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 57344)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 61440)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 65536)
+[dev:server] [WebSocket] Committing audio buffer via Lane B
+[dev:server] [OpenAI] Sent message: input_audio_buffer.commit
+[dev:server] [OpenAI] Audio buffer committed
+[dev:server] [OpenAI] Sent message: response.create
+[dev:server] [OpenAI] Response requested
+[dev:server] [OpenAI] Received message: input_audio_buffer.committed
+[dev:server] [OpenAI] Audio buffer committed successfully
+[dev:server] [OpenAI] Received message: conversation.item.created
+[dev:server] [OpenAI] Received message: response.created
+[dev:server] [OpenAI] Response started
+[dev:server] [LaneB] Response started
+[dev:server] [OpenAI] Received message: response.output_item.added
+[dev:server] [OpenAI] Received message: conversation.item.created
+[dev:server] [OpenAI] Received message: response.content_part.added
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [LaneB] First audio ready after 451ms
+[dev:server] [WebSocket] Lane B first audio ready (451ms)
+[dev:server] [LaneArbitrator] Lane B ready after 0ms
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: conversation.item.input_audio_transcription.delta
+[dev:server] [OpenAI] Received message: conversation.item.input_audio_transcription.completed
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.done
+[dev:server] [OpenAI] Audio response complete
+[dev:server] [OpenAI] Received message: response.audio_transcript.done
+[dev:server] [OpenAI] Received message: response.content_part.done
+[dev:server] [OpenAI] Received message: response.output_item.done
+[dev:server] [OpenAI] Received message: response.done
+[dev:server] [OpenAI] Response complete
+[dev:server] [LaneB] Response complete (1255ms total)
+[dev:server] [OpenAI] Received message: rate_limits.updated
+[dev:server] [LaneArbitrator] Unexpected B done in state: LISTENING
+[dev:server] [OpenAI] Rate limits updated: [
+[dev:server]   {
+[dev:server]     name: 'tokens',
+[dev:server]     limit: 800000,
+[dev:server]     remaining: 799331,
+[dev:server]     reset_seconds: 0.05
+[dev:server]   }
+[dev:server] ]
+[dev:server] [OpenAI] Connection health check: OK
+[dev:server] [LaneArbitrator] LISTENING -> ENDED (cause: session_end)
+[dev:server] [WebSocket] Lane state: LISTENING -> ENDED
+[dev:server] [LaneArbitrator] Session ended: b4b78a90-78f4-4d69-a965-672dca5f1147
+[dev:server] [OpenAI] Disconnected session
+[dev:server] [LaneB] Disconnected
+[dev:server] [WebSocket] Client disconnected: b4b78a90-78f4-4d69-a965-672dca5f1147
+[dev:server] [LaneArbitrator] ENDED -> ENDED (cause: session_end)
+[dev:server] [WebSocket] Lane state: ENDED -> ENDED
+[dev:server] [LaneArbitrator] Session ended: b4b78a90-78f4-4d69-a965-672dca5f1147
+[dev:server] [LaneB] Disconnected
+[dev:server] [OpenAI] WebSocket closed. Code: 1000, Reason: Client disconnect
+[dev:server] [WebSocket] New client connected
+[dev:server] [TTS] Preloading 6 phrases...
+[dev:server] [TTS] Cache hit for: "Got it"
+[dev:server] [TTS] Cache hit for: "One moment"
+[dev:server] [TTS] Cache hit for: "Sure thing"
+[dev:server] [TTS] Cache hit for: "Working on it"
+[dev:server] [TTS] Cache hit for: "Let me check"
+[dev:server] [TTS] Cache hit for: "I hear you"
+[dev:server] [TTS] Preloaded 6/6 phrases
+[dev:server] [LaneA] Audio cache initialized with 6 reflexes
+[dev:server] [OpenAI] Connecting to Realtime API for session: 6596ac2d-5934-40dc-9275-797606b0f58f
+[dev:server] [OpenAI] WebSocket connected for session: 6596ac2d-5934-40dc-9275-797606b0f58f
+[dev:server] [OpenAI] Sent message: session.update
+[dev:server] [OpenAI] Session configuration sent
+[dev:server] [LaneB] Connected for session: 6596ac2d-5934-40dc-9275-797606b0f58f
+[dev:server] [LaneArbitrator] IDLE -> LISTENING (cause: session_start)
+[dev:server] [WebSocket] Lane state: IDLE -> LISTENING
+[dev:server] [LaneArbitrator] Session started: 6596ac2d-5934-40dc-9275-797606b0f58f
+[dev:server] [OpenAI] Received message: session.created
+[dev:server] [OpenAI] Session created successfully
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 4096)
+[dev:server] [OpenAI] Received message: session.updated
+[dev:server] [OpenAI] Session configuration updated
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 8192)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 12288)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 16384)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 20480)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 24576)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 28672)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 32768)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 36864)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 40960)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 45056)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 49152)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 53248)
+[dev:server] [OpenAI] Received message: input_audio_buffer.speech_started
+[dev:server] [OpenAI] Speech detected - started
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 4096)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 8192)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 12288)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 16384)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 20480)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 24576)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 28672)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 32768)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 36864)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 40960)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 45056)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 49152)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 53248)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 57344)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 61440)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 65536)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 69632)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 73728)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 77824)
+[dev:server] [OpenAI] Sent message: input_audio_buffer.append
+[dev:server] [OpenAI] Sent audio chunk: 4096 bytes (buffer: 81920)
+[dev:server] [WebSocket] Committing audio buffer via Lane B
+[dev:server] [OpenAI] Sent message: input_audio_buffer.commit
+[dev:server] [OpenAI] Audio buffer committed
+[dev:server] [OpenAI] Sent message: response.create
+[dev:server] [OpenAI] Response requested
+[dev:server] [OpenAI] Received message: input_audio_buffer.committed
+[dev:server] [OpenAI] Audio buffer committed successfully
+[dev:server] [OpenAI] Received message: conversation.item.created
+[dev:server] [OpenAI] Received message: response.created
+[dev:server] [OpenAI] Response started
+[dev:server] [LaneB] Response started
+[dev:server] [OpenAI] Received message: response.output_item.added
+[dev:server] [OpenAI] Received message: conversation.item.created
+[dev:server] [OpenAI] Received message: response.content_part.added
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [LaneB] First audio ready after 450ms
+[dev:server] [WebSocket] Lane B first audio ready (450ms)
+[dev:server] [LaneArbitrator] Lane B ready after 0ms
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio_transcript.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.delta
+[dev:server] [OpenAI] Received message: response.audio.done
+[dev:server] [OpenAI] Audio response complete
+[dev:server] [OpenAI] Received message: response.audio_transcript.done
+[dev:server] [OpenAI] Received message: response.content_part.done
+[dev:server] [OpenAI] Received message: response.output_item.done
+[dev:server] [OpenAI] Received message: response.done
+[dev:server] [OpenAI] Response complete
+[dev:server] [LaneB] Response complete (1747ms total)
+[dev:server] [LaneArbitrator] Unexpected B done in state: LISTENING
+[dev:server] [OpenAI] Received message: rate_limits.updated
+[dev:server] [OpenAI] Rate limits updated: [
+[dev:server]   {
+[dev:server]     name: 'tokens',
+[dev:server]     limit: 800000,
+[dev:server]     remaining: 799245,
+[dev:server]     reset_seconds: 0.056
+[dev:server]   }
+[dev:server] ]
+[dev:server] [OpenAI] Received message: conversation.item.input_audio_transcription.delta
+[dev:server] [OpenAI] Received message: conversation.item.input_audio_transcription.completed
+^A[dev:server] [OpenAI] Connection health check: OK
+
+web console:
+[vite] connecting... client:495:9
+[vite] connected. client:618:15
+Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools chunk-MVJA7NKE.js:21549:25
+[AudioPlayback] Initialized AudioPlayback.ts:10:13
+[WebSocket] Connecting to ws://localhost:3000... WebSocketClient.ts:16:17
+[WebSocket] Connected WebSocketClient.ts:22:19
+[SessionManager] Initialized successfully (mic will init on first talk) SessionManager.ts:43:15
+[SessionManager] Session ready: 6596ac2d-5934-40dc-9275-797606b0f58f SessionManager.ts:71:15
+[MicCapture] Native sample rate: 48000Hz MicrophoneCapture.ts:22:15
+[MicCapture] Resample ratio: 2 (48000 -> 24000) MicrophoneCapture.ts:25:15
+[MicCapture] Initialized successfully MicrophoneCapture.ts:39:15
+[SessionManager] Microphone initialized on demand SessionManager.ts:58:15
+[SessionManager] Connecting to OpenAI... SessionManager.ts:156:13
+[SessionManager] Lane state: IDLE -> LISTENING (session_start) SessionManager.ts:131:15
+[SessionManager] Provider connection ready SessionManager.ts:74:15
+[SessionManager] OpenAI ready, starting audio capture SessionManager.ts:170:13
+[MicCapture] Started capturing MicrophoneCapture.ts:72:13
+[SessionManager] Started talking SessionManager.ts:183:13
+[MicCapture] Stopped capturing MicrophoneCapture.ts:77:13
+[SessionManager] Stopped talking, waiting for response... SessionManager.ts:192:13
+[SessionManager] AI response starting SessionManager.ts:77:15

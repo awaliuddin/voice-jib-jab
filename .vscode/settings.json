@@ -1,21 +1,3 @@
 {
-  "terminal.integrated.defaultProfile.linux": "nxtg-voice",
-
-  "terminal.integrated.profiles.linux": {
-    "nxtg-voice": {
-      "path": "/bin/bash",
-      "args": [
-        "-c",
-        "source ~/.bashrc && conda activate nxtg-voice && exec bash"
-      ]
-    }
-  },
-
-  "terminal.integrated.env.linux": {
-    "PGP_KEY_ID": "8D16B74674FC9F4B",
-    "GNUPGHOME": "/home/axw/.gnupg",
-    "APP_ENV": "development"
-  },
-
-  "dotenv.enableAutoload": true
+  "terminal.integrated.defaultProfile.linux": "bash-login"
 }

@@ -5,13 +5,21 @@
 
 import { WebSocketServer, WebSocket } from "ws";
 import { v4 as uuidv4 } from "uuid";
+import { dirname, resolve } from "path";
 import { sessionManager } from "../orchestrator/SessionManager.js";
 import { eventBus } from "../orchestrator/EventBus.js";
 import { LaneArbitrator } from "../orchestrator/LaneArbitrator.js";
 import { LaneA } from "../lanes/LaneA.js";
 import { LaneB } from "../lanes/LaneB.js";
+import { ControlEngine } from "../lanes/laneC_control.js";
+import { FallbackPlanner } from "../insurance/fallback_planner.js";
 import { config } from "../config/index.js";
-import { Event } from "../schemas/events.js";
+import {
+  Event,
+  PolicyDecisionPayload,
+  RAGResultPayload,
+} from "../schemas/events.js";
+import { initializeAuditTrail } from "../insurance/audit_trail.js";
 import {
   getDatabase,
   getTranscriptStore,
@@ -27,8 +35,19 @@ interface ClientConnection {
   laneArbitrator: LaneArbitrator;
   laneA: LaneA;
   laneB: LaneB;
+  controlEngine: ControlEngine;
+  fallbackPlanner: FallbackPlanner;
   sessionContext: SessionContext | null;
+  lastResponseEndTime: number; // Timestamp when AI finished speaking
+  responseStartTime: number | null; // Timestamp when Lane B response started
+  voiceMode: "push-to-talk" | "open-mic"; // Voice interaction mode
+  lastPolicyDecision: PolicyDecisionPayload | null;
+  policyDecisionHandler?: (event: Event) => void;
+  ragResultHandler?: (event: Event) => void;
 }
+
+// Cooldown period after AI response to prevent echo detection (ms)
+const RESPONSE_COOLDOWN_MS = 300;
 
 export class VoiceWebSocketServer {
   private wss: WebSocketServer;
@@ -38,14 +57,38 @@ export class VoiceWebSocketServer {
     this.wss = new WebSocketServer({ server });
     this.connections = new Map();
 
-    // Initialize storage if persistent memory is enabled
-    if (config.features.enablePersistentMemory) {
+    // Initialize storage if persistent memory or audit trail is enabled
+    if (
+      config.features.enablePersistentMemory ||
+      config.features.enableAuditTrail
+    ) {
       try {
-        getDatabase({ path: config.storage.databasePath });
-        console.log("[WebSocket] Persistent memory storage initialized");
+        getDatabase({
+          path: config.storage.databasePath,
+          walMode: config.storage.enableWalMode,
+        });
+        console.log("[WebSocket] Storage initialized");
       } catch (error) {
         console.error("[WebSocket] Failed to initialize storage:", error);
       }
+    }
+
+    if (config.features.enableAuditTrail) {
+      const auditDir = resolve(
+        dirname(config.storage.databasePath),
+        "audit",
+      );
+      initializeAuditTrail({
+        enabled: true,
+        databasePath: config.storage.databasePath,
+        walMode: config.storage.enableWalMode,
+        jsonlDir: auditDir,
+        includeTranscripts: config.features.enablePersistentMemory,
+        includeTranscriptDeltas: false,
+        includeAudio: config.safety.storeRawAudio,
+        includeSessionEvents: true,
+        includeResponseMetadata: true,
+      });
     }
 
     this.wss.on("connection", this.handleConnection.bind(this));
@@ -66,6 +109,14 @@ export class VoiceWebSocketServer {
         apiKey: config.openai.apiKey,
         model: config.openai.model,
       },
+      rag: {
+        enabled: config.features.enableRAG,
+        topK: config.rag.topK,
+      },
+      safety: {
+        enablePIIRedaction: config.safety.enablePIIRedaction,
+        piiRedactionMode: "redact",
+      },
     });
 
     // Create Lane A (reflex engine)
@@ -82,6 +133,19 @@ export class VoiceWebSocketServer {
       transitionGapMs: 10,
     });
 
+    // Create Lane C (ControlEngine)
+    const controlEngine = new ControlEngine(session.id, {
+      enabled: config.features.enablePolicyGate,
+      enablePIIRedaction: config.safety.enablePIIRedaction,
+      piiRedactionMode: "redact",
+    });
+
+    // Create FallbackPlanner
+    const fallbackPlanner = new FallbackPlanner(session.id, {
+      enabled: config.features.enablePolicyGate,
+      mode: config.fallback.mode,
+    });
+
     // Store connection
     const connection: ClientConnection = {
       ws,
@@ -91,7 +155,13 @@ export class VoiceWebSocketServer {
       laneArbitrator,
       laneA,
       laneB,
+      controlEngine,
+      fallbackPlanner,
       sessionContext: null,
+      lastResponseEndTime: 0,
+      responseStartTime: null,
+      voiceMode: "push-to-talk", // Default to push-to-talk mode
+      lastPolicyDecision: null,
     };
     this.connections.set(ws, connection);
 
@@ -112,7 +182,8 @@ export class VoiceWebSocketServer {
   }
 
   private setupLaneHandlers(connection: ClientConnection): void {
-    const { ws, sessionId, laneArbitrator, laneA, laneB } = connection;
+    const { ws, sessionId, laneArbitrator, laneA, laneB, fallbackPlanner } =
+      connection;
 
     // ============== Lane Arbitrator Events ==============
 
@@ -170,8 +241,37 @@ export class VoiceWebSocketServer {
       laneB.cancel();
     });
 
+    // Play fallback audio
+    laneArbitrator.on("play_fallback", () => {
+      if (!fallbackPlanner.isEnabled()) {
+        laneArbitrator.onFallbackComplete();
+        return;
+      }
+
+      sessionManager.updateSessionState(sessionId, "responding");
+      this.sendToClient(ws, {
+        type: "response.start",
+        timestamp: Date.now(),
+      });
+
+      const decisionPayload = connection.lastPolicyDecision ?? undefined;
+      fallbackPlanner.trigger(decisionPayload).catch((error) => {
+        console.error("[WebSocket] Failed to play fallback:", error);
+        fallbackPlanner.stop();
+        laneArbitrator.onFallbackComplete();
+      });
+    });
+
+    // Stop fallback audio
+    laneArbitrator.on("stop_fallback", () => {
+      fallbackPlanner.stop();
+    });
+
     // Response complete
     laneArbitrator.on("response_complete", () => {
+      // Track when response ended for cooldown period
+      connection.lastResponseEndTime = Date.now();
+
       sessionManager.updateSessionState(sessionId, "listening");
       this.sendToClient(ws, {
         type: "response.end",
@@ -366,6 +466,22 @@ export class VoiceWebSocketServer {
     // Handle response lifecycle
     laneB.on("response_start", () => {
       sessionManager.updateSessionState(sessionId, "responding");
+      const startedAt = Date.now();
+      connection.responseStartTime = startedAt;
+
+      const responseStartEvent: Event = {
+        event_id: uuidv4(),
+        session_id: sessionId,
+        t_ms: startedAt,
+        source: "laneB",
+        type: "response.metadata",
+        payload: {
+          phase: "start",
+          voice_mode: connection.voiceMode,
+        },
+      };
+      eventBus.emit(responseStartEvent);
+
       this.sendToClient(ws, {
         type: "response.start",
         timestamp: Date.now(),
@@ -373,6 +489,29 @@ export class VoiceWebSocketServer {
     });
 
     laneB.on("response_end", () => {
+      const endedAt = Date.now();
+      const totalMs =
+        connection.responseStartTime !== null
+          ? endedAt - connection.responseStartTime
+          : undefined;
+      const ttfbMs = laneB.getTTFB() ?? undefined;
+
+      const responseEndEvent: Event = {
+        event_id: uuidv4(),
+        session_id: sessionId,
+        t_ms: endedAt,
+        source: "laneB",
+        type: "response.metadata",
+        payload: {
+          phase: "end",
+          total_ms: totalMs,
+          ttfb_ms: ttfbMs,
+          voice_mode: connection.voiceMode,
+        },
+      };
+      eventBus.emit(responseEndEvent);
+      connection.responseStartTime = null;
+
       // Signal arbitrator that Lane B is done
       laneArbitrator.onLaneBDone();
     });
@@ -386,6 +525,92 @@ export class VoiceWebSocketServer {
         timestamp: Date.now(),
       });
     });
+
+    // ============== FallbackPlanner Events ==============
+
+    fallbackPlanner.on(
+      "audio",
+      (chunk: { data: Buffer; format: string; sampleRate: number }) => {
+        if (laneArbitrator.getCurrentOwner() !== "fallback") {
+          return;
+        }
+
+        const event: Event = {
+          event_id: uuidv4(),
+          session_id: sessionId,
+          t_ms: Date.now(),
+          source: "orchestrator",
+          type: "audio.chunk",
+          payload: { ...chunk, lane: "fallback" },
+        };
+        eventBus.emit(event);
+
+        this.sendToClient(ws, {
+          type: "audio.chunk",
+          data: chunk.data.toString("base64"),
+          format: chunk.format,
+          sampleRate: chunk.sampleRate,
+          lane: "fallback",
+          timestamp: Date.now(),
+        });
+      },
+    );
+
+    fallbackPlanner.on(
+      "done",
+      (payload: { reason: "done" | "stopped"; utterance?: string | null }) => {
+        if (payload.reason === "done") {
+          laneArbitrator.onFallbackComplete();
+        }
+      },
+    );
+
+    // ============== Policy / RAG Events ==============
+
+    const policyDecisionHandler = (event: Event) => {
+      if (event.type !== "policy.decision" || event.session_id !== sessionId) {
+        return;
+      }
+
+      const payload = event.payload as PolicyDecisionPayload;
+      connection.lastPolicyDecision = payload;
+
+      const disclaimerId = payload?.required_disclaimer_id;
+      if (typeof disclaimerId === "string" && disclaimerId.length > 0) {
+        const existing = laneB.getRequiredDisclaimers();
+        laneB.setRequiredDisclaimers([...existing, disclaimerId]);
+      }
+
+      if (
+        payload?.decision === "cancel_output" ||
+        payload?.decision === "refuse" ||
+        payload?.decision === "escalate"
+      ) {
+        laneArbitrator.onPolicyCancel();
+      }
+    };
+
+    const ragResultHandler = (event: Event) => {
+      if (event.type !== "rag.result" || event.session_id !== sessionId) {
+        return;
+      }
+
+      const payload = event.payload as RAGResultPayload;
+      const disclaimers = Array.isArray(payload?.disclaimers)
+        ? payload.disclaimers
+        : [];
+
+      if (disclaimers.length > 0) {
+        const existing = laneB.getRequiredDisclaimers();
+        laneB.setRequiredDisclaimers([...existing, ...disclaimers]);
+      }
+    };
+
+    eventBus.on("policy.decision", policyDecisionHandler);
+    eventBus.on("rag.result", ragResultHandler);
+
+    connection.policyDecisionHandler = policyDecisionHandler;
+    connection.ragResultHandler = ragResultHandler;
   }
 
   private async handleMessage(
@@ -449,6 +674,16 @@ export class VoiceWebSocketServer {
             }
           }
 
+          // Set voice mode if provided
+          if (
+            message.voiceMode === "push-to-talk" ||
+            message.voiceMode === "open-mic"
+          ) {
+            connection.voiceMode = message.voiceMode;
+            laneB.setVoiceMode(message.voiceMode);
+            console.log(`[WebSocket] Voice mode set to: ${message.voiceMode}`);
+          }
+
           // Only connect Lane B if not already connected
           // This prevents creating duplicate OpenAI sessions
           if (!laneB.isConnected()) {
@@ -470,6 +705,7 @@ export class VoiceWebSocketServer {
               connection.sessionContext?.isReturningUser || false,
             previousSessionCount:
               connection.sessionContext?.previousSessionCount || 0,
+            voiceMode: connection.voiceMode,
             timestamp: Date.now(),
           });
           break;
@@ -480,6 +716,27 @@ export class VoiceWebSocketServer {
             console.log(
               "[WebSocket] Dropping audio chunk: Lane B not connected",
             );
+            return;
+          }
+
+          // CRITICAL: Audio gating to prevent feedback loop
+          // Only accept audio when in LISTENING state
+          // This prevents echoed AI audio from being sent back to OpenAI
+          const currentState = laneArbitrator.getState();
+          if (currentState !== "LISTENING") {
+            // Silently drop audio - AI is speaking or processing
+            // This breaks the feedback loop where AI talks over itself
+            return;
+          }
+
+          // CRITICAL: Cooldown period after AI response ends
+          // This prevents echoed audio tail from triggering new responses
+          const timeSinceResponse = Date.now() - connection.lastResponseEndTime;
+          if (
+            connection.lastResponseEndTime > 0 &&
+            timeSinceResponse < RESPONSE_COOLDOWN_MS
+          ) {
+            // Still in cooldown period, drop audio
             return;
           }
 
@@ -506,15 +763,39 @@ export class VoiceWebSocketServer {
 
         case "audio.commit":
           // User released Talk button - commit audio buffer to trigger response
-          console.log("[WebSocket] Committing audio buffer via Lane B");
+          console.log(
+            `[WebSocket] Audio commit requested ` +
+              `(state: ${laneArbitrator.getState()})`,
+          );
 
-          // Trigger state transition if still in LISTENING state
-          // This handles the case where VAD didn't fire (manual push-to-talk mode)
+          // Trigger state transition FIRST (before commit attempt)
+          // This ensures arbitrator knows a response cycle is starting
           if (laneArbitrator.getState() === "LISTENING") {
             laneArbitrator.onUserSpeechEnded();
           }
 
-          await laneB.commitAudio();
+          // Attempt commit (may fail with guards)
+          const commitSucceeded = await laneB.commitAudio();
+
+          // If commit was skipped (buffer too small), we need to notify
+          if (commitSucceeded === false) {
+            console.log(
+              `[WebSocket] Commit skipped (buffer too small), ` +
+                `resetting arbitrator state`,
+            );
+
+            // Reset arbitrator since response won't happen
+            laneArbitrator.resetResponseInProgress();
+
+            // Notify client
+            ws.send(
+              JSON.stringify({
+                type: "commit.skipped",
+                reason: "buffer_too_small",
+                timestamp: Date.now(),
+              }),
+            );
+          }
           break;
 
         case "user.barge_in":
@@ -569,6 +850,32 @@ export class VoiceWebSocketServer {
           ws.close();
           break;
 
+        case "session.set_mode":
+          // Change voice mode dynamically
+          if (
+            message.voiceMode === "push-to-talk" ||
+            message.voiceMode === "open-mic"
+          ) {
+            connection.voiceMode = message.voiceMode;
+            laneB.setVoiceMode(message.voiceMode);
+
+            console.log(
+              `[WebSocket] Voice mode changed to: ${message.voiceMode}`,
+            );
+
+            // Notify client of mode change
+            this.sendToClient(ws, {
+              type: "session.mode_changed",
+              voiceMode: message.voiceMode,
+              timestamp: Date.now(),
+            });
+          } else {
+            console.warn(
+              `[WebSocket] Invalid voice mode: ${message.voiceMode}`,
+            );
+          }
+          break;
+
         default:
           console.warn(`[WebSocket] Unknown message type: ${message.type}`);
       }
@@ -583,9 +890,27 @@ export class VoiceWebSocketServer {
   }
 
   private handleClose(connection: ClientConnection): void {
-    const { ws, sessionId, userId, laneArbitrator, laneB } = connection;
+    const {
+      ws,
+      sessionId,
+      userId,
+      laneArbitrator,
+      laneB,
+      controlEngine,
+      fallbackPlanner,
+    } = connection;
 
     console.log(`[WebSocket] Client disconnected: ${sessionId}`);
+
+    if (connection.policyDecisionHandler) {
+      eventBus.off("policy.decision", connection.policyDecisionHandler);
+      connection.policyDecisionHandler = undefined;
+    }
+
+    if (connection.ragResultHandler) {
+      eventBus.off("rag.result", connection.ragResultHandler);
+      connection.ragResultHandler = undefined;
+    }
 
     // Save conversation summary before closing
     if (config.features.enablePersistentMemory && userId) {
@@ -620,6 +945,8 @@ export class VoiceWebSocketServer {
     }
 
     laneArbitrator.endSession();
+    fallbackPlanner.stop();
+    controlEngine.destroy();
     laneB.disconnect().catch(console.error);
     sessionManager.endSession(sessionId, "connection_closed");
     this.connections.delete(ws);

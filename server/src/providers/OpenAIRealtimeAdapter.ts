@@ -42,6 +42,19 @@ interface SessionConfig {
   max_response_output_tokens?: number | "inf";
 }
 
+export type VoiceMode = "push-to-talk" | "open-mic";
+
+/**
+ * Buffer state tracking for synchronization with OpenAI
+ * Tracks local buffer state to prevent race conditions
+ */
+interface BufferState {
+  localBytes: number; // Our tracking of bytes sent
+  lastAppendTime: number; // Timestamp of last audio append
+  speechDetected: boolean; // VAD confirmed OpenAI processed audio
+  pendingCommit: boolean; // Commit waiting for confirmation
+}
+
 export class OpenAIRealtimeAdapter extends ProviderAdapter {
   private ws: WebSocket | null = null;
   private connected: boolean = false;
@@ -54,6 +67,19 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
   private responding: boolean = false;
   private audioBuffer: Buffer = Buffer.alloc(0);
   private conversationContext: string | null = null;
+  private voiceMode: VoiceMode = "push-to-talk";
+  private responseInstructionsProvider:
+    | ((transcript: string) => string | null)
+    | null = null;
+  private pendingInputTranscript: string = "";
+
+  // Buffer state synchronization
+  private bufferState: BufferState = {
+    localBytes: 0,
+    lastAppendTime: 0,
+    speechDetected: false,
+    pendingCommit: false,
+  };
 
   // TTFB drift prevention: Max buffer size (5 seconds of audio at 24kHz PCM16)
   private readonly MAX_AUDIO_BUFFER_SIZE = 24000 * 2 * 5; // 240KB
@@ -72,6 +98,16 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
     console.log(
       `[OpenAI] Conversation context set (${context.length} characters)`,
     );
+  }
+
+  /**
+   * Provide dynamic response instructions based on input transcript.
+   * Used for RAG injection before response creation.
+   */
+  setResponseInstructionsProvider(
+    provider: ((transcript: string) => string | null) | null,
+  ): void {
+    this.responseInstructionsProvider = provider;
   }
 
   /**
@@ -174,6 +210,14 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
    * Incorporates conversation context if available for cross-session memory
    */
   private createSession(): void {
+    this.updateSessionConfig();
+  }
+
+  /**
+   * Update session configuration based on current voice mode
+   * Called during initial session creation and when mode changes
+   */
+  private updateSessionConfig(): void {
     // Build system instructions with optional conversation context
     let instructions =
       this.config.systemInstructions ||
@@ -198,6 +242,19 @@ Continue the conversation naturally, keeping in mind the previous context.`;
       );
     }
 
+    // Configure turn detection based on voice mode
+    // Push-to-talk: Disable VAD - user controls turn-taking
+    // Open-mic: Enable VAD with higher threshold to reduce false triggers
+    const turnDetection =
+      this.voiceMode === "open-mic"
+        ? {
+            type: "server_vad",
+            threshold: 0.6, // Higher threshold for open-mic to reduce echo triggers
+            prefix_padding_ms: 300,
+            silence_duration_ms: 700, // Longer silence for open-mic
+          }
+        : undefined; // Push-to-talk: No VAD
+
     const sessionConfig: SessionConfig = {
       modalities: ["text", "audio"],
       instructions,
@@ -207,12 +264,7 @@ Continue the conversation naturally, keeping in mind the previous context.`;
       input_audio_transcription: {
         model: "whisper-1",
       },
-      turn_detection: {
-        type: "server_vad",
-        threshold: 0.5,
-        prefix_padding_ms: 300,
-        silence_duration_ms: 500,
-      },
+      turn_detection: turnDetection,
       temperature: 0.8,
       max_response_output_tokens: "inf",
     };
@@ -222,7 +274,57 @@ Continue the conversation naturally, keeping in mind the previous context.`;
       session: sessionConfig,
     });
 
-    console.log("[OpenAI] Session configuration sent");
+    console.log(
+      `[OpenAI] Session configuration sent (mode: ${this.voiceMode}, VAD: ${turnDetection ? "enabled" : "disabled"})`,
+    );
+  }
+
+  /**
+   * Set the voice interaction mode
+   * @param mode - 'push-to-talk' or 'open-mic'
+   */
+  setVoiceMode(mode: VoiceMode): void {
+    if (this.voiceMode === mode) {
+      return; // No change needed
+    }
+
+    this.voiceMode = mode;
+    console.log(`[OpenAI] Voice mode changed to: ${mode}`);
+
+    // Update session config if connected
+    if (this.isConnected() && this.sessionCreated) {
+      this.updateSessionConfig();
+    }
+  }
+
+  /**
+   * Get the current voice mode
+   */
+  getVoiceMode(): VoiceMode {
+    return this.voiceMode;
+  }
+
+  /**
+   * Calculate buffer duration in milliseconds
+   * PCM16 at 24kHz: 24000 samples/sec * 2 bytes/sample = 48000 bytes/sec
+   */
+  private getBufferDurationMs(): number {
+    const BYTES_PER_SECOND = 48000; // 24kHz * 2 bytes per sample
+    return Math.floor((this.bufferState.localBytes / BYTES_PER_SECOND) * 1000);
+  }
+
+  /**
+   * Reset buffer state to initial values
+   */
+  private resetBufferState(): void {
+    this.bufferState = {
+      localBytes: 0,
+      lastAppendTime: 0,
+      speechDetected: false,
+      pendingCommit: false,
+    };
+    this.audioBuffer = Buffer.alloc(0);
+    this.pendingInputTranscript = "";
   }
 
   /**
@@ -252,6 +354,10 @@ Continue the conversation naturally, keeping in mind the previous context.`;
         audio: audioData,
       });
 
+      // Track buffer state for synchronization
+      this.bufferState.localBytes += chunk.data.length;
+      this.bufferState.lastAppendTime = Date.now();
+
       // Accumulate audio for potential processing
       this.audioBuffer = Buffer.concat([this.audioBuffer, chunk.data]);
 
@@ -263,10 +369,13 @@ Continue the conversation naturally, keeping in mind the previous context.`;
         // Keep only the most recent 2 seconds of audio
         const keepSize = 24000 * 2 * 2; // 2 seconds
         this.audioBuffer = this.audioBuffer.subarray(-keepSize);
+        this.bufferState.localBytes = keepSize;
       }
 
+      const durationMs = this.getBufferDurationMs();
       console.log(
-        `[OpenAI] Sent audio chunk: ${chunk.data.length} bytes (buffer: ${this.audioBuffer.length})`,
+        `[OpenAI] Sent audio chunk: ${chunk.data.length} bytes ` +
+          `(local: ${this.bufferState.localBytes}, duration: ${durationMs}ms)`,
       );
     } catch (error) {
       console.error("[OpenAI] Failed to send audio:", error);
@@ -277,50 +386,73 @@ Continue the conversation naturally, keeping in mind the previous context.`;
 
   /**
    * Commit the audio buffer and trigger response
-   * Only commits if there's enough audio data (at least 100ms at 24kHz)
+   * Enhanced with confirmation protocol to prevent race conditions
+   * Returns boolean indicating if commit was attempted
    */
-  async commitAudio(): Promise<void> {
+  async commitAudio(): Promise<boolean> {
     if (!this.isConnected()) {
-      return;
+      return false;
     }
 
-    // PCM16 at 24kHz: 24000 samples/sec * 2 bytes/sample = 48000 bytes/sec
-    // 100ms minimum = 4800 bytes
-    const MIN_BUFFER_SIZE = 4800;
+    const MIN_BUFFER_DURATION_MS = 100;
+    const SAFETY_WINDOW_MS = 50; // Wait for network + OpenAI processing
 
-    if (this.audioBuffer.length < MIN_BUFFER_SIZE) {
+    const durationMs = this.getBufferDurationMs();
+
+    // Guard 1: Minimum duration check
+    if (durationMs < MIN_BUFFER_DURATION_MS) {
       console.log(
-        `[OpenAI] Skipping audio commit: buffer too small (${this.audioBuffer.length} bytes, need ${MIN_BUFFER_SIZE})`,
+        `[OpenAI] Skipping commit: buffer too small ` +
+          `(${durationMs}ms < ${MIN_BUFFER_DURATION_MS}ms, ` +
+          `${this.bufferState.localBytes} bytes)`,
       );
-      // Clear the small buffer to avoid accumulation issues
-      this.audioBuffer = Buffer.alloc(0);
-      return;
+      this.resetBufferState();
+      return false;
+    }
+
+    // Guard 2: Safety window - ensure OpenAI had time to process
+    const timeSinceLastAppend = Date.now() - this.bufferState.lastAppendTime;
+
+    if (timeSinceLastAppend < SAFETY_WINDOW_MS) {
+      const waitTime = SAFETY_WINDOW_MS - timeSinceLastAppend;
+      console.log(
+        `[OpenAI] Waiting ${waitTime}ms for buffer stabilization ` +
+          `(${durationMs}ms buffered)`,
+      );
+
+      // Wait for safety window, then continue
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
+    }
+
+    // Guard 3: Prefer VAD confirmation when available (indicates processing)
+    if (!this.bufferState.speechDetected && durationMs < 500) {
+      console.log(
+        `[OpenAI] Warning: Committing without VAD confirmation ` +
+          `(${durationMs}ms buffer) - OpenAI may not have processed audio yet`,
+      );
     }
 
     try {
+      console.log(
+        `[OpenAI] Committing audio buffer ` +
+          `(duration: ${durationMs}ms, bytes: ${this.bufferState.localBytes})`,
+      );
+
       this.sendMessage({
         type: "input_audio_buffer.commit",
       });
 
-      // Clear the audio buffer after commit
-      this.audioBuffer = Buffer.alloc(0);
+      this.bufferState.pendingCommit = true;
 
-      console.log("[OpenAI] Audio buffer committed");
+      // DO NOT send response.create here - wait for input_audio_buffer.committed
+      // This prevents the race condition where commit fails but response is requested
 
-      // Only trigger response if not already responding (prevents race condition)
-      if (!this.responding) {
-        this.sendMessage({
-          type: "response.create",
-          response: {
-            modalities: ["text", "audio"],
-          },
-        });
-        console.log("[OpenAI] Response requested");
-      } else {
-        console.log("[OpenAI] Skipping response.create: already responding");
-      }
+      console.log("[OpenAI] Audio buffer commit sent, awaiting confirmation");
+      return true;
     } catch (error) {
       console.error("[OpenAI] Failed to commit audio:", error);
+      this.resetBufferState();
+      return false;
     }
   }
 
@@ -460,7 +592,42 @@ Continue the conversation naturally, keeping in mind the previous context.`;
         break;
 
       case "input_audio_buffer.committed":
-        console.log("[OpenAI] Audio buffer committed successfully");
+        console.log(
+          `[OpenAI] Audio buffer committed successfully ` +
+            `(was ${this.bufferState.localBytes} bytes)`,
+        );
+
+        // NOW trigger response creation - only after commit confirmation
+        if (this.bufferState.pendingCommit && !this.responding) {
+          const transcript = this.pendingInputTranscript.trim();
+          let instructions: string | null = null;
+          if (this.responseInstructionsProvider) {
+            try {
+              instructions = this.responseInstructionsProvider(transcript);
+            } catch (error) {
+              console.error(
+                "[OpenAI] Response instructions provider failed:",
+                error,
+              );
+            }
+          }
+
+          const responsePayload: any = {
+            modalities: ["text", "audio"],
+          };
+          if (instructions) {
+            responsePayload.instructions = instructions;
+          }
+
+          this.sendMessage({
+            type: "response.create",
+            response: responsePayload,
+          });
+          console.log("[OpenAI] Response requested after commit confirmation");
+        }
+
+        this.pendingInputTranscript = "";
+        this.resetBufferState();
         break;
 
       case "input_audio_buffer.cleared":
@@ -468,9 +635,11 @@ Continue the conversation naturally, keeping in mind the previous context.`;
         break;
 
       case "input_audio_buffer.speech_started":
-        console.log("[OpenAI] Speech detected - started");
-        // Clear local audio buffer on new speech to prevent stale data accumulation
-        this.audioBuffer = Buffer.alloc(0);
+        console.log("[OpenAI] Speech detected - started (VAD confirmed processing)");
+        // Mark that VAD has confirmed OpenAI processed audio
+        this.bufferState.speechDetected = true;
+        // DON'T reset buffer state here - we need it for commit duration checking
+        // Buffer will be reset after successful commit confirmation
         this.emit("speech_started");
         break;
 
@@ -501,6 +670,12 @@ Continue the conversation naturally, keeping in mind the previous context.`;
       case "response.created":
         console.log("[OpenAI] Response started");
         this.responding = true;
+
+        // CRITICAL: Clear input audio buffer when response starts
+        // This prevents any echoed audio from being processed
+        // and stops the feedback loop where AI answers itself
+        this.sendMessage({ type: "input_audio_buffer.clear" });
+
         this.emit("response_start");
         break;
 
@@ -558,7 +733,9 @@ Continue the conversation naturally, keeping in mind the previous context.`;
       case "response.content_part.added":
       case "response.content_part.done":
       case "conversation.item.input_audio_transcription.delta":
-        // These are informational - no action needed
+        if (message.delta) {
+          this.pendingInputTranscript += message.delta;
+        }
         break;
 
       case "conversation.item.input_audio_transcription.completed":

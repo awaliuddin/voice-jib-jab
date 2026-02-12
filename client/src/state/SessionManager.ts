@@ -17,14 +17,17 @@ export type SessionState =
   | "listening"
   | "error";
 
-export type LaneOwner = "none" | "A" | "B";
+export type LaneOwner = "none" | "A" | "B" | "fallback";
 export type LaneState =
   | "IDLE"
   | "LISTENING"
   | "A_PLAYING"
   | "B_RESPONDING"
   | "B_PLAYING"
+  | "FALLBACK_PLAYING"
   | "ENDED";
+
+export type VoiceMode = "push-to-talk" | "open-mic";
 
 export interface LatencyMetrics {
   ttfb: number | null;
@@ -58,9 +61,12 @@ export class SessionManager {
   private lastUserSpeechEnd: number = 0;
   private firstAudioChunkTime: number = 0;
   private providerSessionActive: boolean = false; // Track if OpenAI session is active
+  private voiceMode: VoiceMode = "push-to-talk"; // Default to push-to-talk
+  private openMicActive: boolean = false; // Whether open mic is currently capturing
   private onStateChange: ((state: SessionState) => void) | null = null;
   private onMetricsUpdate: ((metrics: LatencyMetrics) => void) | null = null;
   private onLaneChange: ((laneInfo: LaneInfo) => void) | null = null;
+  private onVoiceModeChange: ((mode: VoiceMode) => void) | null = null;
 
   constructor(wsUrl: string) {
     this.wsClient = new WebSocketClient(wsUrl);
@@ -237,6 +243,15 @@ export class SessionManager {
       );
       this.laneInfo.owner = message.to as LaneOwner;
       this.notifyLaneChange();
+    });
+
+    // Voice mode changed
+    this.wsClient.on("session.mode_changed", (message) => {
+      console.log(
+        `[SessionManager] Voice mode changed to: ${message.voiceMode}`,
+      );
+      this.voiceMode = message.voiceMode as VoiceMode;
+      this.notifyVoiceModeChange();
     });
   }
 
@@ -449,5 +464,164 @@ export class SessionManager {
    */
   getFingerprint(): string | null {
     return this.fingerprint;
+  }
+
+  /**
+   * Get the current voice mode
+   */
+  getVoiceMode(): VoiceMode {
+    return this.voiceMode;
+  }
+
+  /**
+   * Set the voice mode
+   * @param mode - 'push-to-talk' or 'open-mic'
+   */
+  setVoiceMode(mode: VoiceMode): void {
+    if (this.voiceMode === mode) {
+      return; // No change
+    }
+
+    // If switching from open-mic, stop capturing
+    if (this.voiceMode === "open-mic" && this.openMicActive) {
+      this.stopOpenMic();
+    }
+
+    this.voiceMode = mode;
+
+    // Notify server of mode change
+    if (this.providerSessionActive) {
+      this.wsClient.send({ type: "session.set_mode", voiceMode: mode });
+    }
+
+    this.notifyVoiceModeChange();
+    console.log(`[SessionManager] Voice mode set to: ${mode}`);
+  }
+
+  /**
+   * Toggle the voice mode between push-to-talk and open-mic
+   */
+  toggleVoiceMode(): void {
+    const newMode =
+      this.voiceMode === "push-to-talk" ? "open-mic" : "push-to-talk";
+    this.setVoiceMode(newMode);
+  }
+
+  /**
+   * Start open mic mode (continuous capture)
+   */
+  async startOpenMic(): Promise<void> {
+    if (this.voiceMode !== "open-mic") {
+      console.warn(
+        "[SessionManager] Cannot start open mic: not in open-mic mode",
+      );
+      return;
+    }
+
+    if (this.openMicActive) {
+      console.log("[SessionManager] Open mic already active");
+      return;
+    }
+
+    // Stop any playing audio
+    if (this.audioPlayback.isActive()) {
+      this.audioPlayback.stop();
+      this.wsClient.send({ type: "user.barge_in" });
+    }
+
+    // Ensure microphone is initialized
+    const micReady = await this.ensureMicrophoneInitialized();
+    if (!micReady) {
+      console.error(
+        "[SessionManager] Cannot start open mic without microphone",
+      );
+      return;
+    }
+
+    // Ensure provider session is active
+    if (!this.providerSessionActive) {
+      console.log("[SessionManager] Connecting to OpenAI for open mic...");
+
+      const providerReady = new Promise<void>((resolve) => {
+        const handler = () => {
+          this.wsClient.off("provider.ready", handler);
+          this.providerSessionActive = true;
+          resolve();
+        };
+        this.wsClient.on("provider.ready", handler);
+
+        setTimeout(() => {
+          this.wsClient.off("provider.ready", handler);
+          resolve();
+        }, 10000);
+      });
+
+      this.wsClient.send({
+        type: "session.start",
+        fingerprint: this.fingerprint,
+        userAgent: navigator.userAgent,
+        voiceMode: "open-mic",
+      });
+      await providerReady;
+    }
+
+    this.openMicActive = true;
+    this.setState("talking");
+
+    // Start continuous capture - server handles gating
+    this.micCapture.start((audioChunk) => {
+      if (!this.openMicActive) {
+        return;
+      }
+
+      const pcm16Buffer = MicrophoneCapture.float32ToPCM16(audioChunk);
+      const base64Data = btoa(
+        String.fromCharCode(...new Uint8Array(pcm16Buffer)),
+      );
+
+      this.wsClient.send({
+        type: "audio.chunk",
+        data: base64Data,
+        format: "pcm",
+        sampleRate: 24000,
+      });
+    });
+
+    console.log("[SessionManager] Open mic started");
+  }
+
+  /**
+   * Stop open mic mode
+   */
+  stopOpenMic(): void {
+    if (!this.openMicActive) {
+      return;
+    }
+
+    this.openMicActive = false;
+    this.micCapture.stop();
+    this.setState("connected");
+
+    console.log("[SessionManager] Open mic stopped");
+  }
+
+  /**
+   * Check if open mic is currently active
+   */
+  isOpenMicActive(): boolean {
+    return this.openMicActive;
+  }
+
+  /**
+   * Set callback for voice mode changes
+   */
+  setOnVoiceModeChange(callback: (mode: VoiceMode) => void): void {
+    this.onVoiceModeChange = callback;
+  }
+
+  private notifyVoiceModeChange(): void {
+    if (this.onVoiceModeChange) {
+      this.onVoiceModeChange(this.voiceMode);
+    }
   }
 }

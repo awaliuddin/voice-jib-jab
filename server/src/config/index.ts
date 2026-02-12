@@ -5,6 +5,7 @@
 import { config as loadEnv } from "dotenv";
 import { resolve } from "path";
 import { existsSync } from "fs";
+import type { FallbackMode } from "../schemas/events.js";
 
 // Determine the project root directory
 // When running from server/ directory, we need to look in parent directory
@@ -60,11 +61,19 @@ export interface ServerConfig {
     storeRawAudio: boolean;
     maxSessionDurationMinutes: number;
   };
+  rag: {
+    topK: number;
+    maxTokens: number;
+    maxBytes: number;
+  };
   storage: {
     databasePath: string;
     enableWalMode: boolean;
     maxHistoryTurns: number;
     maxSummaryLength: number;
+  };
+  fallback: {
+    mode: FallbackMode;
   };
 }
 
@@ -92,6 +101,33 @@ function getEnvNumber(key: string, defaultValue: number): number {
   return num;
 }
 
+function getEnvFallbackMode(
+  key: string,
+  defaultValue: FallbackMode,
+): FallbackMode {
+  const value = process.env[key];
+  if (!value) return defaultValue;
+
+  const normalized = value.trim().toLowerCase();
+  const allowed: FallbackMode[] = [
+    "auto",
+    "ask_clarifying_question",
+    "refuse_politely",
+    "switch_to_text_summary",
+    "escalate_to_human",
+    "offer_email_or_link",
+  ];
+
+  if (allowed.includes(normalized as FallbackMode)) {
+    return normalized as FallbackMode;
+  }
+
+  console.warn(
+    `[Config] Invalid ${key}="${value}". Using default "${defaultValue}".`,
+  );
+  return defaultValue;
+}
+
 export const config: ServerConfig = {
   port: getEnvNumber("PORT", 3000),
   nodeEnv: getEnvVar("NODE_ENV", "development"),
@@ -116,6 +152,11 @@ export const config: ServerConfig = {
     storeRawAudio: getEnvBool("STORE_RAW_AUDIO", false),
     maxSessionDurationMinutes: getEnvNumber("MAX_SESSION_DURATION_MINUTES", 30),
   },
+  rag: {
+    topK: getEnvNumber("RAG_TOP_K", 5),
+    maxTokens: getEnvNumber("RAG_MAX_TOKENS", 600),
+    maxBytes: getEnvNumber("RAG_MAX_BYTES", 4000),
+  },
   storage: {
     databasePath: getEnvVar(
       "DATABASE_PATH",
@@ -124,5 +165,8 @@ export const config: ServerConfig = {
     enableWalMode: getEnvBool("DATABASE_WAL_MODE", true),
     maxHistoryTurns: getEnvNumber("MAX_HISTORY_TURNS", 20),
     maxSummaryLength: getEnvNumber("MAX_SUMMARY_LENGTH", 2000),
+  },
+  fallback: {
+    mode: getEnvFallbackMode("FALLBACK_MODE", "auto"),
   },
 };
