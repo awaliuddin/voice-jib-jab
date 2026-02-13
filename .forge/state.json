@@ -1,0 +1,73 @@
+{
+  "version": "0.1.0",
+  "project_name": "voice-jib-jab",
+  "created_at": "2026-02-11T01:17:44.951061535Z",
+  "updated_at": "2026-02-13T03:59:13.421482399Z",
+  "tools": [
+    {
+      "name": "claude",
+      "agent_type": "claude",
+      "version": "2.1.39 (Claude Code)",
+      "path": "/home/axw/.local/bin/claude",
+      "available": true
+    },
+    {
+      "name": "codex",
+      "agent_type": "codex",
+      "version": "codex-cli 0.98.0",
+      "path": "/home/axw/.nvm/versions/node/v22.21.1/bin/codex",
+      "available": true
+    },
+    {
+      "name": "gemini",
+      "agent_type": "gemini",
+      "version": "0.27.3",
+      "path": "/home/axw/.nvm/versions/node/v22.21.1/bin/gemini",
+      "available": true
+    }
+  ],
+  "brain": {
+    "provider": "openai",
+    "model": null
+  },
+  "task_summary": {
+    "total": 13,
+    "pending": 13,
+    "in_progress": 0,
+    "completed": 0,
+    "failed": 0,
+    "blocked": 0
+  },
+  "active_locks": {
+    "V-001": {
+      "task_id": "V-001",
+      "agent": "codex",
+      "locked_at": "2026-02-13T03:55:58.731997401Z",
+      "files": [
+        "server/src/lanes/laneC_control.ts",
+        "server/src/insurance/policy_gate.ts",
+        "server/src/insurance/allowed_claims_registry.ts"
+      ]
+    },
+    "V-002": {
+      "task_id": "V-002",
+      "agent": "codex",
+      "locked_at": "2026-02-13T03:57:48.068278031Z",
+      "files": [
+        "server/src/lanes/laneC_control.ts",
+        "server/src/orchestrator/LaneArbitrator.ts",
+        "server/src/insurance/fallback_planner.ts"
+      ]
+    }
+  },
+  "agent_auth": {},
+  "agent_permissions": {
+    "claude": "yolo",
+    "codex": "yolo",
+    "gemini": "yolo"
+  },
+  "git": {
+    "auto_commit": true,
+    "strategy": "single"
+  }
+}
