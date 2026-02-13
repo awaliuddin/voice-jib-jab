@@ -2,7 +2,7 @@
   "version": "0.1.0",
   "project_name": "voice-jib-jab",
   "created_at": "2026-02-11T01:17:44.951061535Z",
-  "updated_at": "2026-02-13T04:04:01.068223844Z",
+  "updated_at": "2026-02-13T04:04:22.515853016Z",
   "tools": [
     {
       "name": "claude",
@@ -39,14 +39,6 @@
     "blocked": 0
   },
   "active_locks": {
-    "V-005": {
-      "task_id": "V-005",
-      "agent": "codex",
-      "locked_at": "2026-02-13T04:00:11.306648047Z",
-      "files": [
-        "server/src/insurance/audit_trail.ts"
-      ]
-    },
     "V-007": {
       "task_id": "V-007",
       "agent": "codex",
@@ -64,12 +56,21 @@
       "files": [
         "server/src/lanes/LaneB.ts"
       ]
+    },
+    "V-009": {
+      "task_id": "V-009",
+      "agent": "codex",
+      "locked_at": "2026-02-13T04:04:22.515852906Z",
+      "files": [
+        "server/src/retrieval/nxtg_knowledge_pack.ts",
+        "knowledge/disclaimers.json"
+      ]
     }
   },
   "agent_auth": {},
   "agent_permissions": {
-    "claude": "yolo",
     "codex": "yolo",
+    "claude": "yolo",
     "gemini": "yolo"
   },
   "git": {
