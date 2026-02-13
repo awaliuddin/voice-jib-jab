@@ -2,7 +2,7 @@
   "version": "0.1.0",
   "project_name": "voice-jib-jab",
   "created_at": "2026-02-11T01:17:44.951061535Z",
-  "updated_at": "2026-02-13T04:09:32.348237408Z",
+  "updated_at": "2026-02-13T04:10:14.972076161Z",
   "tools": [
     {
       "name": "claude",
@@ -46,21 +46,13 @@
       "files": [
         "server/src/lanes/laneB_reasoning.test.ts"
       ]
-    },
-    "V-012": {
-      "task_id": "V-012",
-      "agent": "codex",
-      "locked_at": "2026-02-13T04:07:59.495920364Z",
-      "files": [
-        "server/src/orchestrator/lane_arbitration.test.ts"
-      ]
     }
   },
   "agent_auth": {},
   "agent_permissions": {
-    "codex": "yolo",
     "gemini": "yolo",
-    "claude": "yolo"
+    "claude": "yolo",
+    "codex": "yolo"
   },
   "git": {
     "auto_commit": true,

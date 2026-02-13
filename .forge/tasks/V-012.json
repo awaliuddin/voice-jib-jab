@@ -2,7 +2,7 @@
   "id": "V-012",
   "title": "Verify: Test Lane Arbitration and Barge-in",
   "description": "Run automated tests for task T-015.\nReview changes and verify acceptance criteria.\nOriginal: Write and run tests for lane ownership transitions, barge-in interrupts, and policy cancel events. Verify correct state transitions and event emissions.\nCriteria:\n- All lane transitions are covered by tests\n- Barge-in interrupts assistant audio reliably\n- Policy cancel stops Lane B and triggers fallback",
-  "status": "in_progress",
+  "status": "completed",
   "assigned_to": "codex",
   "task_type": "review",
   "depends_on": [
@@ -17,8 +17,8 @@
     "Policy cancel stops Lane B and triggers fallback"
   ],
   "created_at": "2026-02-13T03:48:19.311194438Z",
-  "updated_at": "2026-02-13T04:07:59.495838055Z",
-  "completed_at": null,
+  "updated_at": "2026-02-13T04:10:14.971969743Z",
+  "completed_at": "2026-02-13T04:10:14.971969645Z",
   "parent_task": "T-015",
   "phase": "verify",
   "retry_count": 0
