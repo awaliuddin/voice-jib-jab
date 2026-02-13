@@ -2,7 +2,7 @@
   "id": "V-010",
   "title": "Verify: Test Lane C Policy Cancel and Fallback",
   "description": "Run automated tests for task T-012.\nReview changes and verify acceptance criteria.\nOriginal: Write tests to verify that Lane C can emit policy cancel events, Lane B audio is stopped, and fallback is triggered correctly. Test arbitration state transitions and audit logging.\nCriteria:\n- Test triggers policy cancel and verifies Lane B audio stops\n- Test verifies fallback maneuver is executed\n- Test checks correct arbitration state transitions\n- AuditTrail logs all relevant events",
-  "status": "pending",
+  "status": "in_progress",
   "assigned_to": "codex",
   "task_type": "review",
   "depends_on": [
@@ -18,7 +18,7 @@
     "AuditTrail logs all relevant events"
   ],
   "created_at": "2026-02-13T03:48:19.311146707Z",
-  "updated_at": "2026-02-13T03:48:19.311146707Z",
+  "updated_at": "2026-02-13T04:07:12.591049507Z",
   "completed_at": null,
   "parent_task": "T-012",
   "phase": "verify",
