@@ -90,6 +90,9 @@ export class SessionHistory {
     this.createSessionStmt = db.prepare(`
       INSERT INTO sessions (id, user_id, metadata)
       VALUES (@id, @userId, @metadata)
+      ON CONFLICT(id) DO UPDATE SET
+        user_id = COALESCE(excluded.user_id, sessions.user_id),
+        metadata = excluded.metadata
     `);
 
     this.endSessionStmt = db.prepare(`

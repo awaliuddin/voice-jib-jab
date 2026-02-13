@@ -603,9 +603,17 @@ export class SessionManager {
     this.openMicActive = true;
     this.setState("talking");
 
-    // Start continuous capture - server handles gating
+    // Start continuous capture — suppress while AI audio is playing
+    // to prevent the microphone from picking up speaker output.
     this.micCapture.start((audioChunk) => {
       if (!this.openMicActive) {
+        return;
+      }
+
+      // Client-side echo gate: don't send audio while speakers are active.
+      // The server also gates, but dropping early saves bandwidth and
+      // prevents any edge-case where echoed audio slips through.
+      if (this.audioPlayback.isActive()) {
         return;
       }
 

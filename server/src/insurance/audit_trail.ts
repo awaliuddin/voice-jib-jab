@@ -112,6 +112,13 @@ export class AuditTrail {
         ? R
         : never)
     | null = null;
+  private ensureSessionStmt:
+    | (ReturnType<typeof getDatabase>["prepare"] extends (
+        sql: string,
+      ) => infer R
+        ? R
+        : never)
+    | null = null;
   private useConsoleFallback = false;
   private jsonlDir: string | null = null;
   private includeTranscripts = true;
@@ -151,6 +158,17 @@ export class AuditTrail {
       this.insertStmt = db.prepare(`
         INSERT INTO audit_events (event_id, session_id, event_type, source, payload, timestamp_ms)
         VALUES (@eventId, @sessionId, @eventType, @source, @payload, @timestampMs)
+      `);
+
+      // T-021 fix: Ensure session row exists before inserting audit events.
+      // SessionManager.createSession() emits "session.start" synchronously
+      // before the session is persisted to the DB, causing a foreign key
+      // violation when the audit_events INSERT references a non-existent
+      // sessions row. This INSERT OR IGNORE creates a minimal placeholder
+      // row so the FK constraint is satisfied. The full session metadata
+      // is filled in later by SessionHistory.recordSession().
+      this.ensureSessionStmt = db.prepare(`
+        INSERT OR IGNORE INTO sessions (id) VALUES (?)
       `);
     } catch (error) {
       this.useConsoleFallback = true;
@@ -208,6 +226,13 @@ export class AuditTrail {
 
     if (this.insertStmt) {
       try {
+        // Ensure the referenced session row exists to avoid FK violation.
+        // The full session record is written later by SessionHistory; this
+        // creates a minimal placeholder if it doesn't exist yet.
+        if (this.ensureSessionStmt) {
+          this.ensureSessionStmt.run(sanitized.session_id);
+        }
+
         this.insertStmt.run({
           eventId: sanitized.event_id,
           sessionId: sanitized.session_id,
