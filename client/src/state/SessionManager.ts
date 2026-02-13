@@ -96,6 +96,10 @@ export class SessionManager {
 
       // Setup audio playback callback
       this.audioPlayback.setOnPlaybackEnd(() => {
+        // Notify server that speakers are now silent so it can start
+        // the echo-cooldown timer from the right moment.
+        this.wsClient.send({ type: "playback.ended", timestamp: Date.now() });
+
         if (this.state === "listening") {
           this.setState("connected");
         }

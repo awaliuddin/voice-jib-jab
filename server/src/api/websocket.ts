@@ -38,7 +38,8 @@ interface ClientConnection {
   controlEngine: ControlEngine;
   fallbackPlanner: FallbackPlanner;
   sessionContext: SessionContext | null;
-  lastResponseEndTime: number; // Timestamp when AI finished speaking
+  lastResponseEndTime: number; // Timestamp when OpenAI response.done fired (server-side)
+  lastPlaybackEndTime: number; // Timestamp when client reports audio playback finished
   responseStartTime: number | null; // Timestamp when Lane B response started
   voiceMode: "push-to-talk" | "open-mic"; // Voice interaction mode
   audioStopped: boolean; // Client signaled audio stop — reject further chunks
@@ -47,8 +48,16 @@ interface ClientConnection {
   ragResultHandler?: (event: Event) => void;
 }
 
-// Cooldown period after AI response to prevent echo detection (ms)
-const RESPONSE_COOLDOWN_MS = 300;
+// Cooldown period after AI response audio finishes playing on the client (ms).
+// Must exceed typical room reverb time (RT60) to prevent echoed AI speech
+// from being treated as new user input. 1500ms covers most room acoustics.
+const RESPONSE_COOLDOWN_MS = 1500;
+
+// Minimum RMS energy threshold for audio chunks.
+// Chunks below this level are likely silence or faint echo residue and are dropped.
+// PCM16 range is [-32768, 32767]; RMS of ~200 ≈ -44 dBFS — well above noise floor
+// but filters out reverb tails and quiet echo bleed-through.
+const MIN_AUDIO_RMS = 200;
 
 export class VoiceWebSocketServer {
   private wss: WebSocketServer;
@@ -160,6 +169,7 @@ export class VoiceWebSocketServer {
       fallbackPlanner,
       sessionContext: null,
       lastResponseEndTime: 0,
+      lastPlaybackEndTime: 0,
       responseStartTime: null,
       voiceMode: "push-to-talk", // Default to push-to-talk mode
       audioStopped: false,
@@ -742,20 +752,42 @@ export class VoiceWebSocketServer {
             return;
           }
 
-          // CRITICAL: Cooldown period after AI response ends
-          // This prevents echoed audio tail from triggering new responses
-          const timeSinceResponse = Date.now() - connection.lastResponseEndTime;
-          if (
-            connection.lastResponseEndTime > 0 &&
-            timeSinceResponse < RESPONSE_COOLDOWN_MS
-          ) {
-            // Still in cooldown period, drop audio
+          // CRITICAL: Cooldown period after AI audio finishes playing.
+          // Use the later of server-side response end and client playback end
+          // so the cooldown doesn't start until audio has actually stopped
+          // coming out of the speakers.
+          const cooldownAnchor = Math.max(
+            connection.lastResponseEndTime,
+            connection.lastPlaybackEndTime,
+          );
+          if (cooldownAnchor > 0) {
+            const timeSinceCooldownAnchor = Date.now() - cooldownAnchor;
+            if (timeSinceCooldownAnchor < RESPONSE_COOLDOWN_MS) {
+              // Still in cooldown period, drop audio
+              return;
+            }
+          }
+
+          // CRITICAL: RMS energy gate — drop audio chunks that are too quiet.
+          // Echoed AI audio and room reverb are typically much quieter than
+          // direct speech into a microphone. This catches echo residue that
+          // slips past the cooldown window.
+          const audioBytes = Buffer.from(message.data, "base64");
+          let sumSquares = 0;
+          const sampleCount = Math.floor(audioBytes.length / 2);
+          for (let i = 0; i < sampleCount; i++) {
+            const sample = audioBytes.readInt16LE(i * 2);
+            sumSquares += sample * sample;
+          }
+          const rms = sampleCount > 0 ? Math.sqrt(sumSquares / sampleCount) : 0;
+          if (rms < MIN_AUDIO_RMS) {
+            // Audio is below energy threshold — likely silence or echo
             return;
           }
 
           // Forward audio to Lane B
           await laneB.sendAudio({
-            data: Buffer.from(message.data, "base64"),
+            data: audioBytes,
             format: message.format || "pcm",
             sampleRate: message.sampleRate || 24000,
           });
@@ -792,6 +824,13 @@ export class VoiceWebSocketServer {
           if (laneArbitrator.getState() === "B_RESPONDING") {
             laneArbitrator.resetResponseInProgress();
           }
+          break;
+
+        case "playback.ended":
+          // Client finished playing all AI audio through speakers.
+          // This is the real moment echoes stop, so we anchor the cooldown here.
+          connection.lastPlaybackEndTime = Date.now();
+          console.log("[WebSocket] Client playback ended — cooldown anchor updated");
           break;
 
         case "audio.commit":
