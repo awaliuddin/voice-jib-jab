@@ -2,7 +2,7 @@
   "id": "V-002",
   "title": "Verify: Implement Policy Cancel Output and Fallback Trigger",
   "description": "Run automated tests for task T-003.\nReview changes and verify acceptance criteria.\nOriginal: Extend the Lane C ControlEngine and LaneArbitrator to support policy cancel events that immediately stop Lane B audio and trigger fallback handling. Ensure the fallback planner is invoked and the correct arbitration state transitions occur.\nCriteria:\n- Policy cancel event from Lane C stops Lane B audio playback\n- FallbackPlanner is invoked when cancel_output is triggered\n- LaneArbitrator transitions to FALLBACK_PLAYING state\n- Session resumes listening after fallback completes",
-  "status": "in_progress",
+  "status": "completed",
   "assigned_to": "codex",
   "task_type": "review",
   "depends_on": [
@@ -20,8 +20,8 @@
     "Session resumes listening after fallback completes"
   ],
   "created_at": "2026-02-13T03:48:19.277693138Z",
-  "updated_at": "2026-02-13T03:57:48.068180352Z",
-  "completed_at": null,
+  "updated_at": "2026-02-13T04:00:11.304904348Z",
+  "completed_at": "2026-02-13T04:00:11.304904191Z",
   "parent_task": "T-003",
   "phase": "verify",
   "retry_count": 0

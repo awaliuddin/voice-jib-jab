@@ -2,7 +2,7 @@
   "id": "V-005",
   "title": "Verify: Implement AuditTrail Event Logging for Lane C",
   "description": "Run automated tests for task T-006.\nReview changes and verify acceptance criteria.\nOriginal: Extend the AuditTrail to support structured logging of all Lane C policy decisions, overrides, and relevant session events. Ensure events are stored in append-only JSONL format and support replay for session timelines.\nCriteria:\n- AuditTrail logs all Lane C policy decisions and overrides\n- Events are stored in append-only JSONL files\n- AuditTrail supports replaying session timelines (transcript, decisions, tool calls)\n- AuditTrail respects configuration for transcript/audio storage",
-  "status": "pending",
+  "status": "in_progress",
   "assigned_to": "codex",
   "task_type": "review",
   "depends_on": [
@@ -18,7 +18,7 @@
     "AuditTrail respects configuration for transcript/audio storage"
   ],
   "created_at": "2026-02-13T03:48:19.310980789Z",
-  "updated_at": "2026-02-13T03:48:19.310980789Z",
+  "updated_at": "2026-02-13T04:00:11.306548268Z",
   "completed_at": null,
   "parent_task": "T-006",
   "phase": "verify",
