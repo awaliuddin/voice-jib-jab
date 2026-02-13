@@ -2,7 +2,7 @@
   "version": "0.1.0",
   "project_name": "voice-jib-jab",
   "created_at": "2026-02-11T01:17:44.951061535Z",
-  "updated_at": "2026-02-12T01:56:46.076785698Z",
+  "updated_at": "2026-02-13T03:54:46.168582538Z",
   "tools": [
     {
       "name": "claude",
@@ -41,8 +41,12 @@
   "active_locks": {},
   "agent_auth": {},
   "agent_permissions": {
-    "gemini": "yolo",
     "codex": "yolo",
+    "gemini": "yolo",
     "claude": "yolo"
+  },
+  "git": {
+    "auto_commit": true,
+    "strategy": "single"
   }
 }

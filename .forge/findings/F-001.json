@@ -1,0 +1,8 @@
+{
+  "id": "F-001",
+  "description": "Audio Feedback Loop — AI responds to ambient noise or its own audio output, generating infinite responses. VAD picks up AI's own speech, input_audio_buffer.append continues indefinitely, buffer exceeds max size (243456 bytes). Echo cancellation missing or broken.",
+  "severity": "critical",
+  "finding_type": "bug",
+  "related_tasks": ["T-002", "T-003"],
+  "created_at": "2026-02-11T12:00:00Z"
+}

@@ -25,3 +25,36 @@
 ## Pre-existing: SessionManager Test Timeout (LOW)
 **What happened:** `npm test` shows 40/41 pass, 1 timeout in SessionManager.initialize() — tries to connect to ws://localhost:3000 which isn't running during test.
 **Note:** Pre-existing issue, not caused by forge agents. Needs mock server in test setup.
+
+Absolutely — and I’ll keep the same **layout + style** you locked in.
+
+After reviewing your logs, there is **one major issue** that absolutely belongs in your UAT Findings list, and it’s not a small one. It’s a **database integrity failure** happening on every new WebSocket connection.
+
+Here is the entry in your format.
+
+---
+
+# UAT Findings — Additional Issue from Server Logs  
+> Human tester: Asif (founder)  
+> Method: Log inspection during `npm run dev` startup and first client connection
+
+## Finding 5: Audit Trail Foreign Key Failure (CRITICAL)  
+**What happened:**  
+Immediately after the first WebSocket client connected, the server attempted to persist an audit event. SQLite threw a `FOREIGN KEY constraint failed` error. This means the audit event references a session or entity that does **not exist** at the time of insertion.
+
+**Expected:**  
+Audit events should only be written after the parent session record exists and is committed. No audit write should ever violate referential integrity.
+
+**Related components:**  
+AuditTrail handler, EventBus ordering, SessionManager.createSession(), SQLite schema (foreign key constraints), transaction boundaries.
+
+**Server evidence:**  
+```
+[AuditTrail] Failed to persist audit event: SqliteError: FOREIGN KEY constraint failed
+...
+code: 'SQLITE_CONSTRAINT_FOREIGNKEY'
+```
+
+**Notes:**  
+This is a **hard failure** — not a warning. It means your audit system is currently **dropping events** and potentially leaving the system in an inconsistent state. It also suggests a race condition: the audit event is emitted before the session row exists.
+

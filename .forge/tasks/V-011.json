@@ -1,0 +1,26 @@
+{
+  "id": "V-011",
+  "title": "Verify: Test Knowledge Pack Retrieval and Injection",
+  "description": "Run automated tests for task T-013.\nReview changes and verify acceptance criteria.\nOriginal: Write tests to verify the retrieval service returns correct facts packs, enforces token/byte caps, and Lane B injects facts into responses. Test citation inclusion and error handling.\nCriteria:\n- Retrieval service returns correct facts pack for sample queries\n- Token/byte cap is enforced in results\n- Lane B includes facts and citations in responses\n- Error cases (missing facts, malformed queries) are handled",
+  "status": "pending",
+  "assigned_to": "codex",
+  "task_type": "review",
+  "depends_on": [
+    "T-013"
+  ],
+  "locked_files": [
+    "server/src/__tests__/LaneB.test.ts"
+  ],
+  "acceptance_criteria": [
+    "Retrieval service returns correct facts pack for sample queries",
+    "Token/byte cap is enforced in results",
+    "Lane B includes facts and citations in responses",
+    "Error cases (missing facts, malformed queries) are handled"
+  ],
+  "created_at": "2026-02-13T03:48:19.311170141Z",
+  "updated_at": "2026-02-13T03:48:19.311170141Z",
+  "completed_at": null,
+  "parent_task": "T-013",
+  "phase": "verify",
+  "retry_count": 0
+}

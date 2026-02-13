@@ -1,0 +1,26 @@
+{
+  "id": "V-006",
+  "title": "Verify: Implement FallbackPlanner Stub",
+  "description": "Run automated tests for task T-007.\nReview changes and verify acceptance criteria.\nOriginal: Implement the FallbackPlanner as a stub module that supports safe fallback maneuvers (ask clarifying question, refuse politely, switch to text summary, escalate to human, offer to send email/link). Integrate with LaneArbitrator and Lane C for triggering fallback patterns.\nCriteria:\n- FallbackPlanner supports all specified fallback maneuvers as stub functions\n- FallbackPlanner can be invoked by LaneArbitrator on policy cancel\n- Fallback mode is configurable\n- Fallback events are logged in AuditTrail",
+  "status": "pending",
+  "assigned_to": "codex",
+  "task_type": "review",
+  "depends_on": [
+    "T-007"
+  ],
+  "locked_files": [
+    "server/src/insurance/fallback_planner.ts"
+  ],
+  "acceptance_criteria": [
+    "FallbackPlanner supports all specified fallback maneuvers as stub functions",
+    "FallbackPlanner can be invoked by LaneArbitrator on policy cancel",
+    "Fallback mode is configurable",
+    "Fallback events are logged in AuditTrail"
+  ],
+  "created_at": "2026-02-13T03:48:19.311023985Z",
+  "updated_at": "2026-02-13T03:48:19.311023985Z",
+  "completed_at": null,
+  "parent_task": "T-007",
+  "phase": "verify",
+  "retry_count": 0
+}

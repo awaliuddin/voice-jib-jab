@@ -1,0 +1,25 @@
+{
+  "id": "V-013",
+  "title": "Verify: Test Knowledge Pack Retrieval and Injection",
+  "description": "Run automated tests for task T-016.\nReview changes and verify acceptance criteria.\nOriginal: Write and run tests to verify that Lane B consistently uses retrieved facts and asks clarifying questions when facts are missing. Test facts pack schema and limits.\nCriteria:\n- Lane B responses use only retrieved facts\n- Clarifying questions are asked when facts are missing\n- Facts pack schema and limits are enforced",
+  "status": "pending",
+  "assigned_to": "codex",
+  "task_type": "review",
+  "depends_on": [
+    "T-016"
+  ],
+  "locked_files": [
+    "server/src/lanes/laneB_reasoning.test.ts"
+  ],
+  "acceptance_criteria": [
+    "Lane B responses use only retrieved facts",
+    "Clarifying questions are asked when facts are missing",
+    "Facts pack schema and limits are enforced"
+  ],
+  "created_at": "2026-02-13T03:48:19.311217008Z",
+  "updated_at": "2026-02-13T03:48:19.311217008Z",
+  "completed_at": null,
+  "parent_task": "T-016",
+  "phase": "verify",
+  "retry_count": 0
+}

@@ -1,0 +1,8 @@
+{
+  "id": "F-002",
+  "description": "Stop Button Unresponsive — clicking talk/stop button does nothing. Required 3 presses before it actually stopped. Single click should immediately stop mic capture AND send input_audio_buffer.clear to OpenAI.",
+  "severity": "high",
+  "finding_type": "bug",
+  "related_tasks": [],
+  "created_at": "2026-02-11T12:05:00Z"
+}

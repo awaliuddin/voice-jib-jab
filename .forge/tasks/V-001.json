@@ -1,0 +1,29 @@
+{
+  "id": "V-001",
+  "title": "Verify: Implement Lane C ControlEngine Scaffold",
+  "description": "Run automated tests for task T-002.\nReview changes and verify acceptance criteria.\nOriginal: Implement the Lane C ControlEngine scaffold as designed, including stubbed versions of Moderator, ClaimsChecker, PIIRedactor, and OverrideController. Ensure the module can receive transcript and response metadata, emit policy decision events, and log audit events. Integrate with the event bus and session manager.\nCriteria:\n- Lane C ControlEngine module exists and is instantiable\n- Moderator, ClaimsChecker, PIIRedactor, and OverrideController are present as stubs\n- Module receives transcript and response metadata events\n- Policy decision events are emitted on the event bus\n- Audit events are logged for policy decisions",
+  "status": "pending",
+  "assigned_to": "codex",
+  "task_type": "review",
+  "depends_on": [
+    "T-002"
+  ],
+  "locked_files": [
+    "server/src/lanes/laneC_control.ts",
+    "server/src/insurance/policy_gate.ts",
+    "server/src/insurance/allowed_claims_registry.ts"
+  ],
+  "acceptance_criteria": [
+    "Lane C ControlEngine module exists and is instantiable",
+    "Moderator, ClaimsChecker, PIIRedactor, and OverrideController are present as stubs",
+    "Module receives transcript and response metadata events",
+    "Policy decision events are emitted on the event bus",
+    "Audit events are logged for policy decisions"
+  ],
+  "created_at": "2026-02-13T03:48:19.277596229Z",
+  "updated_at": "2026-02-13T03:48:19.277596229Z",
+  "completed_at": null,
+  "parent_task": "T-002",
+  "phase": "verify",
+  "retry_count": 0
+}

@@ -1,0 +1,8 @@
+{
+  "id": "F-005",
+  "description": "Audit Trail Foreign Key Failure — on first WebSocket connection, SQLite throws FOREIGN KEY constraint failed (SQLITE_CONSTRAINT_FOREIGNKEY). Audit event references a session that doesn't exist yet. Race condition: audit event emitted before session row exists. Hard failure dropping audit events.",
+  "severity": "critical",
+  "finding_type": "bug",
+  "related_tasks": ["T-006"],
+  "created_at": "2026-02-11T12:20:00Z"
+}

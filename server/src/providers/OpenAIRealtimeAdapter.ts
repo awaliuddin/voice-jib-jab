@@ -457,6 +457,20 @@ Continue the conversation naturally, keeping in mind the previous context.`;
   }
 
   /**
+   * Clear the OpenAI input audio buffer and reset local buffer state.
+   * Used when the client signals stop to immediately discard in-flight audio.
+   */
+  clearInputBuffer(): void {
+    if (!this.isConnected()) {
+      return;
+    }
+
+    this.sendMessage({ type: "input_audio_buffer.clear" });
+    this.resetBufferState();
+    console.log("[OpenAI] Input audio buffer cleared (client stop)");
+  }
+
+  /**
    * Cancel current response
    */
   async cancel(): Promise<void> {
@@ -493,6 +507,17 @@ Continue the conversation naturally, keeping in mind the previous context.`;
         this.pingInterval = null;
       }
 
+      // Clear input buffer before closing to stop OpenAI processing
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        try {
+          this.ws.send(
+            JSON.stringify({ type: "input_audio_buffer.clear" }),
+          );
+        } catch {
+          // Best-effort — connection may already be closing
+        }
+      }
+
       // Close WebSocket connection
       if (this.ws) {
         this.ws.close(1000, "Client disconnect");
@@ -503,7 +528,7 @@ Continue the conversation naturally, keeping in mind the previous context.`;
       this.sessionCreated = false;
       this.sessionId = null;
       this.messageQueue = [];
-      this.audioBuffer = Buffer.alloc(0);
+      this.resetBufferState();
 
       console.log("[OpenAI] Disconnected session");
     } catch (error) {

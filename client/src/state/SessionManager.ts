@@ -245,6 +245,14 @@ export class SessionManager {
       this.notifyLaneChange();
     });
 
+    // Commit skipped (buffer too small) — ensure we're not stuck
+    this.wsClient.on("commit.skipped", () => {
+      console.log("[SessionManager] Commit skipped (buffer too small)");
+      if (this.state === "talking") {
+        this.setState("connected");
+      }
+    });
+
     // Voice mode changed
     this.wsClient.on("session.mode_changed", (message) => {
       console.log(
@@ -313,6 +321,13 @@ export class SessionManager {
       console.log("[SessionManager] Reusing existing OpenAI session");
     }
 
+    // If user released the button while we were waiting for provider, abort
+    // (state may have changed during the async wait above)
+    if ((this.state as SessionState) !== "talking") {
+      console.log("[SessionManager] User released button during setup, aborting");
+      return;
+    }
+
     console.log("[SessionManager] Starting audio capture");
 
     // Now start capturing microphone - OpenAI is ready
@@ -341,12 +356,28 @@ export class SessionManager {
     this.micCapture.stop();
     this.lastUserSpeechEnd = Date.now();
 
-    // Tell server to commit audio buffer and generate response
+    // Commit the buffered audio to trigger AI response.
+    // Do NOT send audio.stop/clear first — that would wipe the buffer
+    // before commit can process it. The server's response.created handler
+    // sends input_audio_buffer.clear to OpenAI after the response cycle starts.
     this.wsClient.send({ type: "audio.commit" });
 
-    // Stay in talking state until we get response.start
-    // This keeps the button in "processing" state
-    console.log("[SessionManager] Stopped talking, waiting for response...");
+    // Immediately transition to connected so the button is responsive again.
+    // When the AI response arrives (response.start), state transitions to "listening".
+    // If commit is skipped (buffer too small), we're already in "connected" — no deadlock.
+    this.setState("connected");
+    console.log("[SessionManager] Stopped talking, ready for next interaction");
+  }
+
+  /**
+   * Force-cancel recording: stops mic and tells server to clear the audio buffer.
+   * No AI response will be generated.
+   */
+  cancelTalking(): void {
+    this.micCapture.stop();
+    this.wsClient.send({ type: "audio.cancel" });
+    this.setState("connected");
+    console.log("[SessionManager] Cancelled talking, buffer cleared");
   }
 
   /**

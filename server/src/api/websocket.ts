@@ -41,6 +41,7 @@ interface ClientConnection {
   lastResponseEndTime: number; // Timestamp when AI finished speaking
   responseStartTime: number | null; // Timestamp when Lane B response started
   voiceMode: "push-to-talk" | "open-mic"; // Voice interaction mode
+  audioStopped: boolean; // Client signaled audio stop — reject further chunks
   lastPolicyDecision: PolicyDecisionPayload | null;
   policyDecisionHandler?: (event: Event) => void;
   ragResultHandler?: (event: Event) => void;
@@ -161,6 +162,7 @@ export class VoiceWebSocketServer {
       lastResponseEndTime: 0,
       responseStartTime: null,
       voiceMode: "push-to-talk", // Default to push-to-talk mode
+      audioStopped: false,
       lastPolicyDecision: null,
     };
     this.connections.set(ws, connection);
@@ -271,6 +273,9 @@ export class VoiceWebSocketServer {
     laneArbitrator.on("response_complete", () => {
       // Track when response ended for cooldown period
       connection.lastResponseEndTime = Date.now();
+
+      // Re-enable audio acceptance for next utterance
+      connection.audioStopped = false;
 
       sessionManager.updateSessionState(sessionId, "listening");
       this.sendToClient(ws, {
@@ -624,6 +629,9 @@ export class VoiceWebSocketServer {
 
       switch (message.type) {
         case "session.start":
+          // New session — ensure audio gate is open
+          connection.audioStopped = false;
+
           // Handle user identification and session context
           if (config.features.enablePersistentMemory) {
             try {
@@ -711,6 +719,11 @@ export class VoiceWebSocketServer {
           break;
 
         case "audio.chunk":
+          // Reject audio after client signaled stop
+          if (connection.audioStopped) {
+            return;
+          }
+
           // Only forward audio if Lane B is connected
           if (!laneB.isConnected()) {
             console.log(
@@ -761,12 +774,36 @@ export class VoiceWebSocketServer {
           sessionManager.touchSession(sessionId);
           break;
 
+        case "audio.stop":
+          // Client stopped capturing — gate any in-flight chunks and
+          // immediately clear the OpenAI input buffer to prevent stale audio
+          console.log("[WebSocket] Client audio stop received");
+          connection.audioStopped = true;
+          laneB.clearInputBuffer();
+          break;
+
+        case "audio.cancel":
+          // Client cancelled recording — discard buffer, no response
+          console.log("[WebSocket] Client audio cancel received");
+          connection.audioStopped = true;
+          laneB.clearInputBuffer();
+
+          // Reset arbitrator if a response cycle was started
+          if (laneArbitrator.getState() === "B_RESPONDING") {
+            laneArbitrator.resetResponseInProgress();
+          }
+          break;
+
         case "audio.commit":
           // User released Talk button - commit audio buffer to trigger response
           console.log(
             `[WebSocket] Audio commit requested ` +
               `(state: ${laneArbitrator.getState()})`,
           );
+
+          // Gate further audio chunks — the client has stopped capturing
+          // and any chunks arriving after this are in-flight leftovers
+          connection.audioStopped = true;
 
           // Trigger state transition FIRST (before commit attempt)
           // This ensures arbitrator knows a response cycle is starting
@@ -787,6 +824,9 @@ export class VoiceWebSocketServer {
             // Reset arbitrator since response won't happen
             laneArbitrator.resetResponseInProgress();
 
+            // Re-enable audio for next attempt
+            connection.audioStopped = false;
+
             // Notify client
             ws.send(
               JSON.stringify({
@@ -799,6 +839,9 @@ export class VoiceWebSocketServer {
           break;
 
         case "user.barge_in":
+          // Re-enable audio acceptance — barge-in means user wants to talk again
+          connection.audioStopped = false;
+
           // Handle barge-in through arbitrator
           laneArbitrator.onUserBargeIn();
 

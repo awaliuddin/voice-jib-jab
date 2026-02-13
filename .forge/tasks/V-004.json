@@ -1,0 +1,26 @@
+{
+  "id": "V-004",
+  "title": "Verify: Implement PIIRedactor Stub",
+  "description": "Run automated tests for task T-005.\nReview changes and verify acceptance criteria.\nOriginal: Implement a PIIRedactor stub in Lane C that can scan transcript or response metadata for potential PII and redact or flag as configured. Ensure redacted content is used in audit logs and tool calls as appropriate.\nCriteria:\n- PIIRedactor scans input text for PII patterns (stubbed)\n- Redacted output is used for audit and tool call events\n- Policy decision events include PII reason_codes when detected\n- Stub supports future expansion with more robust detection",
+  "status": "pending",
+  "assigned_to": "codex",
+  "task_type": "review",
+  "depends_on": [
+    "T-005"
+  ],
+  "locked_files": [
+    "server/src/insurance/policy_gate.ts"
+  ],
+  "acceptance_criteria": [
+    "PIIRedactor scans input text for PII patterns (stubbed)",
+    "Redacted output is used for audit and tool call events",
+    "Policy decision events include PII reason_codes when detected",
+    "Stub supports future expansion with more robust detection"
+  ],
+  "created_at": "2026-02-13T03:48:19.310867182Z",
+  "updated_at": "2026-02-13T03:48:19.310867182Z",
+  "completed_at": null,
+  "parent_task": "T-005",
+  "phase": "verify",
+  "retry_count": 0
+}

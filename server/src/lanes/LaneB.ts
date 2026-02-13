@@ -226,6 +226,14 @@ export class LaneB extends EventEmitter {
   }
 
   /**
+   * Clear the OpenAI input audio buffer.
+   * Called when the client signals audio stop to discard any in-flight chunks.
+   */
+  clearInputBuffer(): void {
+    this.adapter.clearInputBuffer();
+  }
+
+  /**
    * Cancel current response (for barge-in)
    */
   async cancel(): Promise<void> {

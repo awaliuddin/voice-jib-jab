@@ -1,0 +1,8 @@
+{
+  "id": "F-003",
+  "description": "Server Keeps Streaming After Client Stop — after UI showed stopped, server logs continued showing input_audio_buffer.append with 4096-byte chunks for 30+ seconds. Server didn't receive or process the stop signal. Only stopped on Ctrl+C (SIGINT).",
+  "severity": "high",
+  "finding_type": "bug",
+  "related_tasks": [],
+  "created_at": "2026-02-11T12:10:00Z"
+}
