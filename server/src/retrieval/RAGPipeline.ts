@@ -131,7 +131,7 @@ export class RAGPipeline {
       "For questions about NextGen AI, use ONLY the facts in FACTS_PACK. " +
       "Do not use outside knowledge or speculation. " +
       "When stating a fact, include its fact ID in brackets like [NXTG-001]. " +
-      "If the facts are insufficient, say you don't know.\nFACTS_PACK=" +
+      "If the facts are insufficient, ask a brief clarifying question instead of guessing.\nFACTS_PACK=" +
       factsJson
     );
   }

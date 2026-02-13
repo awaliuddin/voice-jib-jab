@@ -14,6 +14,17 @@ const knowledgeDir = resolve(process.cwd(), "..", "knowledge");
 const factsPath = resolve(knowledgeDir, "nxtg_facts.jsonl");
 const disclaimersPath = resolve(knowledgeDir, "disclaimers.json");
 
+const FACTS_PACK_MARKER = "FACTS_PACK=";
+
+function extractFactsPack(instructions: string) {
+  const markerIndex = instructions.indexOf(FACTS_PACK_MARKER);
+  if (markerIndex === -1) {
+    throw new Error("FACTS_PACK marker not found in instructions");
+  }
+  const json = instructions.slice(markerIndex + FACTS_PACK_MARKER.length).trim();
+  return JSON.parse(json);
+}
+
 describe("T-013: Knowledge Pack Retrieval and Injection", () => {
   describe("RetrievalService: Unit Tests", () => {
     let service: RetrievalService;
@@ -116,6 +127,7 @@ describe("T-013: Knowledge Pack Retrieval and Injection", () => {
       if (laneB.isConnected()) {
         await laneB.disconnect();
       }
+      await new Promise((resolve) => process.nextTick(resolve));
       jest.restoreAllMocks();
     });
 
@@ -129,39 +141,44 @@ describe("T-013: Knowledge Pack Retrieval and Injection", () => {
       arbitrator.onUserSpeechEnded();
 
       await laneB.commitAudio();
-      mockWs.receiveMessage({ type: "input_audio_buffer.committed" });
 
       mockWs.receiveMessage({
-        type: "response.audio_transcript.delta",
+        type: "conversation.item.input_audio_transcription.delta",
         delta: userQuery,
       });
+
+      mockWs.receiveMessage({ type: "input_audio_buffer.committed" });
       
       const createMessage = mockWs.getMessagesByType("response.create")[0];
       expect(createMessage).toBeDefined();
 
-      const instructions = createMessage.payload.instructions;
+      const instructions = createMessage.response?.instructions;
+      expect(typeof instructions).toBe("string");
+      if (!instructions) {
+        throw new Error("Response instructions missing");
+      }
 
       expect(retrievalService.retrieveFactsPack).toHaveBeenCalledWith(
         userQuery,
         expect.any(Object)
       );
 
-      expect(instructions).toContain("--- NXTG Facts ---");
-      expect(instructions).toContain("Source: performance-targets");
+      expect(instructions).toContain("use ONLY the facts in FACTS_PACK");
       expect(instructions).toContain(
-        "The platform targets sub-400ms time-to-first-byte"
+        "ask a brief clarifying question instead of guessing"
       );
-      expect(instructions).toContain("ID: NXTG-004");
-      expect(instructions).toContain("--- End NXTG Facts ---");
 
-      expect(instructions).toContain("--- Disclaimers ---");
-      expect(instructions).toContain(
-        "Performance data is based on internal testing"
+      const factsPack = extractFactsPack(instructions);
+      const hasPerformanceFact = factsPack.facts.some(
+        (fact: { id: string; text: string }) =>
+          fact.id === "NXTG-004" ||
+          fact.text.includes("sub-400ms time-to-first-byte")
       );
-      expect(instructions).toContain("ID: DISC-002");
+      expect(hasPerformanceFact).toBe(true);
+      expect(factsPack.disclaimers).toContain("DISC-002");
     });
 
-    it("should not inject facts if retrieval returns an empty pack", async () => {
+    it("should still provide instructions when retrieval returns an empty pack", async () => {
         (retrievalService.retrieveFactsPack as jest.Mock).mockReturnValue({
           topic: "Empty",
           facts: [],
@@ -176,18 +193,27 @@ describe("T-013: Knowledge Pack Retrieval and Injection", () => {
         arbitrator.onUserSpeechEnded();
   
         await laneB.commitAudio();
-        mockWs.receiveMessage({ type: "input_audio_buffer.committed" });
 
         mockWs.receiveMessage({
-            type: "response.audio_transcript.delta",
+            type: "conversation.item.input_audio_transcription.delta",
             delta: userQuery,
         });
 
+        mockWs.receiveMessage({ type: "input_audio_buffer.committed" });
+
         const createMessage = mockWs.getMessagesByType("response.create")[0];
-        const instructions = createMessage.payload.instructions;
-  
-        expect(instructions).not.toContain("--- NXTG Facts ---");
-        expect(instructions).not.toContain("--- Disclaimers ---");
+        const instructions = createMessage.response?.instructions;
+        expect(typeof instructions).toBe("string");
+        if (!instructions) {
+          throw new Error("Response instructions missing");
+        }
+
+        const factsPack = extractFactsPack(instructions);
+        expect(factsPack.facts.length).toBe(0);
+        expect(factsPack.disclaimers.length).toBe(0);
+        expect(instructions).toContain(
+          "ask a brief clarifying question instead of guessing"
+        );
       });
   });
 });
