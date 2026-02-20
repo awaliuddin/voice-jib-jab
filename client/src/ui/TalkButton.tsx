@@ -58,7 +58,7 @@ export const TalkButton: React.FC<TalkButtonProps> = ({
   const handleMouseDown = () => {
     if (state === 'connected') {
       onPress();
-    } else if (state === 'listening' && isAudioPlaying) {
+    } else if (state === 'listening') {
       onBargeIn();
     }
   };

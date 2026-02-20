@@ -31,7 +31,13 @@ describe("SessionManager", () => {
 
       expect(stateChanges[0]).toBe("initializing");
 
-      await vi.runAllTimersAsync();
+      // Flush timers multiple times to allow the async fingerprint generation
+      // to settle, then the WebSocket setTimeout(0) to fire, then initialize()
+      // to complete. Each advanceTimersByTimeAsync settles pending microtasks
+      // before advancing timers.
+      for (let i = 0; i < 5; i++) {
+        await vi.advanceTimersByTimeAsync(0);
+      }
       await initPromise;
 
       expect(stateChanges).toContain("connected");

@@ -89,7 +89,7 @@ function App() {
   };
 
   const handleBargeIn = () => {
-    sessionManager.bargeIn();
+    sessionManager.stopAssistant();
   };
 
   const handleEndCall = () => {

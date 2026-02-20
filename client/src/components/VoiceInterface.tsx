@@ -57,10 +57,14 @@ export const VoiceInterface: React.FC<VoiceInterfaceProps> = ({
 
   const handleMouseDown = () => {
     if (voiceMode === 'push-to-talk') {
-      if (state === 'connected') {
-        onPress();
-      } else if (state === 'listening' && isAudioPlaying) {
+      if (state === 'listening') {
         onBargeIn();
+      } else if (state === 'connected' && isAudioPlaying) {
+        // Audio still playing through speakers even though response ended
+        // (race between response.end and playback completion) — treat as stop
+        onBargeIn();
+      } else if (state === 'connected') {
+        onPress();
       }
     }
   };

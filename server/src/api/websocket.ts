@@ -337,6 +337,13 @@ export class VoiceWebSocketServer {
     laneB.on(
       "audio",
       (chunk: { data: Buffer; format: string; sampleRate: number }) => {
+        // Gate: reject audio after client signaled stop/cancel (Bug #3 fix).
+        // In-flight chunks from OpenAI may arrive after cancellation —
+        // drop them so the client doesn't receive stale audio.
+        if (connection.audioStopped) {
+          return;
+        }
+
         // Only forward when Lane B strictly owns audio output
         // During B_RESPONDING, Lane A may still be playing - don't forward yet
         if (laneArbitrator.getCurrentOwner() !== "B") {
@@ -546,6 +553,9 @@ export class VoiceWebSocketServer {
     fallbackPlanner.on(
       "audio",
       (chunk: { data: Buffer; format: string; sampleRate: number }) => {
+        if (connection.audioStopped) {
+          return;
+        }
         if (laneArbitrator.getCurrentOwner() !== "fallback") {
           return;
         }
@@ -812,18 +822,46 @@ export class VoiceWebSocketServer {
           console.log("[WebSocket] Client audio stop received");
           connection.audioStopped = true;
           laneB.clearInputBuffer();
+
+          // If a response is in progress, cancel it so the server stops streaming
+          if (laneB.getIsResponding()) {
+            await laneB.cancel();
+          }
+          {
+            const stopState = laneArbitrator.getState();
+            if (stopState === "B_RESPONDING" || stopState === "B_PLAYING") {
+              laneArbitrator.resetResponseInProgress();
+            }
+          }
+
+          this.sendToClient(ws, { type: "audio.stop.ack", timestamp: Date.now() });
+          this.sendToClient(ws, { type: "response.end", timestamp: Date.now() });
           break;
 
         case "audio.cancel":
-          // Client cancelled recording — discard buffer, no response
+          // Client cancelled — discard buffer and stop any active response
           console.log("[WebSocket] Client audio cancel received");
           connection.audioStopped = true;
           laneB.clearInputBuffer();
 
-          // Reset arbitrator if a response cycle was started
-          if (laneArbitrator.getState() === "B_RESPONDING") {
-            laneArbitrator.resetResponseInProgress();
+          if (laneB.getIsResponding()) {
+            await laneB.cancel();
           }
+
+          // Reset arbitrator if a response cycle was started
+          {
+            const cancelState = laneArbitrator.getState();
+            if (cancelState === "B_RESPONDING" || cancelState === "B_PLAYING") {
+              laneArbitrator.resetResponseInProgress();
+            }
+          }
+
+          // Send ack first, then response.end to confirm streaming has stopped.
+          // This completes the delivery acknowledgment protocol (Bug #3 fix):
+          // client sends audio.cancel → server cancels + acks → client is certain
+          // no more audio chunks will arrive.
+          this.sendToClient(ws, { type: "audio.cancel.ack", timestamp: Date.now() });
+          this.sendToClient(ws, { type: "response.end", timestamp: Date.now() });
           break;
 
         case "playback.ended":
@@ -883,6 +921,8 @@ export class VoiceWebSocketServer {
 
           // Handle barge-in through arbitrator
           laneArbitrator.onUserBargeIn();
+
+          this.sendToClient(ws, { type: "user.barge_in.ack", timestamp: Date.now() });
 
           const bargeInEvent: Event = {
             event_id: uuidv4(),

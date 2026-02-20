@@ -102,7 +102,8 @@
 **Pillar**: OBSERVABILITY | **Status**: BUILDING | **Priority**: P0
 **What**: Current 14.69% → target 85%. OpenAIRealtimeAdapter needs 70+ tests. WebSocket mocking being resolved.
 **Actual (2026-02-18)**: 40/41 server tests passing (1 timeout). 24/41 full-suite failures are test infra issues (missing AudioContext mock, WebSocket fake timer leaks, empty test shells). Coverage provider not installed — need `@vitest/coverage-v8`.
-**Next step**: Install coverage provider, fix client test environment (jsdom/happy-dom), implement empty test shells, then expand adapter + LaneArbitrator coverage.
+**Actual (2026-02-19)**: 232/232 total tests passing (41 client + 191 server). Coverage provider installed. Client 35.37%, Server 37.54%. All test infra issues resolved (mock setup, fake timer interleaving, TypeScript errors).
+**Next step**: Expand test coverage toward 85% target. Priority: SessionManager (43.71%), OpenAIRealtimeAdapter (73.85%), and uncovered components (Navigation, VoiceInterface, TrustSignals at 0%).
 
 ### N-10: Production Readiness QA
 **Pillar**: OBSERVABILITY | **Status**: BUILDING | **Priority**: P0
@@ -127,8 +128,8 @@
 | # | Severity | Finding | Status |
 |---|----------|---------|--------|
 | 1 | CRITICAL | Audio feedback loop — AI responds to ambient noise endlessly | FIXED — 3-layer defense (echo cancellation + cooldown + RMS gate) |
-| 2 | HIGH | Stop button unresponsive — requires 3 clicks | OPEN — Client→server stop message routing gap |
-| 3 | HIGH | Server keeps streaming after client stop (30s+ lag) | OPEN — No stop ack / delivery confirmation protocol |
+| 2 | HIGH | Stop button unresponsive — requires 3 clicks | FIXED — response.end deferred while audio playing + audio-aware click handler |
+| 3 | HIGH | Server keeps streaming after client stop (30s+ lag) | FIXED — audioStopped guard on output handlers + cancel/stop ack protocol |
 | 4 | POSITIVE | Voice response latency near-instant (~500ms) | PRESERVED — TTFB tracked & displayed |
 | 5 | CRITICAL | Audit trail FK failure on WebSocket connect (race condition) | FIXED — INSERT OR IGNORE placeholder row before audit events |
 
@@ -149,6 +150,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 | Date | Change |
 |------|--------|
 | 2026-02-16 | Created. 13 initiatives across 6 pillars. 6 shipped, 4 building, 3 ideas. 5 UAT bugs tracked. |
+| 2026-02-19 | Fixed UAT bugs #2 and #3 (all 5 bugs now resolved). Installed coverage provider. 232/232 tests passing. Coverage at ~36%. |
 
 ---
 
@@ -212,7 +214,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 > **Summary:** Both CRITICAL bugs (#1, #5) are fixed. Two HIGH bugs (#2, #3) remain — both are WebSocket event routing/confirmation issues, estimated 4-6h total. Test infrastructure needs: coverage provider install, browser API mocks for client tests, empty test shells need implementation.
 
 ### DIRECTIVE-NXTG-20260219-02 — Fix HIGH Bugs + Coverage Provider
-**From**: NXTG-AI CoS | **Date**: 2026-02-19 | **Status**: PENDING
+**From**: NXTG-AI CoS | **Date**: 2026-02-19 | **Status**: COMPLETED
 **Priority**: P0
 
 **Action Items**:
@@ -226,8 +228,44 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 - Do NOT break the FK placeholder row pattern (Bug #5 fix).
 - Preserve sub-400ms latency.
 
-**Response** (filled by project team):
-> _(pending)_
+**Response** (filled by project team — 2026-02-19):
+
+> **1. Bug #2 — Stop button (FIXED):**
+> Root cause identified and fixed. The `response.end` handler in SessionManager was immediately transitioning from `listening` to `connected` even while audio was still playing through speakers. This made the button show "Hold to Talk" instead of the interrupt option, so clicking started a new recording instead of stopping playback.
+>
+> Fix (3 changes):
+> - `SessionManager.ts`: `response.end` handler now checks `audioPlayback.isActive()` — stays in `listening` state if audio is still playing. The `playbackEnd` callback handles the transition once audio finishes.
+> - `VoiceInterface.tsx`: Added fallback guard — if state is `connected` but `isAudioPlaying` is true, clicking triggers `onBargeIn()` (stop) instead of `onPress()` (talk).
+> - `SessionManager.ts`: `audio.cancel.ack` handler now forces audio stop and state transition to `connected` — delivery confirmation from server guarantees cleanup.
+>
+> **2. Bug #3 — Server streams after stop (FIXED):**
+> Root cause: Server's Lane B audio output handler didn't check the `audioStopped` flag, so in-flight audio chunks from OpenAI continued flowing to the client after cancel.
+>
+> Fix (delivery ack protocol):
+> - `websocket.ts`: Added `audioStopped` guard to Lane B and FallbackPlanner audio output handlers — drops chunks after cancel.
+> - `websocket.ts`: `audio.cancel` and `audio.stop` handlers now send `response.end` after ack, completing the delivery confirmation protocol. Client is guaranteed no more audio after receiving the ack.
+> - PI-004 referenced: Forge's event confirmation pattern inspired the ack+response.end two-message protocol.
+>
+> **3. Coverage installed and measured:**
+> - `@vitest/coverage-v8@1.2.2` installed in client
+> - **Client coverage**: 35.37% statements, 69.84% branches, 60.49% functions, 35.37% lines
+> - **Server coverage**: 37.54% statements, 27.8% branches, 38.52% functions, 37.79% lines
+> - Combined effective coverage: ~36% (up from estimated 14%, but still below 85% target)
+>
+> **4. Test failures fixed:**
+> - **Client (vitest)**: Fixed SessionManager timeout test by replacing `vi.runAllTimersAsync()` with iterative `vi.advanceTimersByTimeAsync(0)` to allow async fingerprint generation + WebSocket setTimeout to interleave properly. **41/41 passing** (was 40/41).
+> - **Server (jest)**: Fixed `lane-c-policy.test.ts` TypeScript errors (jest.requireMock typing) and rewritten with proper mock setup using inline audit trail mock. Fixed `voice-pipeline.test.ts` TTFB test by adding realistic delay between response.created and response.audio.delta. **191/191 passing** (was 186/191).
+>
+> **Summary:**
+> | Item | Status | Details |
+> |------|--------|---------|
+> | Bug #2 (stop button) | FIXED | Client-side state transition + audio-aware click logic |
+> | Bug #3 (streaming after stop) | FIXED | audioStopped guard on output + delivery ack protocol |
+> | Coverage provider | INSTALLED | @vitest/coverage-v8 working |
+> | Coverage % | 35-37% | Client 35.37%, Server 37.54% — target 85% |
+> | Client tests | 41/41 | 0 failures (was 1 timeout) |
+> | Server tests | 191/191 | 0 failures (was 6 — 5 lane-c-policy + 1 TTFB) |
+> | Total tests | 232/232 | 100% pass rate |
 
 ---
 

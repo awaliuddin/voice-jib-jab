@@ -191,8 +191,17 @@ export class SessionManager {
       console.log("[SessionManager] Response ended");
       this.firstAudioChunkTime = 0;
 
-      // Transition to connected when response ends
-      // This allows the user to start talking again
+      // Only transition to connected if audio playback is already done.
+      // If audio is still playing through speakers, stay in "listening"
+      // so the UI shows the interrupt button (Bug #2 fix).
+      // The playbackEnd callback will handle the transition once audio finishes.
+      if (this.audioPlayback.isActive()) {
+        console.log(
+          "[SessionManager] Audio still playing, staying in listening state",
+        );
+        return;
+      }
+
       if (this.state === "listening" || this.state === "talking") {
         this.setState("connected");
       }
@@ -255,6 +264,27 @@ export class SessionManager {
       if (this.state === "talking") {
         this.setState("connected");
       }
+    });
+
+    // Cancel/barge-in acks (state already transitioned optimistically)
+    this.wsClient.on("audio.cancel.ack", () => {
+      console.log("[SessionManager] Server acknowledged audio.cancel");
+      // Server confirmed cancel — ensure we're in connected state
+      // and audio is stopped (delivery confirmation for Bug #3)
+      if (this.audioPlayback.isActive()) {
+        this.audioPlayback.stop();
+      }
+      if (this.state === "listening" || this.state === "talking") {
+        this.setState("connected");
+      }
+    });
+
+    this.wsClient.on("audio.stop.ack", () => {
+      console.log("[SessionManager] Server acknowledged audio.stop");
+    });
+
+    this.wsClient.on("user.barge_in.ack", () => {
+      console.log("[SessionManager] Server acknowledged barge-in");
     });
 
     // Voice mode changed
@@ -411,6 +441,22 @@ export class SessionManager {
       this.setState("connected");
       await this.startTalking();
     }
+  }
+
+  /**
+   * Force-stop the assistant: stops local playback and tells the server
+   * to cancel the active response. Unlike bargeIn(), this has no
+   * isActive() guard — it always works, fixing the "3 clicks" bug.
+   */
+  stopAssistant(): void {
+    this.audioPlayback.stop();
+    this.wsClient.send({ type: "audio.cancel" });
+
+    if (this.state === "listening" || this.state === "talking") {
+      this.setState("connected");
+    }
+
+    console.log("[SessionManager] Stopped assistant");
   }
 
   disconnect(): void {
