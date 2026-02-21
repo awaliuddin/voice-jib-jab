@@ -47,6 +47,14 @@ function makePayload(
   };
 }
 
+/**
+ * Flush enough microtasks to drain the async chain through
+ * Promise.race + .finally (TTS timeout) and async streamAudio.
+ */
+async function flushAsync() {
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+}
+
 // Use fake timers so streamAudio does not run in real time
 jest.useFakeTimers();
 
@@ -518,9 +526,7 @@ describe("FallbackPlanner", () => {
       planner.on("done", doneSpy);
 
       const p = planner.trigger(makePayload());
-      // Let TTS resolve
-      await Promise.resolve();
-      await Promise.resolve();
+      await flushAsync();
 
       // Advance timers to stream all chunks and complete
       jest.runAllTimers();
@@ -537,8 +543,7 @@ describe("FallbackPlanner", () => {
       planner.on("audio", audioSpy);
 
       const p = planner.trigger(makePayload());
-      await Promise.resolve();
-      await Promise.resolve();
+      await flushAsync();
 
       // Advance timers to trigger audio chunk emission
       jest.advanceTimersByTime(200);
@@ -709,8 +714,7 @@ describe("FallbackPlanner", () => {
 
       // First trigger - populates cache
       const p1 = fp.trigger(makePayload());
-      await Promise.resolve();
-      await Promise.resolve();
+      await flushAsync();
 
       // Let audio finish streaming
       jest.runAllTimers();
@@ -718,7 +722,7 @@ describe("FallbackPlanner", () => {
 
       expect(fp.isActive()).toBe(false);
 
-      // Second trigger - should hit cache
+      // Second trigger - should hit cache (no TTS call, so no extra race hop)
       const audioSpy = jest.fn();
       fp.on("audio", audioSpy);
 
@@ -912,8 +916,7 @@ describe("FallbackPlanner", () => {
       fp.on("done", doneSpy);
 
       const p = fp.trigger(makePayload());
-      await Promise.resolve();
-      await Promise.resolve();
+      await flushAsync();
 
       // Should have warned about TTS failure
       expect(warnSpy).toHaveBeenCalledWith(

@@ -362,8 +362,7 @@ export class ControlEngine extends EventEmitter {
    */
   destroy(): void {
     this.flushMetrics();
-    // EventBus doesn't support targeted removal well, but we can clean up
-    // our local emitter.
+    eventBus.offSession(this.sessionId);
     this.removeAllListeners();
   }
 

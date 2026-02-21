@@ -10,11 +10,13 @@ type EventHandler = (event: Event) => void | Promise<void>;
 export class EventBus {
   private emitter: EventEmitter;
   private handlers: Map<string, Set<EventHandler>>;
+  private sessionHandlers: Map<string, Set<EventHandler>>;
 
   constructor() {
     this.emitter = new EventEmitter();
     this.emitter.setMaxListeners(100); // Support many concurrent sessions
     this.handlers = new Map();
+    this.sessionHandlers = new Map();
   }
 
   /**
@@ -46,11 +48,18 @@ export class EventBus {
    * Subscribe to all events for a session
    */
   onSession(sessionId: string, handler: EventHandler): void {
-    this.emitter.on("*", (event: Event) => {
+    const wrappedHandler = (event: Event) => {
       if (event.session_id === sessionId) {
         handler(event);
       }
-    });
+    };
+
+    if (!this.sessionHandlers.has(sessionId)) {
+      this.sessionHandlers.set(sessionId, new Set());
+    }
+    this.sessionHandlers.get(sessionId)!.add(wrappedHandler);
+
+    this.emitter.on("*", wrappedHandler);
   }
 
   /**
@@ -79,9 +88,13 @@ export class EventBus {
    * Remove all handlers for a session
    */
   offSession(sessionId: string): void {
-    // EventEmitter doesn't support easy session cleanup
-    // In production, consider using a more sophisticated event bus
-    this.emitter.removeAllListeners(sessionId);
+    const handlers = this.sessionHandlers.get(sessionId);
+    if (handlers) {
+      for (const handler of handlers) {
+        this.emitter.off("*", handler);
+      }
+      this.sessionHandlers.delete(sessionId);
+    }
   }
 
   /**

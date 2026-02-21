@@ -76,6 +76,9 @@ const DEFAULT_CONFIG: FallbackPlannerConfig = {
   defaultSampleRate: 24000,
 };
 
+const MAX_CACHE_SIZE = 50;
+const TTS_TIMEOUT_MS = 5000;
+
 export class FallbackPlanner extends EventEmitter {
   private sessionId: string;
   private config: FallbackPlannerConfig;
@@ -315,7 +318,15 @@ export class FallbackPlanner extends EventEmitter {
 
     try {
       const tts = getTTSInstance();
-      const audioData = await tts.generateSpeech(utterance);
+      let timeoutId: NodeJS.Timeout | undefined;
+      const audioData = await Promise.race([
+        tts.generateSpeech(utterance),
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error("TTS timeout")), TTS_TIMEOUT_MS);
+        }),
+      ]).finally(() => {
+        if (timeoutId !== undefined) clearTimeout(timeoutId);
+      });
       const durationMs = (audioData.length / bytesPerSecond) * 1000;
 
       const audio: CachedAudio = {
@@ -324,7 +335,7 @@ export class FallbackPlanner extends EventEmitter {
         durationMs,
       };
 
-      this.audioCache.set(cacheKey, audio);
+      this.cacheAudio(cacheKey, audio);
       return audio;
     } catch (error) {
       console.warn(
@@ -341,9 +352,20 @@ export class FallbackPlanner extends EventEmitter {
         durationMs,
       };
 
-      this.audioCache.set(cacheKey, audio);
+      this.cacheAudio(cacheKey, audio);
       return audio;
     }
+  }
+
+  private cacheAudio(key: string, audio: CachedAudio): void {
+    // Evict oldest entry if cache is full
+    if (this.audioCache.size >= MAX_CACHE_SIZE) {
+      const oldestKey = this.audioCache.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.audioCache.delete(oldestKey);
+      }
+    }
+    this.audioCache.set(key, audio);
   }
 
   private generateTone(durationMs: number): Buffer {

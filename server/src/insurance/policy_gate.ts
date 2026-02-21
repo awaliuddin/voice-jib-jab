@@ -587,6 +587,8 @@ export class PolicyGate {
   /**
    * Run all checks and return the merged result.
    * First non-allow at the highest severity wins.
+   * Short-circuits on cancel_output or critical-severity refuse/escalate
+   * to avoid wasted work after a terminal decision.
    */
   evaluate(ctx: EvaluationContext): GateResult {
     const start = Date.now();
@@ -615,6 +617,17 @@ export class PolicyGate {
           result.severity > winningResult.severity)
       ) {
         winningResult = result;
+      }
+
+      // Short-circuit: no check can override cancel_output, and critical
+      // refuse/escalate will be upgraded to cancel_output by OverrideController
+      if (
+        winningResult.decision === "cancel_output" ||
+        (winningResult.severity >= 4 &&
+          (winningResult.decision === "refuse" ||
+            winningResult.decision === "escalate"))
+      ) {
+        break;
       }
     }
 

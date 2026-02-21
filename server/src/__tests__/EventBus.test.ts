@@ -114,6 +114,52 @@ describe("EventBus", () => {
     });
   });
 
+  describe("offSession", () => {
+    it("should remove all handlers for a session", () => {
+      const handler1 = jest.fn();
+      const handler2 = jest.fn();
+
+      eventBus.onSession("session-1", handler1);
+      eventBus.onSession("session-1", handler2);
+      eventBus.offSession("session-1");
+
+      const event = createSessionEvent("session-1");
+      eventBus.emit(event);
+
+      expect(handler1).not.toHaveBeenCalled();
+      expect(handler2).not.toHaveBeenCalled();
+    });
+
+    it("should not affect handlers for other sessions", () => {
+      const handler1 = jest.fn();
+      const handler2 = jest.fn();
+
+      eventBus.onSession("session-1", handler1);
+      eventBus.onSession("session-2", handler2);
+      eventBus.offSession("session-1");
+
+      const event1 = createSessionEvent("session-1");
+      const event2 = createSessionEvent("session-2");
+      eventBus.emit(event1);
+      eventBus.emit(event2);
+
+      expect(handler1).not.toHaveBeenCalled();
+      expect(handler2).toHaveBeenCalledWith(event2);
+    });
+
+    it("should be a no-op for unknown session", () => {
+      const handler = jest.fn();
+      eventBus.onSession("session-1", handler);
+
+      // Removing a non-existent session shouldn't throw or affect session-1
+      eventBus.offSession("session-unknown");
+
+      const event = createSessionEvent("session-1");
+      eventBus.emit(event);
+      expect(handler).toHaveBeenCalledWith(event);
+    });
+  });
+
   describe("onPattern", () => {
     it("should call handler when event type matches pattern", () => {
       const handler = jest.fn();

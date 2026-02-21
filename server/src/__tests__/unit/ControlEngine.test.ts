@@ -24,6 +24,7 @@ jest.mock("../../orchestrator/EventBus.js", () => ({
     on: jest.fn(),
     off: jest.fn(),
     onSession: jest.fn(),
+    offSession: jest.fn(),
   },
 }));
 
@@ -141,6 +142,20 @@ describe("ControlEngine", () => {
       expect(result.decision).toBe("refuse");
       expect(result.reasonCodes).toContain("MODERATION_VIOLATION");
       expect(result.severity).toBe(4);
+    });
+
+    it("should short-circuit and skip claims_checker after critical refuse", () => {
+      const engine = createEngine();
+      const ctx = makeContext({
+        text: "I want to discuss banned_word topics",
+        role: "assistant",
+      });
+      const result = engine.evaluate(ctx);
+
+      // Moderator fires refuse at severity 4 → short-circuit skips claims_checker
+      expect(result.decision).toBe("refuse");
+      expect(result.checksRun).toContain("moderator");
+      expect(result.checksRun).not.toContain("claims_checker");
     });
 
     it("should be case-insensitive for deny patterns", () => {
@@ -359,6 +374,15 @@ describe("ControlEngine", () => {
 
       // After destroy, local emitter listeners should be removed
       expect(engine.listenerCount("policy_decision")).toBe(0);
+    });
+
+    it("should unsubscribe from EventBus session events", () => {
+      const engine = createEngine();
+
+      jest.clearAllMocks();
+      engine.destroy();
+
+      expect(eventBus.offSession).toHaveBeenCalledWith("test-session-control");
     });
   });
 

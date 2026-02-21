@@ -258,6 +258,16 @@ export class AuditTrail {
         t_ms: sanitized.t_ms,
       });
     }
+
+    // Clean up write queue when session ends to prevent memory leak
+    if (event.type === "session.end") {
+      const pending = this.writeQueues.get(event.session_id);
+      if (pending) {
+        void pending.then(() => {
+          this.writeQueues.delete(event.session_id);
+        });
+      }
+    }
   };
 
   private sanitizeEvent(event: Event): Event {
