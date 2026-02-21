@@ -114,6 +114,28 @@ describe("EventBus", () => {
     });
   });
 
+  describe("onPattern", () => {
+    it("should call handler when event type matches pattern", () => {
+      const handler = jest.fn();
+      eventBus.onPattern("session.*", handler);
+
+      const event = createSessionEvent("test-session");
+      eventBus.emit(event);
+
+      expect(handler).toHaveBeenCalledWith(event);
+    });
+
+    it("should not call handler when event type does not match pattern", () => {
+      const handler = jest.fn();
+      eventBus.onPattern("session.*", handler);
+
+      const event = createAudioEvent("test-session");
+      eventBus.emit(event);
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+  });
+
   describe("getEventCount", () => {
     it("should return 0 when no handlers registered", () => {
       expect(eventBus.getEventCount("session.start")).toBe(0);

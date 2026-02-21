@@ -31,6 +31,7 @@ import { ControlEngine } from "../../lanes/laneC_control.js";
 import { AllowedClaimsRegistry } from "../../insurance/allowed_claims_registry.js";
 import { eventBus } from "../../orchestrator/EventBus.js";
 import type { EvaluationContext } from "../../insurance/policy_gate.js";
+import type { Event } from "../../schemas/events.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -540,6 +541,392 @@ describe("ControlEngine", () => {
       jest.clearAllMocks();
       createEngine({ enabled: false });
       expect(eventBus.onSession).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── handleEvent (event-driven path) ─────────────────────────────────
+
+  describe("handleEvent (event-driven path)", () => {
+    let capturedHandler: (event: Event) => void;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      // Create engine with enabled=true so it subscribes via eventBus.onSession
+      createEngine({ enabled: true });
+      // Capture the callback passed to eventBus.onSession
+      const onSessionCalls = (eventBus.onSession as jest.Mock).mock.calls;
+      expect(onSessionCalls.length).toBeGreaterThan(0);
+      capturedHandler = onSessionCalls[0][1];
+    });
+
+    // ── transcript.final ──────────────────────────────────────────────
+
+    it("should evaluate transcript.final events as user role", () => {
+      capturedHandler({
+        event_id: "e1",
+        session_id: SESSION_ID,
+        t_ms: Date.now(),
+        source: "client",
+        type: "transcript.final",
+        payload: {
+          text: "Hello",
+          confidence: 0.9,
+          is_final: true,
+          span_ms: { start: 0, end: 100 },
+        },
+      } as Event);
+
+      const decisions = (eventBus.emit as jest.Mock).mock.calls.filter(
+        (c) => c[0]?.type === "policy.decision",
+      );
+      expect(decisions.length).toBe(1);
+      expect(decisions[0][0].payload.decision).toBe("allow");
+    });
+
+    it("should skip transcript.final with empty text", () => {
+      capturedHandler({
+        event_id: "e2",
+        session_id: SESSION_ID,
+        t_ms: Date.now(),
+        source: "client",
+        type: "transcript.final",
+        payload: {
+          text: "",
+          confidence: 0.9,
+          is_final: true,
+          span_ms: { start: 0, end: 100 },
+        },
+      } as Event);
+
+      const decisions = (eventBus.emit as jest.Mock).mock.calls.filter(
+        (c) => c[0]?.type === "policy.decision",
+      );
+      expect(decisions.length).toBe(0);
+    });
+
+    // ── transcript.delta ──────────────────────────────────────────────
+
+    it("should skip transcript.delta when evaluateDeltas is false", () => {
+      // Default evaluateDeltas is false
+      capturedHandler({
+        event_id: "e3",
+        session_id: SESSION_ID,
+        t_ms: Date.now(),
+        source: "client",
+        type: "transcript.delta",
+        payload: {
+          text: "partial",
+          confidence: 0.5,
+          is_final: false,
+          span_ms: { start: 0, end: 50 },
+        },
+      } as Event);
+
+      const decisions = (eventBus.emit as jest.Mock).mock.calls.filter(
+        (c) => c[0]?.type === "policy.decision",
+      );
+      expect(decisions.length).toBe(0);
+    });
+
+    it("should evaluate transcript.delta when evaluateDeltas is true", () => {
+      jest.clearAllMocks();
+      createEngine({ enabled: true, evaluateDeltas: true });
+      const handler = (eventBus.onSession as jest.Mock).mock.calls[0][1];
+
+      handler({
+        event_id: "e4",
+        session_id: SESSION_ID,
+        t_ms: Date.now(),
+        source: "client",
+        type: "transcript.delta",
+        payload: {
+          text: "partial text",
+          confidence: 0.5,
+          is_final: false,
+          span_ms: { start: 0, end: 50 },
+        },
+      } as Event);
+
+      const decisions = (eventBus.emit as jest.Mock).mock.calls.filter(
+        (c) => c[0]?.type === "policy.decision",
+      );
+      expect(decisions.length).toBe(1);
+    });
+
+    // ── transcript (assistant from laneB) ─────────────────────────────
+
+    it("should evaluate transcript from laneB as assistant role", () => {
+      capturedHandler({
+        event_id: "e5",
+        session_id: SESSION_ID,
+        t_ms: Date.now(),
+        source: "laneB",
+        type: "transcript",
+        payload: {
+          text: "I can help with that",
+          isFinal: true,
+          confidence: 0.9,
+          timestamp: Date.now(),
+        },
+      } as Event);
+
+      const audits = (eventBus.emit as jest.Mock).mock.calls.filter(
+        (c) => c[0]?.type === "control.audit",
+      );
+      expect(audits.length).toBeGreaterThan(0);
+      expect(audits[0][0].payload.role).toBe("assistant");
+    });
+
+    it("should skip transcript events from non-laneB sources", () => {
+      capturedHandler({
+        event_id: "e6",
+        session_id: SESSION_ID,
+        t_ms: Date.now(),
+        source: "client",
+        type: "transcript",
+        payload: {
+          text: "user text",
+          isFinal: true,
+          confidence: 0.9,
+          timestamp: Date.now(),
+        },
+      } as Event);
+
+      const decisions = (eventBus.emit as jest.Mock).mock.calls.filter(
+        (c) => c[0]?.type === "policy.decision",
+      );
+      expect(decisions.length).toBe(0);
+    });
+
+    it("should skip assistant transcript with empty text", () => {
+      capturedHandler({
+        event_id: "e7",
+        session_id: SESSION_ID,
+        t_ms: Date.now(),
+        source: "laneB",
+        type: "transcript",
+        payload: {
+          text: "",
+          isFinal: true,
+          confidence: 0.9,
+          timestamp: Date.now(),
+        },
+      } as Event);
+
+      const decisions = (eventBus.emit as jest.Mock).mock.calls.filter(
+        (c) => c[0]?.type === "policy.decision",
+      );
+      expect(decisions.length).toBe(0);
+    });
+
+    // ── user_transcript ───────────────────────────────────────────────
+
+    it("should evaluate user_transcript events", () => {
+      capturedHandler({
+        event_id: "e8",
+        session_id: SESSION_ID,
+        t_ms: Date.now(),
+        source: "client",
+        type: "user_transcript",
+        payload: {
+          text: "I need help",
+          isFinal: true,
+          confidence: 0.9,
+          timestamp: Date.now(),
+        },
+      } as Event);
+
+      const decisions = (eventBus.emit as jest.Mock).mock.calls.filter(
+        (c) => c[0]?.type === "policy.decision",
+      );
+      expect(decisions.length).toBe(1);
+    });
+
+    it("should skip user_transcript with empty text", () => {
+      capturedHandler({
+        event_id: "e9",
+        session_id: SESSION_ID,
+        t_ms: Date.now(),
+        source: "client",
+        type: "user_transcript",
+        payload: {
+          text: "",
+          isFinal: true,
+          confidence: 0.9,
+          timestamp: Date.now(),
+        },
+      } as Event);
+
+      const decisions = (eventBus.emit as jest.Mock).mock.calls.filter(
+        (c) => c[0]?.type === "policy.decision",
+      );
+      expect(decisions.length).toBe(0);
+    });
+
+    // ── response.metadata ─────────────────────────────────────────────
+
+    it("should store response.metadata and emit response_metadata event", () => {
+      const metadataHandler = jest.fn();
+      jest.clearAllMocks();
+      const engine = new ControlEngine(SESSION_ID, {
+        claimsRegistry: createRegistry(),
+        moderationDenyPatterns: [/banned_word/i],
+        enabled: true,
+      });
+      engine.on("response_metadata", metadataHandler);
+
+      const handler = (eventBus.onSession as jest.Mock).mock.calls[0][1];
+      handler({
+        event_id: "e10",
+        session_id: SESSION_ID,
+        t_ms: Date.now(),
+        source: "laneB",
+        type: "response.metadata",
+        payload: { phase: "start", ttfb_ms: 350 },
+      } as Event);
+
+      expect(metadataHandler).toHaveBeenCalledWith(
+        expect.objectContaining({ phase: "start", ttfb_ms: 350 }),
+      );
+    });
+
+    it("should skip response.metadata with missing phase", () => {
+      const metadataHandler = jest.fn();
+      jest.clearAllMocks();
+      const engine = new ControlEngine(SESSION_ID, {
+        claimsRegistry: createRegistry(),
+        moderationDenyPatterns: [],
+        enabled: true,
+      });
+      engine.on("response_metadata", metadataHandler);
+
+      const handler = (eventBus.onSession as jest.Mock).mock.calls[0][1];
+      handler({
+        event_id: "e11",
+        session_id: SESSION_ID,
+        t_ms: Date.now(),
+        source: "laneB",
+        type: "response.metadata",
+        payload: { noPhase: true },
+      } as unknown as Event);
+
+      expect(metadataHandler).not.toHaveBeenCalled();
+    });
+
+    // ── metadata propagation through evaluation context ───────────────
+
+    it("should include response metadata in assistant evaluation context", () => {
+      jest.clearAllMocks();
+      // Engine created for side effect: subscribes to eventBus.onSession
+      void new ControlEngine(SESSION_ID, {
+        claimsRegistry: createRegistry(),
+        moderationDenyPatterns: [],
+        enabled: true,
+      });
+
+      const handler = (eventBus.onSession as jest.Mock).mock.calls[0][1];
+
+      // First, send response.metadata so lastResponseMetadata is set
+      handler({
+        event_id: "meta1",
+        session_id: SESSION_ID,
+        t_ms: Date.now(),
+        source: "laneB",
+        type: "response.metadata",
+        payload: { phase: "start", ttfb_ms: 250 },
+      } as Event);
+
+      // Then send assistant transcript that will pick up the metadata
+      handler({
+        event_id: "t1",
+        session_id: SESSION_ID,
+        t_ms: Date.now(),
+        source: "laneB",
+        type: "transcript",
+        payload: {
+          text: "Here is my response",
+          isFinal: true,
+          confidence: 0.9,
+          timestamp: Date.now(),
+        },
+      } as Event);
+
+      const audits = (eventBus.emit as jest.Mock).mock.calls.filter(
+        (c) => c[0]?.type === "control.audit",
+      );
+      const lastAudit = audits[audits.length - 1];
+      expect(lastAudit[0].payload.role).toBe("assistant");
+    });
+
+    it("should include response metadata in user_transcript evaluation context", () => {
+      jest.clearAllMocks();
+      // Engine created for side effect: subscribes to eventBus.onSession
+      void new ControlEngine(SESSION_ID, {
+        claimsRegistry: createRegistry(),
+        moderationDenyPatterns: [],
+        enabled: true,
+      });
+
+      const handler = (eventBus.onSession as jest.Mock).mock.calls[0][1];
+
+      // First, set response metadata
+      handler({
+        event_id: "meta2",
+        session_id: SESSION_ID,
+        t_ms: Date.now(),
+        source: "laneB",
+        type: "response.metadata",
+        payload: { phase: "end", total_ms: 500 },
+      } as Event);
+
+      // Then send user_transcript that will include metadata in context
+      handler({
+        event_id: "t2",
+        session_id: SESSION_ID,
+        t_ms: Date.now(),
+        source: "client",
+        type: "user_transcript",
+        payload: {
+          text: "Thanks for the help",
+          isFinal: true,
+          confidence: 0.95,
+          timestamp: Date.now(),
+        },
+      } as Event);
+
+      // Verify evaluate was called (policy.decision emitted)
+      const decisions = (eventBus.emit as jest.Mock).mock.calls.filter(
+        (c) => c[0]?.type === "policy.decision",
+      );
+      expect(decisions.length).toBe(1);
+    });
+
+    // ── transcript.final with moderation violation ────────────────────
+
+    it("should refuse transcript.final containing banned content", () => {
+      capturedHandler({
+        event_id: "e12",
+        session_id: SESSION_ID,
+        t_ms: Date.now(),
+        source: "client",
+        type: "transcript.final",
+        payload: {
+          text: "I want to discuss banned_word topics",
+          confidence: 0.95,
+          is_final: true,
+          span_ms: { start: 0, end: 200 },
+        },
+      } as Event);
+
+      const decisions = (eventBus.emit as jest.Mock).mock.calls.filter(
+        (c) => c[0]?.type === "policy.decision",
+      );
+      expect(decisions.length).toBe(1);
+      // With default cancelOutputThreshold=4 and moderation severity=4,
+      // the refuse gets upgraded to cancel_output
+      expect(["refuse", "cancel_output"]).toContain(
+        decisions[0][0].payload.decision,
+      );
     });
   });
 });

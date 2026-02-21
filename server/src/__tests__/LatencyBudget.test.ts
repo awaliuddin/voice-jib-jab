@@ -157,5 +157,12 @@ describe("LatencyBudget", () => {
       const timeSince = latencyBudget.timeSince("unknown", "start");
       expect(timeSince).toBeNull();
     });
+
+    it("should return null when session has markers but specific marker is missing", () => {
+      // Mark one marker, then ask for a different one
+      latencyBudget.mark(sessionId, "start");
+      const timeSince = latencyBudget.timeSince(sessionId, "nonexistent");
+      expect(timeSince).toBeNull();
+    });
   });
 });

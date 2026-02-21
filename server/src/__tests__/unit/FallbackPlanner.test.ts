@@ -13,9 +13,10 @@ import type { PolicyDecisionPayload } from "../../schemas/events.js";
 
 // ── Mocks (must be before imports that use them) ───────────────────────
 
+const mockGenerateSpeech = jest.fn().mockResolvedValue(Buffer.alloc(4800));
 jest.mock("../../services/OpenAITTS.js", () => ({
   getTTSInstance: () => ({
-    generateSpeech: jest.fn().mockResolvedValue(Buffer.alloc(4800)),
+    generateSpeech: mockGenerateSpeech,
   }),
 }));
 
@@ -570,6 +571,384 @@ describe("FallbackPlanner", () => {
       planner.stop();
       jest.runAllTimers();
       await p;
+    });
+  });
+
+  // ── Text output path (line 151) ─────────────────────────────────
+
+  describe("text output path", () => {
+    it("should emit text event and finish immediately for text output plans", async () => {
+      const fp = makePlanner();
+      // Override private buildPlan to return a text output plan
+      (fp as any).buildPlan = () => ({
+        mode: "refuse_politely" as const,
+        utterance: "I cannot help with that.",
+        output: "text" as const,
+      });
+
+      const logSpy = jest.spyOn(console, "log").mockImplementation();
+      const textSpy = jest.fn();
+      const audioSpy = jest.fn();
+      const doneSpy = jest.fn();
+      fp.on("text", textSpy);
+      fp.on("audio", audioSpy);
+      fp.on("done", doneSpy);
+
+      await fp.trigger(makePayload());
+
+      expect(textSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: "I cannot help with that.",
+          mode: "refuse_politely",
+        }),
+      );
+      expect(audioSpy).not.toHaveBeenCalled();
+      expect(doneSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: "done" }),
+      );
+      expect(fp.isActive()).toBe(false);
+
+      logSpy.mockRestore();
+    });
+  });
+
+  // ── getAudio returns null (line 158) ────────────────────────────
+
+  describe("null audio from getAudio", () => {
+    it("should finish when getAudio returns null", async () => {
+      const fp = makePlanner();
+      (fp as any).getAudio = jest.fn().mockResolvedValue(null);
+
+      const logSpy = jest.spyOn(console, "log").mockImplementation();
+      const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+      const doneSpy = jest.fn();
+      fp.on("done", doneSpy);
+
+      await fp.trigger(makePayload());
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "[FallbackPlanner] Failed to generate fallback audio",
+      );
+      expect(doneSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: "done" }),
+      );
+      expect(fp.isActive()).toBe(false);
+
+      logSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+  });
+
+  // ── pickPhrase edge cases (lines 284, 289) ─────────────────────
+
+  describe("pickPhrase edge cases", () => {
+    it("should use fallback when phrases list is empty", async () => {
+      const fp = makePlanner({ phrases: [] });
+      const logSpy = jest.spyOn(console, "log").mockImplementation();
+      const startedSpy = jest.fn();
+      fp.on("started", startedSpy);
+
+      const p = fp.trigger(makePayload({ decision: "refuse" }));
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(startedSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          utterance: "Sorry, I can't help with that.",
+        }),
+      );
+
+      fp.stop();
+      jest.runAllTimers();
+      await p;
+      logSpy.mockRestore();
+    });
+
+    it("should use fallback when phrases list is not an array", async () => {
+      const fp = makePlanner({ phrases: null as any });
+      const logSpy = jest.spyOn(console, "log").mockImplementation();
+      const startedSpy = jest.fn();
+      fp.on("started", startedSpy);
+
+      const p = fp.trigger(makePayload({ decision: "refuse" }));
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(startedSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          utterance: "Sorry, I can't help with that.",
+        }),
+      );
+
+      fp.stop();
+      jest.runAllTimers();
+      await p;
+      logSpy.mockRestore();
+    });
+
+    it("should use fallback when picked element is falsy", () => {
+      // Directly test pickPhrase with a list containing an empty string
+      const fp = makePlanner();
+      // Seed Math.random to always pick index 0
+      const randomSpy = jest.spyOn(Math, "random").mockReturnValue(0);
+      const result = (fp as any).pickPhrase(["", "valid"], "fallback");
+      expect(result).toBe("fallback");
+      randomSpy.mockRestore();
+    });
+  });
+
+  // ── Audio cache hit (line 310) ──────────────────────────────────
+
+  describe("audio caching", () => {
+    it("should use cached audio on second trigger with same phrase", async () => {
+      const fp = makePlanner({
+        mode: "refuse_politely",
+        phrases: ["Fixed phrase for caching"],
+      });
+      const logSpy = jest.spyOn(console, "log").mockImplementation();
+
+      // First trigger - populates cache
+      const p1 = fp.trigger(makePayload());
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Let audio finish streaming
+      jest.runAllTimers();
+      await p1;
+
+      expect(fp.isActive()).toBe(false);
+
+      // Second trigger - should hit cache
+      const audioSpy = jest.fn();
+      fp.on("audio", audioSpy);
+
+      const p2 = fp.trigger(makePayload());
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(fp.isActive()).toBe(true);
+
+      jest.runAllTimers();
+      await p2;
+
+      expect(audioSpy).toHaveBeenCalled();
+      expect(fp.isActive()).toBe(false);
+
+      logSpy.mockRestore();
+    });
+  });
+
+  // ── Trigger error handling (lines 164-167) ──────────────────────
+
+  describe("trigger error handling", () => {
+    it("should finish gracefully when getAudio throws", async () => {
+      const fp = makePlanner();
+      const errorSpy = jest.spyOn(console, "error").mockImplementation();
+      const logSpy = jest.spyOn(console, "log").mockImplementation();
+      const doneSpy = jest.fn();
+      fp.on("done", doneSpy);
+
+      // Make getAudio throw to exercise the catch block
+      (fp as any).getAudio = jest
+        .fn()
+        .mockRejectedValue(new Error("Boom"));
+
+      await fp.trigger(makePayload());
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        "[FallbackPlanner] Error during fallback playback:",
+        expect.any(Error),
+      );
+      expect(doneSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: "done" }),
+      );
+      expect(fp.isActive()).toBe(false);
+
+      errorSpy.mockRestore();
+      logSpy.mockRestore();
+    });
+  });
+
+  // ── Double stop / double finish guard (line 404) ────────────────
+
+  describe("double stop guard", () => {
+    it("should not double-finish when stop is called twice", async () => {
+      const logSpy = jest.spyOn(console, "log").mockImplementation();
+      const doneSpy = jest.fn();
+      planner.on("done", doneSpy);
+
+      const p = planner.trigger(makePayload());
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Call stop twice rapidly
+      planner.stop();
+      planner.stop(); // second stop hits the !isPlaying guard
+
+      jest.runAllTimers();
+      await p;
+
+      expect(doneSpy).toHaveBeenCalledTimes(1);
+      logSpy.mockRestore();
+    });
+  });
+
+  // ── Finish with null state (lines 414, 415, 429) ───────────────
+
+  describe("finish with null state defaults", () => {
+    it("should use default mode and output when finish is called with null internal state", () => {
+      const fp = makePlanner();
+
+      // Manually set isPlaying=true but leave mode/output/utterance null
+      (fp as any).isPlaying = true;
+      (fp as any).currentMode = null;
+      (fp as any).currentOutput = null;
+      (fp as any).currentUtterance = null;
+      (fp as any).lastDecision = null;
+
+      const doneSpy = jest.fn();
+      fp.on("done", doneSpy);
+
+      fp.stop(); // calls finish("stopped")
+
+      expect(doneSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reason: "stopped",
+          mode: "refuse_politely", // default from ?? operator
+          utterance: null,
+        }),
+      );
+      expect(fp.isActive()).toBe(false);
+    });
+
+    it("should pass utterance ?? undefined to the fallback event when utterance is null", () => {
+      const fp = makePlanner();
+
+      (fp as any).isPlaying = true;
+      (fp as any).currentMode = null;
+      (fp as any).currentOutput = null;
+      (fp as any).currentUtterance = null;
+      (fp as any).lastDecision = null;
+
+      fp.stop();
+
+      // Verify the eventBus was called with utterance: undefined (from null ?? undefined)
+      expect(mockEmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "fallback.completed",
+          payload: expect.objectContaining({
+            mode: "refuse_politely",
+            output: "audio",
+            utterance: undefined,
+            status: "completed",
+            reason: "stopped",
+          }),
+        }),
+      );
+    });
+  });
+
+  // ── streamAudio isPlaying guard (line 374) ──────────────────────
+
+  describe("streamAudio isPlaying guard", () => {
+    it("should bail out of streamChunk when isPlaying is false", async () => {
+      const fp = makePlanner();
+      const logSpy = jest.spyOn(console, "log").mockImplementation();
+
+      // Provide a buffer large enough for multiple chunks (3 chunks of 4800 bytes)
+      (fp as any).getAudio = jest.fn().mockResolvedValue({
+        utterance: "test",
+        audioData: Buffer.alloc(14400),
+        durationMs: 300,
+      });
+
+      const audioSpy = jest.fn();
+      fp.on("audio", audioSpy);
+
+      const p = fp.trigger(makePayload());
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // First chunk fires synchronously in streamChunk
+      expect(audioSpy).toHaveBeenCalledTimes(1);
+
+      // Directly set isPlaying=false WITHOUT clearing the timer.
+      // This simulates the guard condition at line 374: the timer
+      // callback fires but isPlaying is already false.
+      (fp as any).isPlaying = false;
+
+      // Advance timer so the next scheduled streamChunk runs --
+      // it should hit the !isPlaying guard and return immediately.
+      jest.advanceTimersByTime(100);
+
+      // No additional audio chunk should have been emitted
+      expect(audioSpy).toHaveBeenCalledTimes(1);
+
+      // Clean up pending timers
+      jest.runAllTimers();
+      await p;
+
+      logSpy.mockRestore();
+    });
+  });
+
+  // ── TTS failure fallback to tone (lines 330-361) ─────────────────
+
+  describe("TTS failure fallback to tone", () => {
+    it("should generate fallback tone when TTS fails", async () => {
+      const fp = makePlanner({
+        mode: "refuse_politely",
+        phrases: ["unique tts failure phrase"],
+      });
+      const logSpy = jest.spyOn(console, "log").mockImplementation();
+      const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+
+      // Make TTS reject for this test
+      mockGenerateSpeech.mockRejectedValueOnce(new Error("TTS unavailable"));
+
+      const audioSpy = jest.fn();
+      const doneSpy = jest.fn();
+      fp.on("audio", audioSpy);
+      fp.on("done", doneSpy);
+
+      const p = fp.trigger(makePayload());
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Should have warned about TTS failure
+      expect(warnSpy).toHaveBeenCalledWith(
+        "[FallbackPlanner] TTS failed, using fallback tone:",
+        expect.any(Error),
+      );
+
+      // Advance timers to stream the tone audio
+      jest.runAllTimers();
+      await p;
+
+      expect(audioSpy).toHaveBeenCalled();
+      expect(doneSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: "done" }),
+      );
+
+      logSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+  });
+
+  // ── finish guard when not playing (line 404) ────────────────────
+
+  describe("finish guard when not playing", () => {
+    it("should be a no-op when finish is called while not playing", () => {
+      const fp = makePlanner();
+      const doneSpy = jest.fn();
+      fp.on("done", doneSpy);
+
+      // isPlaying is false by default. Calling finish directly
+      // should hit the guard at line 404 and return without emitting.
+      (fp as any).finish("done");
+
+      expect(doneSpy).not.toHaveBeenCalled();
+      expect(fp.isActive()).toBe(false);
     });
   });
 });

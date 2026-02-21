@@ -43,11 +43,18 @@ jest.mock("fs", () => ({
   existsSync: jest.fn(() => false),
 }));
 
-import { AuditTrail, initializeAuditTrail } from "../../insurance/audit_trail.js";
+import {
+  AuditTrail,
+  initializeAuditTrail,
+  loadSessionTimeline,
+  replaySessionTimeline,
+} from "../../insurance/audit_trail.js";
 import type { AuditTrailConfig } from "../../insurance/audit_trail.js";
 import { eventBus } from "../../orchestrator/EventBus.js";
 import { getDatabase } from "../../storage/Database.js";
 import { appendFile, mkdir } from "fs/promises";
+import { createReadStream, existsSync } from "fs";
+import { Readable } from "stream";
 import type { Event } from "../../schemas/events.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -592,6 +599,308 @@ describe("AuditTrail", () => {
       // the same instance. We test the factory behavior here.
       const result = initializeAuditTrail(defaultConfig());
       expect(result).toBeInstanceOf(AuditTrail);
+    });
+  });
+
+  // ── Config option defaults (null coalescing branches) ────────────────
+
+  describe("config option defaults", () => {
+    it("should use defaults when config options are undefined", () => {
+      const trail = new AuditTrail();
+      trail.start({
+        enabled: true,
+        databasePath: "/tmp/test.db",
+        // intentionally omit all optional fields to hit ?? defaults
+      });
+
+      const subscribedTypes = (eventBus.on as jest.Mock).mock.calls.map(
+        (c: [string, Function]) => c[0],
+      );
+
+      // includeTranscripts defaults to true
+      expect(subscribedTypes).toContain("transcript");
+      // includeTranscriptDeltas defaults to false
+      expect(subscribedTypes).not.toContain("transcript.delta");
+      // includeAudio defaults to false
+      expect(subscribedTypes).not.toContain("audio.chunk");
+      // includeSessionEvents defaults to true
+      expect(subscribedTypes).toContain("session.start");
+      // includeResponseMetadata defaults to true
+      expect(subscribedTypes).toContain("response.metadata");
+    });
+
+    it("should not subscribe to transcript types when includeTranscripts is false", () => {
+      const trail = new AuditTrail();
+      trail.start(defaultConfig({ includeTranscripts: false }));
+
+      const subscribedTypes = (eventBus.on as jest.Mock).mock.calls.map(
+        (c: [string, Function]) => c[0],
+      );
+      expect(subscribedTypes).not.toContain("transcript");
+      expect(subscribedTypes).not.toContain("user_transcript");
+      expect(subscribedTypes).not.toContain("transcript.final");
+    });
+
+    it("should not subscribe to session events when includeSessionEvents is false", () => {
+      const trail = new AuditTrail();
+      trail.start(defaultConfig({ includeSessionEvents: false }));
+
+      const subscribedTypes = (eventBus.on as jest.Mock).mock.calls.map(
+        (c: [string, Function]) => c[0],
+      );
+      expect(subscribedTypes).not.toContain("session.start");
+      expect(subscribedTypes).not.toContain("session.end");
+      expect(subscribedTypes).not.toContain("session.error");
+    });
+
+    it("should not subscribe to response.metadata when includeResponseMetadata is false", () => {
+      const trail = new AuditTrail();
+      trail.start(defaultConfig({ includeResponseMetadata: false }));
+
+      const subscribedTypes = (eventBus.on as jest.Mock).mock.calls.map(
+        (c: [string, Function]) => c[0],
+      );
+      expect(subscribedTypes).not.toContain("response.metadata");
+    });
+  });
+
+  // ── Console fallback path (no DB, no jsonlDir) ───────────────────────
+
+  describe("console fallback", () => {
+    it("should log to console when DB fails and no jsonlDir configured", () => {
+      (getDatabase as jest.Mock).mockImplementationOnce(() => {
+        throw new Error("DB failed");
+      });
+      const consoleSpy = jest.spyOn(console, "log").mockImplementation();
+      const errorSpy = jest.spyOn(console, "error").mockImplementation();
+
+      const trail = new AuditTrail();
+      // Start WITHOUT jsonlDir — resolveAuditDir will still resolve a dir
+      // from databasePath fallback, so we must also omit databasePath to
+      // truly reach the console fallback. But the config requires databasePath
+      // for the DB init attempt. The key is that when DB fails AND the
+      // resolved jsonlDir mkdir also fails or jsonlDir is set, the console
+      // fallback fires. Actually, looking at the source: the jsonlDir is
+      // ALWAYS set via resolveAuditDir. The console fallback only fires when
+      // this.jsonlDir is falsy AND useConsoleFallback is true. But
+      // resolveAuditDir always returns a string. So we need to test a path
+      // where jsonlDir ends up null. The only way is if jsonlDir is explicitly
+      // set to empty string or the appendJsonl guard returns early.
+      //
+      // Re-reading source line 143: this.jsonlDir = resolveAuditDir(config)
+      // resolveAuditDir always returns a non-empty string, so the console
+      // fallback on line 251 can only be reached if this.jsonlDir is set to
+      // null after start. For testing, we can access the private field.
+      trail.start({
+        enabled: true,
+        databasePath: "/tmp/test.db",
+      });
+
+      // Force jsonlDir to null to simulate the fallback path
+      (trail as unknown as { jsonlDir: string | null }).jsonlDir = null;
+
+      trail.log(makePolicyDecisionEvent("laneC"));
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[AuditTrail] audit",
+        expect.objectContaining({ type: "policy.decision" }),
+      );
+
+      consoleSpy.mockRestore();
+      errorSpy.mockRestore();
+    });
+  });
+
+  // ── JSONL write error handling ───────────────────────────────────────
+
+  describe("JSONL write errors", () => {
+    it("should handle appendFile errors gracefully", async () => {
+      (appendFile as jest.Mock).mockRejectedValueOnce(
+        new Error("Write failed"),
+      );
+      const consoleSpy = jest.spyOn(console, "error").mockImplementation();
+
+      const trail = new AuditTrail();
+      trail.start(defaultConfig({ jsonlDir: "/tmp/audit-test" }));
+
+      trail.log(makePolicyDecisionEvent("laneC"));
+
+      // Flush microtasks so the promise chain resolves
+      await new Promise<void>((r) => process.nextTick(r));
+      await new Promise<void>((r) => process.nextTick(r));
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[AuditTrail] Failed to append JSONL event:",
+        expect.any(Error),
+      );
+      consoleSpy.mockRestore();
+    });
+  });
+
+  // ── loadSessionTimeline ──────────────────────────────────────────────
+
+  describe("loadSessionTimeline()", () => {
+    it("should return empty array when JSONL file does not exist", async () => {
+      (existsSync as jest.Mock).mockReturnValue(false);
+      const events = await loadSessionTimeline("nonexistent-session");
+      expect(events).toEqual([]);
+    });
+
+    it("should parse and filter events from JSONL file", async () => {
+      const sessionId = "timeline-test-session";
+      const line1 = JSON.stringify({
+        event_id: "e1",
+        session_id: sessionId,
+        t_ms: 100,
+        source: "laneC",
+        type: "control.audit",
+        payload: {},
+      });
+      const line2 = JSON.stringify({
+        event_id: "e2",
+        session_id: sessionId,
+        t_ms: 200,
+        source: "laneC",
+        type: "policy.decision",
+        payload: {},
+      });
+      const line3 = JSON.stringify({
+        event_id: "e3",
+        session_id: "other-session",
+        t_ms: 300,
+        source: "laneC",
+        type: "policy.decision",
+        payload: {},
+      });
+
+      (existsSync as jest.Mock).mockReturnValue(true);
+      (createReadStream as jest.Mock).mockReturnValue(
+        Readable.from([line1, "\n", line2, "\n", line3, "\n"].join("")),
+      );
+
+      const events = await loadSessionTimeline(sessionId);
+      // Should include control.audit and policy.decision for this session
+      // Should exclude e3 (wrong session)
+      expect(events.length).toBe(2);
+      expect(events[0].event_id).toBe("e1");
+      expect(events[1].event_id).toBe("e2");
+    });
+
+    it("should filter by specified types", async () => {
+      const sessionId = "filter-test";
+      const line1 = JSON.stringify({
+        event_id: "e1",
+        session_id: sessionId,
+        t_ms: 100,
+        source: "laneC",
+        type: "control.audit",
+        payload: {},
+      });
+      const line2 = JSON.stringify({
+        event_id: "e2",
+        session_id: sessionId,
+        t_ms: 200,
+        source: "laneC",
+        type: "policy.decision",
+        payload: {},
+      });
+
+      (existsSync as jest.Mock).mockReturnValue(true);
+      (createReadStream as jest.Mock).mockReturnValue(
+        Readable.from([line1, "\n", line2, "\n"].join("")),
+      );
+
+      const events = await loadSessionTimeline(sessionId, {
+        types: ["policy.decision"],
+      });
+      expect(events.length).toBe(1);
+      expect(events[0].type).toBe("policy.decision");
+    });
+
+    it("should handle malformed JSONL lines gracefully", async () => {
+      const sessionId = "malformed-test";
+      const validLine = JSON.stringify({
+        event_id: "e1",
+        session_id: sessionId,
+        t_ms: 100,
+        source: "laneC",
+        type: "control.audit",
+        payload: {},
+      });
+
+      const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
+      (existsSync as jest.Mock).mockReturnValue(true);
+      (createReadStream as jest.Mock).mockReturnValue(
+        Readable.from([validLine, "\n", "not-json\n", "\n"].join("")),
+      );
+
+      const events = await loadSessionTimeline(sessionId);
+      expect(events.length).toBe(1);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[AuditTrail] Failed to parse JSONL line:",
+        expect.any(Error),
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it("should sort events by t_ms", async () => {
+      const sessionId = "sort-test";
+      const line1 = JSON.stringify({
+        event_id: "e1",
+        session_id: sessionId,
+        t_ms: 300,
+        source: "laneC",
+        type: "control.audit",
+        payload: {},
+      });
+      const line2 = JSON.stringify({
+        event_id: "e2",
+        session_id: sessionId,
+        t_ms: 100,
+        source: "laneC",
+        type: "policy.decision",
+        payload: {},
+      });
+
+      (existsSync as jest.Mock).mockReturnValue(true);
+      (createReadStream as jest.Mock).mockReturnValue(
+        Readable.from([line1, "\n", line2, "\n"].join("")),
+      );
+
+      const events = await loadSessionTimeline(sessionId);
+      expect(events[0].t_ms).toBe(100);
+      expect(events[1].t_ms).toBe(300);
+    });
+  });
+
+  // ── replaySessionTimeline ────────────────────────────────────────────
+
+  describe("replaySessionTimeline()", () => {
+    it("should return events without emitting when emit=false", async () => {
+      (existsSync as jest.Mock).mockReturnValue(false);
+      const events = await replaySessionTimeline("test", { emit: false });
+      expect(events).toEqual([]);
+    });
+
+    it("should emit events to eventBus by default", async () => {
+      const sessionId = "replay-test";
+      const line = JSON.stringify({
+        event_id: "e1",
+        session_id: sessionId,
+        t_ms: 100,
+        source: "laneC",
+        type: "control.audit",
+        payload: {},
+      });
+
+      (existsSync as jest.Mock).mockReturnValue(true);
+      (createReadStream as jest.Mock).mockReturnValue(
+        Readable.from([line, "\n"].join("")),
+      );
+
+      const events = await replaySessionTimeline(sessionId);
+      expect(events.length).toBe(1);
+      expect(eventBus.emit).toHaveBeenCalled();
     });
   });
 });

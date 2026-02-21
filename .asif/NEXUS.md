@@ -104,7 +104,8 @@
 **Actual (2026-02-18)**: 40/41 server tests passing (1 timeout). 24/41 full-suite failures are test infra issues (missing AudioContext mock, WebSocket fake timer leaks, empty test shells). Coverage provider not installed — need `@vitest/coverage-v8`.
 **Actual (2026-02-19)**: 232/232 total tests passing (41 client + 191 server). Coverage provider installed. Client 35.37%, Server 37.54%. All test infra issues resolved (mock setup, fake timer interleaving, TypeScript errors).
 **Actual (2026-02-20)**: 558/558 total tests passing (41 client + 517 server). Server coverage 67.7% stmts (was 38.74%). 11 new test suites covering storage (Database 94%, SessionHistory 96%, TranscriptStore 93%), insurance (PolicyGate 96.59%, AllowedClaimsRegistry 89%, AuditTrail 72%, FallbackPlanner 82%), lanes (LaneA 85%, LaneC 100%, ControlEngine 69%), and config (reflexWhitelist 95%). Two TS errors fixed (allowed_claims_registry TS2532, fallback_planner TS2322).
-**Next step**: Close remaining gap to 85%. Priority: config/index.ts (0%), websocket.ts (0%), server SessionManager (0%), OpenAITTS (0%), DisclaimerLookup (15%), client components (0%). Server threshold is 70% — currently at 67.7%, need ~3pp more to pass CI gate.
+**Actual (2026-02-20 PM)**: 713/713 total tests passing (41 client + 672 server). Server coverage clears 70% CI gate: Stmts 78.84%, Branches 70.00%, Functions 81.29%, Lines 78.99%. +155 new tests across 7 suites: ConfigLoader (31), OpenAITTS (24), SessionManager (35), DisclaimerLookup (42), KnowledgePack (10), RAGPipeline (10), RetrievalIndex (3). Branch coverage boosted from 59.45%→70% via targeted tests on ControlEngine handleEvent switch, AuditTrail timeline loading, FallbackPlanner edge cases, LatencyBudget marker paths, EventBus onPattern, and retrieval modules.
+**Next step**: Push toward 85% target. Priority: websocket.ts (0%, 318 uncov stmts), OpenAIRealtimeAdapter (73.8%), RetrievalService (85%), client components.
 
 ### N-10: Production Readiness QA
 **Pillar**: OBSERVABILITY | **Status**: BUILDING | **Priority**: P0
@@ -154,6 +155,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 | 2026-02-19 | Fixed UAT bugs #2 and #3 (all 5 bugs now resolved). Installed coverage provider. 232/232 tests passing. Coverage at ~36%. |
 | 2026-02-20 | Added CI/CD workflow (ADR-008 compliance). GitHub Actions: checkout → Node 22 → npm ci → npm test. Triggers on push/PR to main. |
 | 2026-02-20 | Test coverage push: 232→558 tests, server coverage 38.74%→67.7%. 11 new test suites. Fixed 2 TS errors. Storage/insurance/lane layers covered. |
+| 2026-02-20 | Coverage CI gate cleared: 558→713 tests (+155). Server passes 70% threshold — Stmts 78.84%, Branches 70%, Functions 81.29%, Lines 78.99%. 7 new/updated suites: ConfigLoader, OpenAITTS, SessionManager, DisclaimerLookup, KnowledgePack, RAGPipeline, RetrievalIndex. |
 
 ---
 
