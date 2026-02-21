@@ -192,7 +192,7 @@ export class AllowedClaimsRegistry {
       }
     }
 
-    if (bestMatch && bestScore >= this.config.partialMatchThreshold) {
+    if (bestMatch && bestScore >= (this.config.partialMatchThreshold ?? 0.6)) {
       return {
         matched: true,
         claimId: bestMatch.id,

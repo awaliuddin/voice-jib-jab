@@ -426,7 +426,7 @@ export class FallbackPlanner extends EventEmitter {
       mode,
       decision: decision?.decision,
       reason_codes: decision?.reason_codes,
-      utterance,
+      utterance: utterance ?? undefined,
       output,
       status: "completed",
       reason,
