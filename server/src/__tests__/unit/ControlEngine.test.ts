@@ -57,6 +57,7 @@ function createEngine(
   return new ControlEngine(SESSION_ID, {
     claimsRegistry: createRegistry(),
     moderationDenyPatterns: [/banned_word/i, /hate_speech/i],
+    moderationCategories: [], // use legacy patterns for test isolation
     enabled: false, // disable event subscriptions in unit tests
     ...overrides,
   });
@@ -795,6 +796,7 @@ describe("ControlEngine", () => {
       const engine = new ControlEngine(SESSION_ID, {
         claimsRegistry: createRegistry(),
         moderationDenyPatterns: [/banned_word/i],
+        moderationCategories: [],
         enabled: true,
       });
       engine.on("response_metadata", metadataHandler);
@@ -820,6 +822,7 @@ describe("ControlEngine", () => {
       const engine = new ControlEngine(SESSION_ID, {
         claimsRegistry: createRegistry(),
         moderationDenyPatterns: [],
+        moderationCategories: [],
         enabled: true,
       });
       engine.on("response_metadata", metadataHandler);
@@ -845,6 +848,7 @@ describe("ControlEngine", () => {
       void new ControlEngine(SESSION_ID, {
         claimsRegistry: createRegistry(),
         moderationDenyPatterns: [],
+        moderationCategories: [],
         enabled: true,
       });
 
@@ -888,6 +892,7 @@ describe("ControlEngine", () => {
       void new ControlEngine(SESSION_ID, {
         claimsRegistry: createRegistry(),
         moderationDenyPatterns: [],
+        moderationCategories: [],
         enabled: true,
       });
 

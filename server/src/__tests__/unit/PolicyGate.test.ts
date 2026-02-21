@@ -98,6 +98,62 @@ describe("ModeratorCheck", () => {
     const check = new ModeratorCheck();
     expect(check.name).toBe("moderator");
   });
+
+  describe("category-aware mode", () => {
+    const categories = [
+      {
+        name: "TEST_CATEGORY",
+        patterns: [/test_violation/i],
+        severity: 3,
+        decision: "refuse" as const,
+      },
+      {
+        name: "ESCALATE_CATEGORY",
+        patterns: [/needs_human/i],
+        severity: 4,
+        decision: "escalate" as const,
+      },
+    ];
+
+    it("should return category-specific reason code on match", () => {
+      const check = new ModeratorCheck(categories);
+      const result = check.evaluate(makeCtx({ text: "this is a test_violation" }));
+
+      expect(result.decision).toBe("refuse");
+      expect(result.reasonCodes).toContain("MODERATION_VIOLATION");
+      expect(result.reasonCodes).toContain("MODERATION:TEST_CATEGORY");
+      expect(result.severity).toBe(3);
+    });
+
+    it("should use the category decision (escalate)", () => {
+      const check = new ModeratorCheck(categories);
+      const result = check.evaluate(makeCtx({ text: "this needs_human help" }));
+
+      expect(result.decision).toBe("escalate");
+      expect(result.reasonCodes).toContain("MODERATION:ESCALATE_CATEGORY");
+      expect(result.severity).toBe(4);
+    });
+
+    it("should allow clean text", () => {
+      const check = new ModeratorCheck(categories);
+      const result = check.evaluate(makeCtx({ text: "perfectly fine text" }));
+
+      expect(result.decision).toBe("allow");
+      expect(result.reasonCodes).toEqual([]);
+    });
+
+    it("should stop at the first matching category", () => {
+      const overlapping = [
+        { name: "FIRST", patterns: [/overlap/i], severity: 3, decision: "refuse" as const },
+        { name: "SECOND", patterns: [/overlap/i], severity: 4, decision: "escalate" as const },
+      ];
+      const check = new ModeratorCheck(overlapping);
+      const result = check.evaluate(makeCtx({ text: "this has overlap content" }));
+
+      expect(result.reasonCodes).toContain("MODERATION:FIRST");
+      expect(result.reasonCodes).not.toContain("MODERATION:SECOND");
+    });
+  });
 });
 
 // ── ClaimsCheck ────────────────────────────────────────────────────────

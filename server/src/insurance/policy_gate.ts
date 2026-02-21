@@ -22,6 +22,7 @@ import {
   ClaimMatchResult,
 } from "./allowed_claims_registry.js";
 import { PolicyDecision } from "../schemas/events.js";
+import type { ModerationCategory } from "./moderation_patterns.js";
 
 // ── Check result returned by each individual policy check ──────────────
 
@@ -62,25 +63,63 @@ export interface PolicyCheck {
   evaluate(ctx: EvaluationContext): CheckResult;
 }
 
-// ── Moderator check (stub) ─────────────────────────────────────────────
+// ── Moderator check ───────────────────────────────────────────────────
 
 /**
- * Pattern-list-based moderation stub.
- * Production: call OpenAI Moderation API or a custom classifier.
+ * Pattern-based content moderation with categorized deny patterns.
+ *
+ * Supports two construction modes:
+ * - Legacy: `new ModeratorCheck(regexArray)` — all matches return generic MODERATION_VIOLATION
+ * - Categorized: `new ModeratorCheck(categoryArray)` — matches return MODERATION:<CATEGORY_NAME>
+ *
+ * Each category can specify its own decision (refuse vs escalate) and severity.
+ * Self-harm triggers "escalate" for human handoff; most others trigger "refuse".
  */
 export class ModeratorCheck implements PolicyCheck {
   readonly name = "moderator";
 
+  private categories: ModerationCategory[];
   private denyPatterns: RegExp[];
 
-  constructor(denyPatterns: RegExp[] = []) {
-    this.denyPatterns = denyPatterns;
+  constructor(patternsOrCategories?: RegExp[] | ModerationCategory[]) {
+    if (
+      !patternsOrCategories ||
+      patternsOrCategories.length === 0
+    ) {
+      this.categories = [];
+      this.denyPatterns = [];
+    } else if (patternsOrCategories[0] instanceof RegExp) {
+      this.categories = [];
+      this.denyPatterns = patternsOrCategories as RegExp[];
+    } else {
+      this.categories = patternsOrCategories as ModerationCategory[];
+      this.denyPatterns = [];
+    }
   }
 
   evaluate(ctx: EvaluationContext): CheckResult {
     const text = ctx.text.toLowerCase();
 
+    // Check categorized patterns first (named, with per-category decisions)
+    for (const category of this.categories) {
+      for (const pattern of category.patterns) {
+        pattern.lastIndex = 0;
+        if (pattern.test(text)) {
+          return {
+            decision: category.decision,
+            reasonCodes: [
+              "MODERATION_VIOLATION",
+              `MODERATION:${category.name}`,
+            ],
+            severity: category.severity,
+          };
+        }
+      }
+    }
+
+    // Fall back to legacy patterns (generic reason code)
     for (const pattern of this.denyPatterns) {
+      pattern.lastIndex = 0;
       if (pattern.test(text)) {
         return {
           decision: "refuse",

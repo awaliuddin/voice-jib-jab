@@ -98,7 +98,14 @@
 - **PolicyGate short-circuit**: Evaluation now breaks early on `cancel_output` or critical-severity `refuse`/`escalate` — avoids wasted downstream checks.
 - **FallbackPlanner TTS timeout**: `getAudio()` wraps TTS call in `Promise.race` with 5s timeout; prevents indefinite hang.
 - **FallbackPlanner cache limit**: Audio cache capped at 50 entries with FIFO eviction.
-**Next step**: ModeratorCheck still a stub (empty deny-list by default). Consider OPA integration (PI-002) or OpenAI Moderation API for semantic moderation. Claims matching is word-overlap (not embedding similarity).
+**Actual (2026-02-21)**: Content moderation system — ModeratorCheck upgraded from empty stub to production-ready categorized pattern engine:
+- **7 moderation categories**: JAILBREAK (prompt injection), SELF_HARM (escalate to human), VIOLENCE_THREATS, HATE_SPEECH, ILLEGAL_ACTIVITY, EXPLICIT_CONTENT, HARASSMENT.
+- **Category-aware matching**: Each category has its own decision type (refuse vs escalate), severity, and reason codes (`MODERATION:<CATEGORY_NAME>`).
+- **Self-harm escalation**: SELF_HARM triggers `escalate` (human handoff) instead of `refuse`, with priority ordering (checked before VIOLENCE to correctly handle "i want to kill myself").
+- **Zero false-positive design**: Patterns use word boundaries, person-object requirements on violence verbs, negative lookaheads to exclude self-harm from violence. 20+ enterprise text scenarios verified clean.
+- **Backward-compatible**: `ModeratorCheck` still accepts `RegExp[]` for legacy use; categories are the new default via `ControlEngineConfig.moderationCategories`.
+- **134 new tests**: Category structure validation, per-category positive/negative cases, category-aware reason codes, legacy mode, regex lastIndex safety, enterprise false-positive suite.
+**Next step**: Tier 2 semantic moderation (OpenAI Moderation API) for subtle/context-dependent violations. Claims matching could benefit from embedding similarity (vs. word-overlap). OPA integration (PI-002) for declarative policy rules.
 
 ### N-08: Knowledge Pack Retrieval
 **Pillar**: GROUNDING | **Status**: BUILDING | **Priority**: P1
@@ -166,6 +173,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 | 2026-02-20 | Coverage CI gate cleared: 558→713 tests (+155). Server passes 70% threshold — Stmts 78.84%, Branches 70%, Functions 81.29%, Lines 78.99%. 7 new/updated suites: ConfigLoader, OpenAITTS, SessionManager, DisclaimerLookup, KnowledgePack, RAGPipeline, RetrievalIndex. |
 | 2026-02-20 | N-09 target exceeded: 713→844 tests (+131). Server Stmts 90.87%, Branches 81.19%, Functions 89.68%, Lines 91.20%. websocket.ts 0%→97%. 2 new suites: WebSocketServer (62), WebSocketMessages (69). Stale dist/ removed. |
 | 2026-02-20 | N-07 Lane C hardening: Fixed 3 resource leaks (EventBus session handlers, AuditTrail writeQueues, FallbackPlanner audio cache). Added PolicyGate short-circuit on critical decisions and FallbackPlanner TTS 5s timeout. +5 tests. N-09 moved to SHIPPED. |
+| 2026-02-21 | N-07 content moderation: ModeratorCheck upgraded from stub to 7-category pattern engine (JAILBREAK, SELF_HARM, VIOLENCE, HATE_SPEECH, ILLEGAL, EXPLICIT, HARASSMENT). Category-aware reason codes, self-harm escalation, zero false-positive design. +134 tests. 1028 total (987 server + 41 client). |
 
 ---
 

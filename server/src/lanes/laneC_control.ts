@@ -84,13 +84,19 @@ import {
   PIIRedactor,
 } from "../insurance/policy_gate.js";
 import { AllowedClaimsRegistry } from "../insurance/allowed_claims_registry.js";
+import {
+  DEFAULT_MODERATION_CATEGORIES,
+  type ModerationCategory,
+} from "../insurance/moderation_patterns.js";
 
 // ── Configuration ──────────────────────────────────────────────────────
 
 export interface ControlEngineConfig {
   enabled: boolean;
-  /** Deny-list regex patterns for the Moderator stub */
+  /** Deny-list regex patterns for the Moderator (legacy, used when moderationCategories is empty) */
   moderationDenyPatterns: RegExp[];
+  /** Categorized moderation patterns with per-category decisions and reason codes */
+  moderationCategories: ModerationCategory[];
   /** Claims registry (injected; may be shared across sessions) */
   claimsRegistry: AllowedClaimsRegistry;
   /** Whether to evaluate non-final (delta) transcripts */
@@ -108,6 +114,7 @@ export interface ControlEngineConfig {
 const DEFAULT_CONFIG: ControlEngineConfig = {
   enabled: true,
   moderationDenyPatterns: [],
+  moderationCategories: DEFAULT_MODERATION_CATEGORIES,
   claimsRegistry: new AllowedClaimsRegistry(),
   evaluateDeltas: false,
   cancelOutputThreshold: 4, // only critical severity triggers cancel
@@ -283,10 +290,13 @@ export class ControlEngine extends EventEmitter {
       });
       checks.push(this.piiRedactor);
     }
-    checks.push(
-      new Moderator(this.config.moderationDenyPatterns),
-      new ClaimsChecker(this.config.claimsRegistry),
-    );
+    // Use categorized patterns when available; fall back to legacy deny-list
+    if (this.config.moderationCategories.length > 0) {
+      checks.push(new Moderator(this.config.moderationCategories));
+    } else {
+      checks.push(new Moderator(this.config.moderationDenyPatterns));
+    }
+    checks.push(new ClaimsChecker(this.config.claimsRegistry));
     this.gate = new PolicyGate(checks);
 
     this.override = new OverrideController(
