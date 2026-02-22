@@ -179,6 +179,31 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ## CoS Directives
 
+### DIRECTIVE-NXTG-20260222-01 — N-10 Production Readiness: Load Test + SLA Baseline
+**From**: NXTG-AI CoS | **Priority**: P1
+**Injected**: 2026-02-22 04:35 | **Estimate**: S | **Status**: PENDING
+
+> **Estimate key**: S = hours (same session), M = 1-2 days, L = 3+ days
+
+**Context**: N-10 (Production Readiness QA) is BUILDING with assessment "NOT_READY (3-4 weeks)". Coverage is excellent (90.87% server). The next production readiness gate is load testing — how many concurrent sessions can the server handle before latency degrades?
+
+**Action Items**:
+1. [ ] Create a load test script (`tests/load/`) that simulates N concurrent WebSocket sessions (start with N=5, 10, 20)
+2. [ ] Each simulated session: connects, sends 3 audio-like messages, receives responses, disconnects. Measure per-session TTFB.
+3. [ ] Report: at what N does p95 latency exceed 1200ms (the SLA target from NEXUS)?
+4. [ ] Document findings in a `docs/load-test-results.md` — this becomes the SLA baseline for production
+5. [ ] Run existing tests after — zero regressions. Report count.
+
+**Constraints**:
+- Use WebSocket client library (not browser). `ws` package is already available.
+- Do NOT modify the server to support more connections — just measure the current limits
+- Tests should work without OpenAI API key (mock the Realtime API responses)
+
+**Response** (filled by project team):
+>
+
+---
+
 ### DIRECTIVE-NXTG-20260216-01 — UAT Bug Triage & Test Baseline
 **From**: NXTG-AI CoS | **Date**: 2026-02-16 | **Status**: COMPLETED
 **Priority**: P0
