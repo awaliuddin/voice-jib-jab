@@ -177,6 +177,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 | 2026-02-20 | N-07 Lane C hardening: Fixed 3 resource leaks (EventBus session handlers, AuditTrail writeQueues, FallbackPlanner audio cache). Added PolicyGate short-circuit on critical decisions and FallbackPlanner TTS 5s timeout. +5 tests. N-09 moved to SHIPPED. |
 | 2026-02-21 | N-07 content moderation: ModeratorCheck upgraded from stub to 7-category pattern engine (JAILBREAK, SELF_HARM, VIOLENCE, HATE_SPEECH, ILLEGAL, EXPLICIT, HARASSMENT). Category-aware reason codes, self-harm escalation, zero false-positive design. +134 tests. 1028 total (987 server + 41 client). |
 | 2026-02-22 | N-10 load test + SLA baseline: Server handles 200 concurrent sessions with p95 TTFB 126.7ms (SLA: <1200ms). Created `tests/load/ws-load-test.ts` (mock OpenAI, concurrent client simulation), `docs/load-test-results.md`, `UAT-Guide.md`. Added `OPENAI_REALTIME_URL` env override for testability. 1028 tests, zero regressions. |
+| 2026-02-22 | N-10 security audit: `npm audit fix` applied (39→36 vulns, all remaining in devDependencies). Secrets review clean — zero hardcoded keys. Production runbook created: `RUNBOOK.md` (deployment, scaling, incident response). |
 
 ---
 
@@ -198,9 +199,34 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 - Do NOT downgrade dependencies unless absolutely necessary for security
 - Runbook should be concise (1-2 pages max)
 
-**Response** (filled by project team):
+**Status**: COMPLETED
+
+**Response** (filled by project team — 2026-02-22):
 >
-> **Started**: | **Completed**: | **Actual**:
+> **Started**: 2026-02-22 15:15 | **Completed**: 2026-02-22 15:35 | **Actual**: S (~20min)
+>
+> **1. npm audit — dependency vulnerabilities:**
+> - Initial scan: 39 vulnerabilities (1 low, 6 moderate, 32 high)
+> - After `npm audit fix`: 36 remaining (4 moderate, 32 high)
+> - Fixed: ajv ReDoS, lodash prototype pollution, qs arrayLimit bypass
+> - **All 36 remaining are in devDependencies only** (not production runtime):
+>   - 32 HIGH: `minimatch` ReDoS via eslint/jest/vitest dependency chains
+>   - 4 MODERATE: esbuild dev server, minimatch transitive
+> - Fixing requires breaking upgrades (eslint@10, vite@7) — not appropriate per constraints
+> - **Production runtime: 0 known vulnerabilities**
+>
+> **2. Secrets review — no hardcoded keys:**
+> - Grep for `sk-[a-zA-Z0-9]{20+}` pattern: **zero matches** in source
+> - All `apiKey` references are test-only mock values (`"test-key"`, `"sk-mock-load-test"`)
+> - `.env` properly in `.gitignore` (along with `.env.local`, `.env.*.local`)
+> - Config loads `OPENAI_API_KEY` from environment only (`process.env.OPENAI_API_KEY`)
+>
+> **3. Production runbook created:** `RUNBOOK.md`
+> - Deployment: prerequisites, env vars, deploy steps, health check endpoints
+> - Scaling: capacity table (50 sessions/instance recommended), horizontal strategy with sticky sessions
+> - Incident response: 5 scenarios (connection failure, high latency, audio feedback, moderation false positives, WebSocket disconnects)
+>
+> **4. Committed and pushed.**
 
 ### DIRECTIVE-NXTG-20260222-01 — N-10 Production Readiness: Load Test + SLA Baseline
 **From**: NXTG-AI CoS | **Priority**: P1
