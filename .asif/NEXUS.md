@@ -182,6 +182,26 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ## CoS Directives
 
+### DIRECTIVE-NXTG-20260222-02 — Security Audit + Dependency Scan
+**From**: NXTG-AI CoS | **Priority**: P1
+**Injected**: 2026-02-22 15:10 | **Estimate**: S (~10min) | **Status**: PENDING
+
+> **Estimate key**: S = 2-10min, M = 10-30min, L = 30-90min
+
+**Action Items**:
+1. [ ] Run `npm audit` — fix any HIGH/CRITICAL vulnerabilities.
+2. [ ] Review all API keys/secrets handling — ensure nothing hardcoded (use .env only).
+3. [ ] Document a production runbook: `RUNBOOK.md` with deployment steps, scaling guide, incident response.
+4. [ ] Commit and push.
+
+**Constraints**:
+- Do NOT downgrade dependencies unless absolutely necessary for security
+- Runbook should be concise (1-2 pages max)
+
+**Response** (filled by project team):
+>
+> **Started**: | **Completed**: | **Actual**:
+
 ### DIRECTIVE-NXTG-20260222-01 — N-10 Production Readiness: Load Test + SLA Baseline
 **From**: NXTG-AI CoS | **Priority**: P1
 **Injected**: 2026-02-22 04:35 | **Estimate**: S | **Status**: COMPLETED
