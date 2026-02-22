@@ -125,6 +125,8 @@
 ### N-10: Production Readiness QA
 **Pillar**: OBSERVABILITY | **Status**: BUILDING | **Priority**: P0
 **What**: Security audit, load testing (concurrent sessions), SLA validation, monitoring. Assessment: NOT_READY (3-4 weeks).
+**Actual (2026-02-22)**: Load test + SLA baseline. Server handles 200 concurrent WebSocket sessions with p95 TTFB 126.7ms (SLA target: <1200ms). TTFB median flat at ~52ms regardless of concurrency — event loop not saturated. Connection time is scaling bottleneck (p95 1560ms at N=200). Mock OpenAI Realtime server enables API-free testing. Load test script: `tests/load/ws-load-test.ts`. Results: `docs/load-test-results.md`. UAT guide: `UAT-Guide.md`.
+**Next step**: Security audit (dependency vulnerabilities, auth hardening). Monitoring/alerting setup. Real OpenAI load test with API key to measure true end-to-end latency under load.
 
 ### N-11: SIP Telephony
 **Pillar**: EXTENSIBILITY | **Status**: IDEA | **Priority**: P1
@@ -174,6 +176,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 | 2026-02-20 | N-09 target exceeded: 713→844 tests (+131). Server Stmts 90.87%, Branches 81.19%, Functions 89.68%, Lines 91.20%. websocket.ts 0%→97%. 2 new suites: WebSocketServer (62), WebSocketMessages (69). Stale dist/ removed. |
 | 2026-02-20 | N-07 Lane C hardening: Fixed 3 resource leaks (EventBus session handlers, AuditTrail writeQueues, FallbackPlanner audio cache). Added PolicyGate short-circuit on critical decisions and FallbackPlanner TTS 5s timeout. +5 tests. N-09 moved to SHIPPED. |
 | 2026-02-21 | N-07 content moderation: ModeratorCheck upgraded from stub to 7-category pattern engine (JAILBREAK, SELF_HARM, VIOLENCE, HATE_SPEECH, ILLEGAL, EXPLICIT, HARASSMENT). Category-aware reason codes, self-harm escalation, zero false-positive design. +134 tests. 1028 total (987 server + 41 client). |
+| 2026-02-22 | N-10 load test + SLA baseline: Server handles 200 concurrent sessions with p95 TTFB 126.7ms (SLA: <1200ms). Created `tests/load/ws-load-test.ts` (mock OpenAI, concurrent client simulation), `docs/load-test-results.md`, `UAT-Guide.md`. Added `OPENAI_REALTIME_URL` env override for testability. 1028 tests, zero regressions. |
 
 ---
 
@@ -181,7 +184,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260222-01 — N-10 Production Readiness: Load Test + SLA Baseline
 **From**: NXTG-AI CoS | **Priority**: P1
-**Injected**: 2026-02-22 04:35 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-02-22 04:35 | **Estimate**: S | **Status**: COMPLETED
 
 > **Estimate key**: S = hours (same session), M = 1-2 days, L = 3+ days
 
@@ -199,8 +202,39 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 - Do NOT modify the server to support more connections — just measure the current limits
 - Tests should work without OpenAI API key (mock the Realtime API responses)
 
-**Response** (filled by project team):
+**Response** (filled by project team — 2026-02-22):
 >
+> **1. Load test script created:** `tests/load/ws-load-test.ts`
+> - Architecture: Mock OpenAI Realtime WS server + real voice-jib-jab server + N concurrent WS clients.
+> - Each session: connect → `session.start` → `provider.ready` → 3 turns (audio chunks + commit + response cycle) → `session.end`.
+> - Uses `ws` package. No real API key needed — `OPENAI_REALTIME_URL` env var points at mock.
+> - Audio chunks generated with 1kHz sine wave (amplitude 8000) to pass the server's RMS energy gate (threshold 200).
+> - Inter-turn delay of 2000ms respects the 1500ms echo-cancellation cooldown.
+> - Run: `npx tsx tests/load/ws-load-test.ts --concurrency 5,10,20,50,100,200`
+>
+> **2. Per-session TTFB measured.** Mock OpenAI adds 20ms simulated thinking + 50ms adapter buffer stabilization. Real-world OpenAI would add 100-500ms.
+>
+> **3. SLA assessment:**
+> - **SLA NOT breached at any tested level (up to N=200).**
+> - p95 TTFB at N=200: **126.7ms** — well under the 1200ms SLA target.
+> - TTFB p50 stays flat at ~52ms regardless of concurrency (event loop not saturated).
+> - Connection time is the scaling bottleneck: p95 connect at N=200 is 1560ms.
+> - Some sessions fail at N≥50 due to Lane A TTS preload hitting real OpenAI API with mock key (test artifact, not production behavior).
+>
+> | N | Success | TTFB p50 | TTFB p95 | TTFB max | Turn p95 | Connect p95 | SLA |
+> |---|---------|----------|----------|----------|----------|-------------|-----|
+> | 5 | 5/5 | 52.5ms | 63.0ms | 63.0ms | 85.4ms | 28.1ms | PASS |
+> | 10 | 10/10 | 51.9ms | 54.3ms | 54.5ms | 75.1ms | 29.6ms | PASS |
+> | 20 | 20/20 | 51.9ms | 73.9ms | 79.7ms | 88.4ms | 99.0ms | PASS |
+> | 50 | 46/50 | 52.1ms | 153.2ms | 177.6ms | 163.6ms | 584.3ms | PASS |
+> | 100 | 90/100 | 51.8ms | 146.4ms | 332.5ms | 169.7ms | 1228.8ms | PASS |
+> | 200 | 189/200 | 51.9ms | 126.7ms | 311.5ms | 146.7ms | 1560.6ms | PASS |
+>
+> **4. Documented:** `docs/load-test-results.md` created with full analysis — TTFB patterns, connection bottleneck, production implications.
+>
+> **5. Regression check:** 1028/1028 tests passing (987 server + 41 client). Zero regressions.
+>
+> **One-line server change:** Added `OPENAI_REALTIME_URL` env var override to `OpenAIRealtimeAdapter.connect()` for testability. Falls back to the hard-coded `wss://api.openai.com/...` URL if not set.
 
 ---
 

@@ -123,7 +123,8 @@ export class OpenAIRealtimeAdapter extends ProviderAdapter {
     return new Promise((resolve, reject) => {
       try {
         // Construct WebSocket URL with API key in query parameters
-        const wsUrl = `wss://api.openai.com/v1/realtime?model=${this.config.model}`;
+        const wsUrl = process.env.OPENAI_REALTIME_URL
+          || `wss://api.openai.com/v1/realtime?model=${this.config.model}`;
 
         console.log(
           `[OpenAI] Connecting to Realtime API for session: ${sessionId}`,
