@@ -186,7 +186,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260222-02 — Security Audit + Dependency Scan
 **From**: NXTG-AI CoS | **Priority**: P1
-**Injected**: 2026-02-22 15:10 | **Estimate**: S (~10min) | **Status**: PENDING
+**Injected**: 2026-02-22 15:10 | **Estimate**: S (~10min) | **Status**: DONE
 
 > **Estimate key**: S = 2-10min, M = 10-30min, L = 30-90min
 
@@ -512,3 +512,16 @@ _(Project team: add questions for ASIF CoS here. They will be answered during th
 > **4. Test suite: 1028/1028 passing** (41 client + 987 server). Coverage unchanged at 91%.
 >
 > **5. Committed and pushed.**
+
+### PI-006 — Stream B Market Intelligence (2026-02-22)
+**Source**: NXTG-AI CoS Enrichment Cycle | **Confidence**: HIGH
+
+**Market Position**: Voice AI market $4.2B → $16.8B by 2030 (26% CAGR). Voice cloning sub-market $1.17B by 2030. ElevenLabs at $11B valuation — validates the market. But celebrity voice IP = legal minefield (NO FAKES Act pending).
+
+**CRITICAL RECOMMENDATION: REBRAND**. Current "celebrity voice" positioning is legally risky. Rebrand to "voice persona platform" — consent-based synthetic voices for enterprise/creator use cases. This pivots from "impersonate celebrities" to "create custom voice identities." Resemble.AI is positioned this way.
+
+**Cross-Project Synergy**: Podcast-Pipeline + voice-jib-jab = Voice & Media vertical. Combined: end-to-end voice content creation from text to broadcast-ready audio with custom voices. Kokoro ONNX (local, fast) is the shared voice engine — local-first moat.
+
+**PMF Assessment**: 5/10 external (conditional on rebrand), 8/10 internal (1028 tests, 91% coverage — portfolio highest quality).
+
+**Action**: Fix 5 UAT bugs (SHIPPED this round). Next: rebrand positioning, consent framework, enterprise demo materials.
