@@ -545,3 +545,17 @@ _(Project team: add questions for ASIF CoS here. They will be answered during th
 **PMF Assessment**: 5/10 external (conditional on rebrand), 8/10 internal (1028 tests, 91% coverage — portfolio highest quality).
 
 **Action**: Fix 5 UAT bugs (SHIPPED this round). Next: rebrand positioning, consent framework, enterprise demo materials.
+
+### PI-007 — OPA WASM for Lane C v2 Governance (2026-02-28)
+**Source**: NXTG-AI CoS Research Brief | **Confidence**: HIGH
+
+**Finding**: OPA compiled to WebAssembly delivers **sub-10 microsecond** policy evaluation — negligible impact on your sub-400ms latency SLA. The `@open-policy-agent/opa-wasm` NPM package (v1.10.0) provides TypeScript-typed in-process evaluation with no sidecar needed.
+
+**Migration path** (when N-14 activates):
+1. **Phase 1**: PolicyGate → Rego rules (decision tree maps directly to Rego semantics)
+2. **Phase 2**: ModeratorCheck → Rego + OpenAI Moderation API (Tier 2 semantic)
+3. **Phase 3**: AllowedClaimsRegistry → Rego + embedding similarity (ChromaDB-fed)
+
+**Cross-project**: oneDB (P-09) has 40/40 OPA tests across 7 policy primitives. Their deny-by-default Rego patterns are directly reusable for Lane C.
+
+**Full brief**: `~/ASIF/enrichment/2026-02-28-research-opa-voice-pipeline.md`
