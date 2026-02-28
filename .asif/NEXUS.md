@@ -184,6 +184,26 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ## CoS Directives
 
+### DIRECTIVE-NXTG-20260228-01 — Close N-07 + N-10 Status Assessment
+**From**: NXTG-AI CoS | **Priority**: P1
+**Injected**: 2026-02-28 15:30 | **Estimate**: S (~15min) | **Status**: PENDING
+
+> **Estimate key**: S = 2-10min, M = 10-30min, L = 30-90min
+
+**Context**: N-07 (Lane C Control Plane) has been BUILDING since Feb, but the scope delivered is substantial: PolicyGate with short-circuit, AuditTrail with session cleanup, LatencyBudget, AllowedClaimsRegistry, FallbackPlanner with TTS timeout + cache eviction, 7-category content moderation engine with 134 tests. The "next steps" (Tier 2 semantic moderation, OPA integration, embedding similarity) are v2 scope — different initiative, different estimate. Similarly, N-10 has load testing + SLA baseline + security audit + runbook done. Time to formally close what's shipped and assess what remains.
+
+**Action Items**:
+1. [ ] **Close N-07**: Update status from BUILDING to SHIPPED. The Lane C Control Plane v1 scope (PolicyGate, AuditTrail, LatencyBudget, AllowedClaimsRegistry, FallbackPlanner, ModeratorCheck) is complete. Move the "Next step" items (Tier 2 semantic moderation, OPA integration, embedding similarity) to a new initiative N-14 "Lane C v2: Semantic Governance" with status IDEA.
+2. [ ] **Assess N-10**: List what remains for N-10 to reach SHIPPED. Load test ✅, SLA baseline ✅, security audit ✅, runbook ✅. What's left? If monitoring/alerting is the only gap and requires infrastructure (Prometheus, Grafana, etc.) that isn't available yet, mark N-10 as SHIPPED with a note that monitoring is deferred to production deployment.
+3. [ ] **Assess N-08**: Knowledge Pack Retrieval is BUILDING but the "next step" is vague ("fact-checked response testing"). Is this blocked on something? If the ChromaDB retrieval is working but testing is incomplete, report what's needed.
+4. [ ] Update the Executive Dashboard table with new statuses.
+5. [ ] Update the Changelog.
+6. [ ] Commit and push.
+
+**Constraints**:
+- Do NOT start new feature work — this is a status cleanup directive
+- If any initiative genuinely has unfinished P0 work, do NOT mark it SHIPPED — report what's blocking
+
 ### DIRECTIVE-NXTG-20260222-02 — Security Audit + Dependency Scan
 **From**: NXTG-AI CoS | **Priority**: P1
 **Injected**: 2026-02-22 15:10 | **Estimate**: S (~10min) | **Status**: DONE
