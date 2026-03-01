@@ -461,6 +461,20 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 > - All steps passed: checkout → setup-node → npm ci → npm test
 > - Run completed in 1m9s. 232/232 tests passing in CI.
 
+### DIRECTIVE-NXTG-20260228-03 — Post-Sprint Hardening
+**From**: NXTG-AI CoS | **Priority**: P2
+**Injected**: 2026-02-28 | **Estimate**: S | **Status**: PENDING
+
+> **Estimate key**: S = hours (same session), M = 1-2 days, L = 3+ days
+
+**Action Items**:
+1. [ ] Run full test suite and confirm 1028/1028 passing
+2. [ ] Review N-14 (Lane C v2: Semantic Governance) IDEA and add implementation notes based on PI-007 OPA WASM research. Include sub-10μs latency finding from the research brief
+3. [ ] Archive any remaining stale CoS directives to NEXUS-archive.md
+
+**Response** (filled by project team):
+>
+
 ---
 
 ## Portfolio Intelligence
