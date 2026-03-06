@@ -43,13 +43,13 @@ fi
 # ── Build WASM bundle ───────────────────────────────────────────────────
 
 echo "[build-policy] Building WASM bundle..."
-echo "  Entrypoints: voice_jib_jab/result, voice_jib_jab/moderator_check"
+echo "  Entrypoints: voice_jib_jab/policy/result, voice_jib_jab/policy/moderator_check"
 echo "  Output: ${OUTPUT}"
 
 "${OPA_BIN}" build \
   -t wasm \
-  -e voice_jib_jab/result \
-  -e voice_jib_jab/moderator_check \
+  -e voice_jib_jab/policy/result \
+  -e voice_jib_jab/policy/moderator_check \
   -o "${OUTPUT}" \
   "${POLICIES_DIR}"
 

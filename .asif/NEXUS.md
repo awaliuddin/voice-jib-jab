@@ -202,6 +202,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 | 2026-03-05 | DIRECTIVE-NXTG-20260304-04: CI Gate Protocol adopted — section added to CLAUDE.md, pre-push hook installed. 1019 server + 41 client tests confirmed passing. |
 | 2026-03-05 | DIRECTIVE-NXTG-20260304-01: N-14 Phase 1 shipped — OpaEvaluator + Rego policy + PolicyGate wiring. @open-policy-agent/opa-wasm@1.10.0 installed. 32 new tests. 1019 server tests (zero regressions). N-14 IDEA→BUILDING. |
 | 2026-03-06 | DIRECTIVE-NXTG-20260306-01: N-14 Phase 2 shipped — OpaModeratorCheck two-tier moderation (pattern + OPA threshold), moderator_check Rego rule, ControlEngine.initialize() (CoS Q2), scripts/build-policy.sh (CoS Q1). 25 new tests. 1044 total, 0 failed. |
+| 2026-03-06 | Q3+Q4 fixes: build-policy.sh entrypoints corrected to voice_jib_jab/policy/result + voice_jib_jab/policy/moderator_check (Q3). OPA singleton wired end-to-end — async startServer(), initializeOpa(), config.opa section, VoiceWebSocketServer constructor threaded to ControlEngine (Q4). 1044 tests, 0 failed. |
 
 ---
 
@@ -392,10 +393,14 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 > **CoS Response (Wolf, 2026-03-06):**
 > **CONFIRMED.** You are correct — OPA WASM entrypoints mirror the full package path with dots→slashes. The correct entrypoints are `voice_jib_jab/policy/result` and `voice_jib_jab/policy/moderator_check`. The plan spec was wrong. **Standing authorization to fix `build-policy.sh`.** Good catch — this was indeed a latent bug invisible to CI. **Status: Q3 ANSWERED. GO.**
 
+> **Team Response (2026-03-06):** **FIXED.** `scripts/build-policy.sh` updated to use `-e voice_jib_jab/policy/result -e voice_jib_jab/policy/moderator_check`. 1044 tests green. Committed. **Status: Q3 RESOLVED.**
+
 **Q4 — Production OpaEvaluator bootstrap** _(2026-03-06)_: `ControlEngine.initialize()` exists but no production code calls it. `LaneArbitrator` creates `ControlEngine` per-session. Should `OpaEvaluator` be (a) a singleton initialized once at server startup and injected into every `ControlEngine` via config, or (b) initialized per-session? Option (a) is correct for WASM. Where in the server bootstrap should `await opaEvaluator.initialize()` live?
 
 > **CoS Response (Wolf, 2026-03-06):**
 > **Option (a) — singleton at server startup.** WASM bundle loads once, shared across all sessions via JS event loop. Wire it in the server's `createServer()` / main bootstrap function: `const opaEvaluator = new OpaEvaluator(config); await opaEvaluator.initialize();` then pass it into `LaneArbitrator` constructor (or config object) so every `ControlEngine` receives the pre-initialized instance. Do NOT lazy-init per-session — that defeats the purpose of WASM pre-compilation. **Standing authorization to implement.** **Status: Q4 ANSWERED. GO.**
+
+> **Team Response (2026-03-06):** **IMPLEMENTED.** OPA singleton wired end-to-end: `server/src/config/index.ts` gains `opa.enabled` (`ENABLE_OPA`, default `false`) + `opa.bundlePath` (`OPA_BUNDLE_PATH`). `server/src/index.ts` refactored to `async startServer()` with `initializeOpa()` helper — OPA initializes before `server.listen()`, so no session can start before the WASM bundle is loaded. `OpaEvaluator` passed into `VoiceWebSocketServer` constructor, threaded through to every per-session `ControlEngine` instance. 1044 tests green. Committed. **Status: Q4 RESOLVED.**
 
 ---
 

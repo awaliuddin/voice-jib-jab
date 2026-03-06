@@ -75,6 +75,12 @@ export interface ServerConfig {
   fallback: {
     mode: FallbackMode;
   };
+  opa: {
+    /** Enable OPA WASM policy engine. Requires a compiled bundle at bundlePath. */
+    enabled: boolean;
+    /** Path to the compiled OPA WASM bundle (produced by scripts/build-policy.sh). */
+    bundlePath: string;
+  };
 }
 
 function getEnvVar(key: string, defaultValue?: string): string {
@@ -168,5 +174,12 @@ export const config: ServerConfig = {
   },
   fallback: {
     mode: getEnvFallbackMode("FALLBACK_MODE", "auto"),
+  },
+  opa: {
+    enabled: getEnvBool("ENABLE_OPA", false),
+    bundlePath: getEnvVar(
+      "OPA_BUNDLE_PATH",
+      resolve(currentDir, "policies", "bundle.tar.gz"),
+    ),
   },
 };

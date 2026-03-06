@@ -26,6 +26,7 @@ import {
   getSessionHistory,
   SessionContext,
 } from "../storage/index.js";
+import type { OpaEvaluator } from "../insurance/opa_evaluator.js";
 
 interface ClientConnection {
   ws: WebSocket;
@@ -62,10 +63,12 @@ const MIN_AUDIO_RMS = 200;
 export class VoiceWebSocketServer {
   private wss: WebSocketServer;
   private connections: Map<WebSocket, ClientConnection>;
+  private opaEvaluator: OpaEvaluator | undefined;
 
-  constructor(server: any) {
+  constructor(server: any, opaEvaluator?: OpaEvaluator) {
     this.wss = new WebSocketServer({ server });
     this.connections = new Map();
+    this.opaEvaluator = opaEvaluator;
 
     // Initialize storage if persistent memory or audit trail is enabled
     if (
@@ -148,6 +151,7 @@ export class VoiceWebSocketServer {
       enabled: config.features.enablePolicyGate,
       enablePIIRedaction: config.safety.enablePIIRedaction,
       piiRedactionMode: "redact",
+      opaEvaluator: this.opaEvaluator,
     });
 
     // Create FallbackPlanner
