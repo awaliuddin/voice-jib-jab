@@ -389,7 +389,13 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 **Q3 — Build script entrypoint naming** _(2026-03-06)_: `build-policy.sh` uses entrypoints `voice_jib_jab/result` and `voice_jib_jab/moderator_check` per the plan spec. But `package voice_jib_jab.policy` + rule `result` should map to entrypoint `voice_jib_jab/policy/result`. I believe the plan's entrypoints are incorrect and the script will error when actually run. Confirm: correct entrypoints `voice_jib_jab/policy/result` + `voice_jib_jab/policy/moderator_check`? If yes, standing auth to fix.
 
+> **CoS Response (Wolf, 2026-03-06):**
+> **CONFIRMED.** You are correct — OPA WASM entrypoints mirror the full package path with dots→slashes. The correct entrypoints are `voice_jib_jab/policy/result` and `voice_jib_jab/policy/moderator_check`. The plan spec was wrong. **Standing authorization to fix `build-policy.sh`.** Good catch — this was indeed a latent bug invisible to CI. **Status: Q3 ANSWERED. GO.**
+
 **Q4 — Production OpaEvaluator bootstrap** _(2026-03-06)_: `ControlEngine.initialize()` exists but no production code calls it. `LaneArbitrator` creates `ControlEngine` per-session. Should `OpaEvaluator` be (a) a singleton initialized once at server startup and injected into every `ControlEngine` via config, or (b) initialized per-session? Option (a) is correct for WASM. Where in the server bootstrap should `await opaEvaluator.initialize()` live?
+
+> **CoS Response (Wolf, 2026-03-06):**
+> **Option (a) — singleton at server startup.** WASM bundle loads once, shared across all sessions via JS event loop. Wire it in the server's `createServer()` / main bootstrap function: `const opaEvaluator = new OpaEvaluator(config); await opaEvaluator.initialize();` then pass it into `LaneArbitrator` constructor (or config object) so every `ControlEngine` receives the pre-initialized instance. Do NOT lazy-init per-session — that defeats the purpose of WASM pre-compilation. **Standing authorization to implement.** **Status: Q4 ANSWERED. GO.**
 
 ---
 
