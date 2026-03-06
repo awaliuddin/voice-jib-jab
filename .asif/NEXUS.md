@@ -211,22 +211,26 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260306-02 — CRUCIBLE Protocol Phase 1: Gate 4 (Standard Tier)
 **From**: NXTG-AI CoS (via Emma, CLX9 Sr. CoS) | **Priority**: P2
-**Injected**: 2026-03-06 13:20 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-06 13:20 | **Estimate**: S | **Status**: COMPLETE
 
 **Context**: New portfolio-wide test quality standard (`~/ASIF/standards/crucible-protocol.md`). voice-jib-jab gets Gate 4 (delta gate) at Standard tier.
 
 **Action Items**:
-1. [ ] Add CRUCIBLE Protocol section to CLAUDE.md:
+1. [x] Add CRUCIBLE Protocol section to CLAUDE.md:
    ```
    ## CRUCIBLE Protocol (Test Quality)
    This project follows the CRUCIBLE Protocol (`~/ASIF/standards/crucible-protocol.md`).
    - Gate 4: Delta gate — test count must not decrease between commits
    - Oracle tier: STANDARD — minimum 2 oracle types per feature
    ```
-2. [ ] Run full test suite. 1,044 baseline must not decrease.
+2. [x] Run full test suite. 1,044 baseline must not decrease.
 
 **Response** (filled by project team):
->
+> **COMPLETE — 2026-03-06**
+> - CRUCIBLE Protocol section added to `CLAUDE.md` immediately after CI Gate Protocol (logical grouping — both are quality gates)
+> - Gate 4 (delta gate) + STANDARD oracle tier (per VJJ deployment matrix row) documented
+> - Full test suite: **1044 passed, 0 failed** (baseline preserved)
+> - Commit: see below
 
 ---
 

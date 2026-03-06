@@ -54,3 +54,9 @@ Before EVERY `git push`, you MUST:
 3. If tests fail → fix before pushing. No exceptions.
 4. Include test count in commit message: "Tests: X passed, Y skipped"
 Violating this protocol means broken CI, which means Asif gets spammed.
+
+## CRUCIBLE Protocol (Test Quality)
+This project follows the CRUCIBLE Protocol (`~/ASIF/standards/crucible-protocol.md`).
+Rules that apply to this project:
+- Gate 4: Delta gate — test count decreases > 5 require justification in commit message
+- Oracle tier: STANDARD — minimum 2 oracle types per feature
