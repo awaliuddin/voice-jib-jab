@@ -416,6 +416,59 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-06 (check-in 3) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+| Deliverable | Detail |
+|-------------|--------|
+| Q3 fix — `build-policy.sh` entrypoints | Corrected to `voice_jib_jab/policy/result` + `voice_jib_jab/policy/moderator_check`. Was `voice_jib_jab/result` / `voice_jib_jab/moderator_check` — wrong because the package is `voice_jib_jab.policy`, so the rule name appends after the full package path. |
+| Q4 fix — OPA singleton bootstrap | `config/index.ts`: `opa.enabled` + `opa.bundlePath` fields. `index.ts`: refactored to `async startServer()` + `initializeOpa()` — WASM loads before `server.listen()`. `api/websocket.ts`: `OpaEvaluator` flows from startup into every per-session `ControlEngine`. |
+| NEXUS Q3/Q4 resolved | Team responses recorded, changelog updated. |
+| **Test count** | **1044 passed, 0 failed** (no change — pure wiring work, no new tests needed). Commit: `a8da29f`. |
+
+---
+
+### 2. What surprised me?
+
+**Context carry-across sessions exposed the `index.ts` structure corruption pattern.** The previous session left `index.ts` in a broken state (missing closing brace, floating shutdown handlers) after multiple sequential Edit operations. The fix was a full-file Write. This highlights that incremental edits on deeply nested files accumulate structural drift that grep/read won't catch until you compile. Mitigation: after >3 edits to the same file, read it back and verify structure before committing.
+
+**`async startServer()` is simpler than it looks, but easy to get wrong.** Top-level `await` at module scope requires ESM `"type": "module"`. Wrapping startup in `async function startServer()` called with `.catch()` is idiomatic CommonJS Node.js. Unsurprising once you're in it — but worth encoding because forgetting why you can't top-level `await` in CJS leads to workarounds that make the problem worse.
+
+**`ENABLE_OPA=false` default is the right production safety posture.** If the WASM bundle doesn't exist (fresh clone, `build:policy` not yet run), the server boots on Tier 1 pattern matching with no error. Explicit opt-in for OPA. Fail-open at moderation, not fail-closed at startup. This is the correct default for any feature gated on a compiled artifact.
+
+---
+
+### 3. Cross-project signals
+
+**`async startServer()` + resource pre-load before `listen()` is a portfolio pattern.** Applies to any ASIF server that needs to pre-load WASM, a DB connection pool, model weights, or crypto keys before accepting connections. If dx3 or oneDB do OPA/WASM loading, follow this exact shape.
+
+**`ENABLE_OPA=false` + graceful degradation pattern.** `initializeOpa()` returns `undefined` on failure; server continues on the fallback path. Any feature gated on an external binary or compiled artifact should default to disabled + fallback. Avoids deploy failures on fresh-clone environments.
+
+**Multi-edit structural drift risk.** Any project using sequential Edit calls on a large, deeply nested TS file can accumulate invisible structural errors. Safe mitigation: read the file back after >3 edits to the same file and verify structure before committing.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **N-14 Phase 3 — AllowedClaimsRegistry → Rego + embedding similarity**: OPA infrastructure is fully wired. Phase 3 is the last leg of N-14 and the only remaining `BUILDING` initiative. Would move the dashboard to 11/14 SHIPPED, 0 BUILDING.
+
+2. **One real-WASM integration test**: All 1044 tests use `_injectPolicy()`. A single `OpaEvaluator.integration.test.ts` that compiles `policy.rego` and loads the real bundle validates the corrected entrypoints, Rego syntax, and WASM ABI end-to-end. Gate it behind `--testPathPattern` so CI skips it when the bundle doesn't exist.
+
+3. **Run `build-policy.sh` manually once**: Q3 entrypoints are theoretically correct but haven't been validated against actual OPA CLI output. One real run would fully close the loop.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+**Q5 — N-14 Phase 3 scope clarification**: Phase 3 is "AllowedClaimsRegistry → Rego + ChromaDB embedding similarity." Current implementation uses exact-match and word-overlap scoring against a SQLite-backed registry. Two questions:
+- (a) Should Phase 3 fully replace the TS scoring logic with Rego, or only move the *threshold decision* (allow/deny) to Rego while keeping similarity computation in TS?
+- (b) Is ChromaDB cosine similarity the confirmed replacement for word-overlap, or still research? If confirmed, should embeddings use the existing `VectorStore` (ChromaDB) or a separate lightweight embedder?
+
+No other blockers. Team is ready for new directives.
+
+---
+
 > Session: 2026-03-06 | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
