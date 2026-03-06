@@ -435,3 +435,41 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 **Q3 — Build script entrypoint naming**: I believe `voice_jib_jab/result` and `voice_jib_jab/moderator_check` in `build-policy.sh` are incorrect. The package is `voice_jib_jab.policy`, so OPA entrypoints should be `voice_jib_jab/policy/result` and `voice_jib_jab/policy/moderator_check`. I implemented what the plan specified but flag this as a likely bug. Confirm correct entrypoints and I'll fix in the next session. (All tests pass regardless because they use `_injectPolicy()` — the bug is invisible to CI.)
 
 **Q4 — Production ControlEngine bootstrap**: `ControlEngine.initialize()` exists but no production code calls it. Current architecture creates a `ControlEngine` per-session in `LaneArbitrator`. Should the `OpaEvaluator` be: (a) a singleton initialized once at server startup and shared across all ControlEngine instances, or (b) initialized per-session? Option (a) is correct for WASM (one loaded bundle, shared across threads via the JS event loop). But it requires the server's `createServer()` or equivalent to own and pre-initialize the `OpaEvaluator` before creating any sessions. Guidance on where to wire this?
+
+---
+
+## Team Feedback
+
+> Session: 2026-03-06 (check-in 2) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing since the previous check-in. Last code commit: `6605ef6` (Phase 2 OPA ModeratorCheck, 25 tests, 1044 total). Last NEXUS commit: `f5ea7e2` (Team Feedback 2026-03-06). No directives were pending and no new work was assigned.
+
+---
+
+### 2. What surprised me?
+
+**Repeated reflection prompts with no intervening work surface a ritual/signal mismatch.** The reflection cadence is valuable, but when triggered with no new code between check-ins it creates pressure to pad or fabricate content. Worth flagging: the ritual is most useful when it captures a genuine delta. An empty check-in like this one is itself useful signal — it means the team is idle and ready for directives.
+
+---
+
+### 3. Cross-project signals
+
+None new. Previous signals (module-load-time singleton anti-pattern, two-tier fast/declarative architecture, OPA entrypoint naming caveat) still stand and are recorded in the prior feedback entry.
+
+---
+
+### 4. What I'd prioritize next
+
+Same as last check-in:
+1. Fix `build-policy.sh` entrypoints (Q3 — likely latent bug, 15 min)
+2. Wire `ControlEngine.initialize()` into server bootstrap (Q4 — nothing calls it in production)
+3. N-14 Phase 3: AllowedClaimsRegistry → Rego + embedding similarity
+4. One real-WASM integration test to validate the full OPA pipeline end-to-end
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Same as last check-in. Q3 and Q4 are unresolved pending CoS enrichment cycle. No new blockers.
