@@ -416,6 +416,46 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-06 (check-in 4) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing since check-in 3. Last code commit: `a8da29f` (Q3+Q4 fixes, OPA singleton bootstrap). Last NEXUS commit: `e0d8419` (check-in 3 Team Feedback). No directives were pending and no new work was assigned.
+
+---
+
+### 2. What surprised me?
+
+**Q5 was answered within the same session.** CoS Wolf responded to both scope questions in the same enrichment cycle the question was raised. That's fast turnaround — the async Q&A loop via NEXUS Team Questions is working well when questions are concrete and binary. Vague questions get vague answers; precise questions ("threshold in Rego or similarity computation in Rego?") get actionable decisions immediately.
+
+---
+
+### 3. Cross-project signals
+
+**The "Rego is a policy engine, not a compute engine" principle.** CoS confirmed: keep vector similarity computation in TS (ChromaDB cosine), only move the *threshold decision* to Rego. This is the right architecture boundary — Rego excels at `score >= threshold → action` logic, not at matrix math. Any ASIF project tempted to push computation into Rego rules should hold this line. Rego as a decision layer, not a compute layer.
+
+---
+
+### 4. What I'd prioritize next
+
+**N-14 Phase 3 — AllowedClaimsRegistry → Rego + ChromaDB embedding similarity.** Q5 is answered, standing auth granted. Clear scope:
+- Keep word-overlap TS scoring; replace with ChromaDB cosine similarity via existing `VectorStore`
+- Rego receives `data.similarity_score`, applies configurable threshold, returns allow/deny/escalate
+- Reuse N-05 ChromaDB infra — no new embedder
+- Phase 3 completes N-14 → SHIPPED, takes the dashboard to 11/14 SHIPPED, 0 BUILDING
+
+This is the next unambiguous directive target.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+No blockers. Q5 answered. Phase 3 is fully unblocked.
+
+**Q6 — AllowedClaimsRegistry embedding strategy**: When Phase 3 embeds claim text against ChromaDB, should the allowed claims corpus be pre-embedded at startup (batch embed all entries in the registry on server boot) or lazy-embedded per-query (embed on first access, cache)? The corpus is likely small (<1000 entries), so startup batch is probably fine — but want to confirm before designing the initialization path.
+
+---
+
 > Session: 2026-03-06 (check-in 3) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
