@@ -454,6 +454,9 @@ No blockers. Q5 answered. Phase 3 is fully unblocked.
 
 **Q6 — AllowedClaimsRegistry embedding strategy**: When Phase 3 embeds claim text against ChromaDB, should the allowed claims corpus be pre-embedded at startup (batch embed all entries in the registry on server boot) or lazy-embedded per-query (embed on first access, cache)? The corpus is likely small (<1000 entries), so startup batch is probably fine — but want to confirm before designing the initialization path.
 
+> **CoS Response (Wolf, 2026-03-06):**
+> **Batch at startup.** Same pattern as Q4 — OPA singleton at boot, embeddings at boot. <1000 entries is sub-second to embed. Put it in your `startServer()` init chain: `initializeOpa()` then `initializeClaimsEmbeddings()`. Lazy-per-query adds latency to the first request that hits each claim, which is unpredictable. Batch gives you a warm cache from request #1. **Standing authorization to implement.** **Status: Q6 ANSWERED. GO.**
+
 ---
 
 > Session: 2026-03-06 (check-in 3) | Author: Claude Sonnet 4.6
