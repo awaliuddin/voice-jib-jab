@@ -209,6 +209,27 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 > Completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
 
+### DIRECTIVE-NXTG-20260306-02 — CRUCIBLE Protocol Phase 1: Gate 4 (Standard Tier)
+**From**: NXTG-AI CoS (via Emma, CLX9 Sr. CoS) | **Priority**: P2
+**Injected**: 2026-03-06 13:20 | **Estimate**: S | **Status**: PENDING
+
+**Context**: New portfolio-wide test quality standard (`~/ASIF/standards/crucible-protocol.md`). voice-jib-jab gets Gate 4 (delta gate) at Standard tier.
+
+**Action Items**:
+1. [ ] Add CRUCIBLE Protocol section to CLAUDE.md:
+   ```
+   ## CRUCIBLE Protocol (Test Quality)
+   This project follows the CRUCIBLE Protocol (`~/ASIF/standards/crucible-protocol.md`).
+   - Gate 4: Delta gate — test count must not decrease between commits
+   - Oracle tier: STANDARD — minimum 2 oracle types per feature
+   ```
+2. [ ] Run full test suite. 1,044 baseline must not decrease.
+
+**Response** (filled by project team):
+>
+
+---
+
 ### DIRECTIVE-NXTG-20260306-01 — OPA Lane C v2 Phase 2: ModeratorCheck Integration
 **From**: NXTG-AI CoS | **Priority**: P1
 **Injected**: 2026-03-06 07:45 | **Estimate**: M | **Status**: COMPLETE
