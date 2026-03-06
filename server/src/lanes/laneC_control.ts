@@ -88,6 +88,8 @@ import {
   DEFAULT_MODERATION_CATEGORIES,
   type ModerationCategory,
 } from "../insurance/moderation_patterns.js";
+import type { OpaEvaluator } from "../insurance/opa_evaluator.js";
+import { OpaModeratorCheck } from "../insurance/opa_moderator.js";
 
 // ── Configuration ──────────────────────────────────────────────────────
 
@@ -109,6 +111,18 @@ export interface ControlEngineConfig {
   piiRedactionMode: "redact" | "flag";
   /** Whether PIIRedactor scans metadata fields */
   piiScanMetadata: boolean;
+  /**
+   * Optional OPA evaluator for declarative moderation threshold logic.
+   * When provided, OpaModeratorCheck replaces the pattern-only Moderator.
+   * Call ControlEngine.initialize() before first session to load the WASM bundle.
+   */
+  opaEvaluator?: OpaEvaluator;
+  /**
+   * Per-category moderation thresholds passed to OPA.
+   * Only used when opaEvaluator is provided.
+   * Example: { "default": 0.5, "SELF_HARM": 0.3 }
+   */
+  moderationThresholds?: Record<string, number>;
 }
 
 const DEFAULT_CONFIG: ControlEngineConfig = {
@@ -290,8 +304,19 @@ export class ControlEngine extends EventEmitter {
       });
       checks.push(this.piiRedactor);
     }
-    // Use categorized patterns when available; fall back to legacy deny-list
-    if (this.config.moderationCategories.length > 0) {
+    // Use OpaModeratorCheck when an OPA evaluator is provided; otherwise fall back
+    // to pattern-only Moderator (categorized patterns or legacy deny-list).
+    if (this.config.opaEvaluator) {
+      checks.push(
+        new OpaModeratorCheck(this.config.opaEvaluator, {
+          categories:
+            this.config.moderationCategories.length > 0
+              ? this.config.moderationCategories
+              : DEFAULT_MODERATION_CATEGORIES,
+          thresholds: this.config.moderationThresholds ?? { default: 0.5 },
+        }),
+      );
+    } else if (this.config.moderationCategories.length > 0) {
       checks.push(new Moderator(this.config.moderationCategories));
     } else {
       checks.push(new Moderator(this.config.moderationDenyPatterns));
@@ -311,6 +336,17 @@ export class ControlEngine extends EventEmitter {
   }
 
   // ── Public API ─────────────────────────────────────────────────────
+
+  /**
+   * Initialize async dependencies (e.g. OPA WASM bundle).
+   * Call once before accepting the first session in production.
+   * Safe to call multiple times — idempotent.
+   */
+  async initialize(): Promise<void> {
+    if (this.config.opaEvaluator && !this.config.opaEvaluator.isInitialized) {
+      await this.config.opaEvaluator.initialize();
+    }
+  }
 
   /**
    * Evaluate arbitrary text through the full policy pipeline.

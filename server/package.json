@@ -7,7 +7,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "jest",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "build:policy": "bash ../scripts/build-policy.sh"
   },
   "dependencies": {
     "@open-policy-agent/opa-wasm": "^1.10.0",

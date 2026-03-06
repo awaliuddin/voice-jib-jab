@@ -39,6 +39,19 @@ export interface OpaOutput {
   requiredDisclaimerId: string | null;
 }
 
+export interface OpaModeratorInput {
+  moderator_check: {
+    categories: Array<{ name: string; score: number }>;
+    thresholds: Record<string, number>;
+  };
+}
+
+export interface OpaModeratorOutput {
+  decision: PolicyDecision;
+  severity: number;
+  reasonCode: string | null;
+}
+
 // ── Internal OPA WASM types ────────────────────────────────────────────
 
 interface OpaPolicy {
@@ -115,6 +128,40 @@ export class OpaEvaluator {
         typeof resultObj.requiredDisclaimerId === "string"
           ? resultObj.requiredDisclaimerId
           : null,
+    };
+  }
+
+  /**
+   * Evaluate the moderator_check rule against category scores and thresholds.
+   * Returns the moderation decision in sub-millisecond time.
+   *
+   * @throws {Error} if initialize() has not been called.
+   */
+  evaluateModeratorCheck(input: OpaModeratorInput): OpaModeratorOutput {
+    if (!this.policy) {
+      throw new Error(
+        "OpaEvaluator not initialized. Call initialize() before evaluateModeratorCheck().",
+      );
+    }
+
+    const results = this.policy.evaluate(input);
+
+    const raw = results?.[0]?.expressions?.[0]?.value as
+      | Record<string, unknown>
+      | undefined;
+
+    if (!raw) {
+      return { decision: "allow", severity: 0, reasonCode: null };
+    }
+
+    // Unwrap moderator_check key if present (multi-entrypoint WASM format)
+    const resultObj = (raw.moderator_check ?? raw) as Record<string, unknown>;
+
+    return {
+      decision: (resultObj.decision as PolicyDecision | undefined) ?? "allow",
+      severity: typeof resultObj.severity === "number" ? resultObj.severity : 0,
+      reasonCode:
+        typeof resultObj.reason_code === "string" ? resultObj.reason_code : null,
     };
   }
 

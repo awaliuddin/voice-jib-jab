@@ -94,3 +94,37 @@ should_short_circuit if {
 	winning_check.severity >= 4
 	winning_check.decision in {"refuse", "escalate"}
 }
+
+# ── ModeratorCheck — OPA threshold evaluation ─────────────────────────────
+#
+# Input: input.moderator_check = {
+#   "categories": [{ "name": string, "score": number }],
+#   "thresholds": { "<CATEGORY>": number, "default": number }
+# }
+# Output: { "decision": string, "severity": number, "reason_code": string|null }
+#
+# Score model: Tier 1 (pattern matching) produces binary scores —
+#   1.0 = category pattern matched, 0.0 = not matched.
+# Future: OpenAI Moderation API replaces 0/1 with real float scores.
+# ─────────────────────────────────────────────────────────────────────────
+
+default moderator_check := {"decision": "allow", "severity": 0, "reason_code": null}
+
+moderator_check := res if {
+	some cat in input.moderator_check.categories
+	threshold := object.get(
+		input.moderator_check.thresholds,
+		cat.name,
+		object.get(input.moderator_check.thresholds, "default", 0.5),
+	)
+	cat.score >= threshold
+	res := _moderator_result(cat.name)
+}
+
+_moderator_result(name) := {"decision": "escalate", "severity": 4, "reason_code": "MODERATION:SELF_HARM"} if {
+	name == "SELF_HARM"
+}
+
+_moderator_result(name) := {"decision": "refuse", "severity": 4, "reason_code": concat("", ["MODERATION:", name])} if {
+	name != "SELF_HARM"
+}
