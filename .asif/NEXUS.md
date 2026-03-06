@@ -201,6 +201,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 | 2026-02-28 | Post-sprint hardening (DIRECTIVE-NXTG-20260228-03): 1028/1028 tests confirmed passing. N-14 enriched with PI-007 OPA WASM implementation notes (sub-10μs latency, 3-phase migration path). 7 completed directives archived to NEXUS-archive.md. NEXUS trimmed to active directive only. |
 | 2026-03-05 | DIRECTIVE-NXTG-20260304-04: CI Gate Protocol adopted — section added to CLAUDE.md, pre-push hook installed. 1019 server + 41 client tests confirmed passing. |
 | 2026-03-05 | DIRECTIVE-NXTG-20260304-01: N-14 Phase 1 shipped — OpaEvaluator + Rego policy + PolicyGate wiring. @open-policy-agent/opa-wasm@1.10.0 installed. 32 new tests. 1019 server tests (zero regressions). N-14 IDEA→BUILDING. |
+| 2026-03-06 | DIRECTIVE-NXTG-20260306-01: N-14 Phase 2 shipped — OpaModeratorCheck two-tier moderation (pattern + OPA threshold), moderator_check Rego rule, ControlEngine.initialize() (CoS Q2), scripts/build-policy.sh (CoS Q1). 25 new tests. 1044 total, 0 failed. |
 
 ---
 
@@ -231,7 +232,20 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 - USE PLAN MODE — this touches policy, middleware, and orchestrator
 
 **Response** (filled by project team):
+> **COMPLETE — 2026-03-06**
 >
+> All 7 action items delivered. Baseline preserved: **1044 tests passing, 0 failed** (1019 baseline + 25 new OpaModeratorCheck tests).
+>
+> **Deliverables:**
+> 1. **`policy.rego` extended** — `moderator_check` rule evaluates category scores against configurable thresholds; `_moderator_result()` helper maps SELF_HARM → escalate, all others → refuse with `MODERATION:<name>` reason code.
+> 2. **`OpaModeratorCheck` created** (`server/src/insurance/opa_moderator.ts`) — two-tier design: Tier 1 pattern matching (binary scores 1.0/0.0), Tier 2 OPA threshold evaluation via `OpaEvaluator.evaluateModeratorCheck()`. Falls back to Tier 1 when OPA uninitialised.
+> 3. **`OpaEvaluator` extended** — `OpaModeratorInput`/`OpaModeratorOutput` interfaces + `evaluateModeratorCheck()` method. Same `raw.moderator_check ?? raw` parsing pattern as `evaluate()`.
+> 4. **`ControlEngine` wired** — `opaEvaluator` + `moderationThresholds` config fields added. Constructor swaps `Moderator` for `OpaModeratorCheck` when `opaEvaluator` is provided (backward compat: existing code unchanged). `async initialize()` method added (CoS Q2 answer).
+> 5. **`scripts/build-policy.sh`** — CoS Q1 answer: auto-downloads OPA CLI, builds WASM with both `voice_jib_jab/result` + `voice_jib_jab/moderator_check` entrypoints. Added `build:policy` to `server/package.json`.
+> 6. **25 new tests** (`OpaModeratorCheck.test.ts`) across 8 groups: lifecycle, tier 1 fallback, OPA toxic input, self-harm escalation, threshold edge cases, PII scenario, ControlEngine integration, multiple categories. All 1044 tests green.
+> 7. Commit: `6605ef6` — full suite confirmed clean before push.
+>
+> **N-14 status**: still BUILDING — Phase 3 (AllowedClaimsRegistry → Rego + embedding similarity) remains.
 
 ---
 
