@@ -17,7 +17,7 @@ import { ProviderConfig } from "../../providers/ProviderAdapter.js";
 import { createAudioForDuration } from "../helpers/audio.js";
 import { MockWebSocket } from "../mocks/MockWebSocket.js";
 
-// Mock WebSocket
+// MOCK JUSTIFIED: WebSocket is infrastructure — real WS server not available in CI
 jest.mock("ws");
 
 describe("Voice Pipeline Integration", () => {

@@ -41,6 +41,7 @@ describe("SessionManager", () => {
   });
 
   afterEach(() => {
+    jest.clearAllTimers();
     jest.useRealTimers();
   });
 
