@@ -211,6 +211,32 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 > Completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
 
+### DIRECTIVE-NXTG-20260307-03 — N-14 Phase 3: AllowedClaimsRegistry to Rego + Embedding Similarity
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-07 12:45 | **Estimate**: M | **Status**: PENDING
+
+> **Estimate key**: S = hours (same session), M = 1-2 days, L = 3+ days
+
+**Context**: Team has been idle since check-in 22 (D-02 completed). N-14 Phase 3 is the last piece to ship N-14 (OPA Policy). Q3 and Q4 are resolved. Architecture is clear: AllowedClaimsRegistry hardcoded allowlist transitions to Rego rules + ChromaDB embedding similarity for flexible claim matching.
+
+**Action Items**:
+1. [ ] **Migrate AllowedClaimsRegistry to Rego**: Move the hardcoded celebrity-claim allowlist into a Rego data document. The existing `voice_jib_jab/policy/result` and `voice_jib_jab/policy/moderator_check` entrypoints should evaluate claims against this data.
+2. [ ] **Add embedding similarity for claim matching**: Use ChromaDB (or a lightweight vector store) to store claim embeddings. When a new claim arrives, find the nearest allowed claim by cosine similarity. If similarity > threshold, allow. This handles paraphrasing ("tell me a joke" vs "say something funny").
+3. [ ] **Update build-policy.sh**: Ensure the WASM bundle includes the new data document. The entrypoints were already fixed per Q3.
+4. [ ] **Write tests**: Rego policy tests (exact match + fuzzy match + deny cases). Integration test with the OPA singleton (Q4 pattern). Target: 15+ new tests.
+5. [ ] **Update N-14 status in NEXUS**: If all above complete, move N-14 to SHIPPED.
+
+**Constraints**:
+- Use the OPA singleton pattern from Q4 (already wired into server bootstrap).
+- Embedding model: use whatever is lightest — this is policy matching, not semantic search. sentence-transformers/all-MiniLM-L6-v2 or similar.
+- If ChromaDB is too heavy, a simple numpy cosine similarity over pre-computed embeddings is acceptable.
+- Standing auth for all items. Plan mode recommended for item 2 (architecture decision on vector store).
+
+**Response** (filled by project team):
+>
+
+---
+
 ### DIRECTIVE-NXTG-20260307-02 — Gate 8.3 Mock Justification + CI Flaky Fix
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
 **Injected**: 2026-03-07 08:40 | **Estimate**: S | **Status**: DONE
