@@ -441,6 +441,46 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-07 (check-in 22) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+| Deliverable | Detail |
+|-------------|--------|
+| Gate 8.3 mock justification | `voice-pipeline.test.ts:21` — changed `// Mock WebSocket` to `// MOCK JUSTIFIED: WebSocket is infrastructure — real WS server not available in CI`. Satisfies CRUCIBLE Gate 8.3 documentation requirement. |
+| SessionManager flaky timer fix | Added `jest.clearAllTimers()` before `jest.useRealTimers()` in `afterEach`. Eliminates the window where pending fake timers fire after clock restoration and race with the next test's setup. |
+| **Test count** | **1044 passed, 0 failed**. Commits: `9a07bbc` (fix), `45b4e6a` (NEXUS). |
+
+---
+
+### 2. What surprised me?
+
+**The flaky fix was one line.** "Fix race condition" sounds like surgery — it was `jest.clearAllTimers()`. The entire class of fake-timer flakiness in Jest collapses to this one pattern: `beforeEach` sets fake timers, test runs, but `afterEach` restores real timers without purging pending fakes first. Any pending `setTimeout` from the current test fires in real time during teardown, potentially interfering with the next test's `beforeEach`. Adding `clearAllTimers()` before `useRealTimers()` closes that window completely.
+
+**Gate 8.3 is documentation-as-code.** The actual mock line was correct all along — `jest.mock("ws")` in an integration test is completely legitimate when the test exercises WebSocket message handling but not socket connectivity. Gate 8.3 just requires you to say so explicitly in the source. The discipline is useful: it forces the author to articulate *why* the mock is there, which is both self-documenting and prevents future "is this intentional?" confusion during audits.
+
+---
+
+### 3. Cross-project signals
+
+**`jest.clearAllTimers()` before `jest.useRealTimers()` is a portfolio-wide pattern.** Any ASIF project using `jest.useFakeTimers()` in `beforeEach` + `jest.useRealTimers()` in `afterEach` should also call `jest.clearAllTimers()` in that same `afterEach`. The absence of it is a latent flakiness bug in every project that uses this pattern. dx3, oneDB, any project with timer-heavy tests should audit their `afterEach` blocks.
+
+**CRUCIBLE Gate 8.3 mock justification comments should be standard practice.** For any test that mocks infrastructure (DB, WS, filesystem, network), a one-line `// MOCK JUSTIFIED: <reason>` comment above the mock prevents audit flags and communicates intent to the next developer. Low cost, high signal value.
+
+---
+
+### 4. What I'd prioritize next
+
+**N-14 Phase 3 — AllowedClaimsRegistry → Rego + ChromaDB embedding similarity.** All design questions resolved (Q5, Q6), standing auth granted, architecture clear. This is the only remaining work to close N-14 → SHIPPED.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+No blockers. No questions. Ready for Phase 3 directive.
+
+---
+
 > Session: 2026-03-07 (check-in 21) | Author: Claude Sonnet 4.6
 
 Nineteenth idle cycle. No new signal. Awaiting directive.
