@@ -203,6 +203,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 | 2026-03-05 | DIRECTIVE-NXTG-20260304-01: N-14 Phase 1 shipped — OpaEvaluator + Rego policy + PolicyGate wiring. @open-policy-agent/opa-wasm@1.10.0 installed. 32 new tests. 1019 server tests (zero regressions). N-14 IDEA→BUILDING. |
 | 2026-03-06 | DIRECTIVE-NXTG-20260306-01: N-14 Phase 2 shipped — OpaModeratorCheck two-tier moderation (pattern + OPA threshold), moderator_check Rego rule, ControlEngine.initialize() (CoS Q2), scripts/build-policy.sh (CoS Q1). 25 new tests. 1044 total, 0 failed. |
 | 2026-03-06 | Q3+Q4 fixes: build-policy.sh entrypoints corrected to voice_jib_jab/policy/result + voice_jib_jab/policy/moderator_check (Q3). OPA singleton wired end-to-end — async startServer(), initializeOpa(), config.opa section, VoiceWebSocketServer constructor threaded to ControlEngine (Q4). 1044 tests, 0 failed. |
+| 2026-03-07 | DIRECTIVE-NXTG-20260307-02: Gate 8.3 mock justification (voice-pipeline.test.ts ws mock) + SessionManager flaky timer fix (jest.clearAllTimers() before useRealTimers()). 1044 tests, 0 failed. |
 
 ---
 
@@ -226,7 +227,11 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 - Do NOT restructure the voice-pipeline integration tests. Just add the justification comment and fix the flaky test.
 
 **Response** (filled by project team):
+> **COMPLETE — 2026-03-07**
 >
+> 1. `voice-pipeline.test.ts:21` — comment changed to `// MOCK JUSTIFIED: WebSocket is infrastructure — real WS server not available in CI`
+> 2. `SessionManager.test.ts` — added `jest.clearAllTimers()` before `jest.useRealTimers()` in `afterEach`. Root cause: pending fake timers from one test could fire after `useRealTimers()` restores the real clock, causing the next test's timer setup to race with the leaked timer. `clearAllTimers()` purges all pending fakes before handing back to the real clock.
+> 3. Full suite: **1044 passed, 0 failed**. Commit: `9a07bbc`.
 
 ---
 
