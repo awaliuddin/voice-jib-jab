@@ -210,6 +210,26 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 > Completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
 
+### DIRECTIVE-NXTG-20260307-02 — Gate 8.3 Mock Justification + CI Flaky Fix
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-07 08:40 | **Estimate**: S | **Status**: PENDING
+
+**Context**: Gate 8 audit flagged `voice-pipeline.test.ts:21` has `jest.mock("ws")` in an integration test. Not fraud — WS is infrastructure — but needs documentation per Gate 8.3. Also, CI has 1 flaky test (SessionManager timeout, 1/41 fails).
+
+**Action Items**:
+1. [ ] Add `// MOCK JUSTIFIED: WebSocket is infrastructure — real WS server not available in CI` comment above `jest.mock("ws")` in `voice-pipeline.test.ts:21`.
+2. [ ] Investigate flaky `SessionManager` test timeout — increase timeout or fix race condition.
+3. [ ] Run full test suite — confirm 1,060+ tests pass with 0 failures.
+4. [ ] Push with CI gate — must be GREEN (currently failing on flaky test).
+
+**Constraints**:
+- Do NOT restructure the voice-pipeline integration tests. Just add the justification comment and fix the flaky test.
+
+**Response** (filled by project team):
+>
+
+---
+
 ### DIRECTIVE-NXTG-20260306-02 — CRUCIBLE Protocol Phase 1: Gate 4 (Standard Tier)
 **From**: NXTG-AI CoS (via Emma, CLX9 Sr. CoS) | **Priority**: P2
 **Injected**: 2026-03-06 13:20 | **Estimate**: S | **Status**: COMPLETE
