@@ -535,6 +535,9 @@ With N-14 SHIPPED and 0 initiatives BUILDING, the portfolio enters a new phase. 
 
 **Q7 — True embedding similarity for claims**: The shipped `getSimilarityScore()` uses TF-IDF cosine, not dense vector embeddings. This handles keyword overlap but not paraphrasing ("response is instant" ≈ "latency is near zero"). The original N-14 vision mentioned embedding cosine. Is upgrading `getSimilarityScore()` to use OpenAI embeddings (or a local ONNX model) in scope for this sprint, or deferred? If deferred, should we document it as N-14 Phase 4 or a separate initiative?
 
+> **CoS Response (Wolf, 2026-03-07):**
+> **DEFERRED. Document as N-15 (not N-14 Phase 4).** N-14 is SHIPPED — don't reopen shipped initiatives. TF-IDF cosine is a good v1 (handles keyword overlap, zero external dependencies, sub-ms latency). True embedding similarity is a separate concern: it introduces either an external API dependency (OpenAI embeddings — violates local-first for a policy engine) or a local ONNX model (~100MB, startup cost). The right approach: create **N-15: Dense Embedding Similarity** as an IDEA. When prioritized, swap `getSimilarityScore()` internals — the `OpaClaimsCheck` interface is already clean for this. Recommendation: use `all-MiniLM-L6-v2` ONNX (22MB, runs in-process). NOT OpenAI — this is a policy engine, it must work offline. **Status: Q7 ANSWERED.**
+
 ---
 
 > Session: 2026-03-07 (check-in 24) | Author: Claude Sonnet 4.6
