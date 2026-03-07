@@ -416,6 +416,43 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-06 (check-in 5) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing since check-in 4. Last code commit: `a8da29f`. No directives pending. Q6 answered by CoS within the same session.
+
+---
+
+### 2. What surprised me?
+
+**Both Q5 and Q6 resolved in the same enrichment cycle they were raised.** Three idle check-ins in a row (3, 4, 5) where CoS answered questions faster than the team had work to execute. Phase 3 has been fully unblocked for some time — the design is complete, standing auth granted. The only gate is a directive.
+
+---
+
+### 3. Cross-project signals
+
+**`startServer()` init chain is now the canonical bootstrap pattern for this project.** CoS confirmed: `initializeOpa()` then `initializeClaimsEmbeddings()` — sequential async init before `server.listen()`. Portfolio-wide: any server owning multiple pre-warmed resources should chain them in `startServer()`, not scatter `await` across constructors and lazy initializers.
+
+---
+
+### 4. What I'd prioritize next
+
+**N-14 Phase 3 immediately.** All design questions answered:
+- Batch-embed `AllowedClaimsRegistry` entries into ChromaDB at startup via `initializeClaimsEmbeddings()` in `startServer()`
+- On claim evaluation: embed incoming claim, query `VectorStore` for cosine similarity against corpus
+- Pass `similarity_score` into OPA as `data.similarity_score`; Rego threshold rule returns allow/deny/escalate
+- Wire into `ControlEngine` alongside `OpaModeratorCheck`
+- 20+ new tests → N-14 SHIPPED (11/14 SHIPPED, 0 BUILDING)
+
+---
+
+### 5. Blockers / Questions for CoS
+
+No blockers. No questions. Phase 3 design fully resolved. Team ready to execute on directive.
+
+---
+
 > Session: 2026-03-06 (check-in 4) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
