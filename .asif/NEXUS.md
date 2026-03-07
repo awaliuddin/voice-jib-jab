@@ -213,7 +213,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260307-02 — Gate 8.3 Mock Justification + CI Flaky Fix
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-07 08:40 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-07 08:40 | **Estimate**: S | **Status**: DONE
 
 **Context**: Gate 8 audit flagged `voice-pipeline.test.ts:21` has `jest.mock("ws")` in an integration test. Not fraud — WS is infrastructure — but needs documentation per Gate 8.3. Also, CI has 1 flaky test (SessionManager timeout, 1/41 fails).
 
