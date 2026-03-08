@@ -225,6 +225,25 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 > Completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
 
+### DIRECTIVE-NXTG-20260308-04 — Governance Hygiene: Archive DONE Directives + Initiative Audit
+**From**: NXTG-AI CoS | **Priority**: P2
+**Injected**: 2026-03-08 09:55 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] Archive all DONE directives from this `## CoS Directives` section into `NEXUS-archive.md` (or create a `## CoS Archive` section at the bottom of NEXUS-archive.md if it doesn't have one). Move the full directive text (header, metadata, action items, response) — do not summarize.
+2. [ ] Leave only PENDING directives (if any) in the `## CoS Directives` section. Add an updated archive note with the count and date.
+3. [ ] Audit all initiative statuses in the Executive Dashboard section of NEXUS: verify each initiative marked IN PROGRESS is actually in progress (has recent commits or open work). Flag any that should be SHIPPED or DONE based on actual state.
+4. [ ] If any initiative status changes, update them in the Executive Dashboard and note the change in the response below.
+
+**Constraints**:
+- Do NOT modify directive content when archiving — preserve exactly as written (including team responses).
+- Do NOT change initiative statuses without verifying actual project state (check git log, test results, etc.).
+
+**Response** (filled by project team):
+>
+
+---
+
 ### DIRECTIVE-NXTG-20260307-03 — N-14 Phase 3: AllowedClaimsRegistry to Rego + Embedding Similarity
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-07 12:45 | **Estimate**: M | **Status**: DONE
