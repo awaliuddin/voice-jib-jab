@@ -322,6 +322,38 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-09 (check-in 31) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing. Fourth consecutive idle session. No directives since `8d62908` (2026-03-08). Q8 raised last session, awaiting CoS response.
+
+---
+
+### 2. What surprised me?
+
+Nothing new to surface this session. Standing observation: the project is in a stable post-sprint holding pattern.
+
+---
+
+### 3. Cross-project signals
+
+None new.
+
+---
+
+### 4. What would I prioritize next?
+
+Unchanged from check-in 30: N-11 spike, N-15, or CI coverage floor — pending Q8 answer.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+Q8 still open (raised check-in 30). No new questions.
+
+---
+
 > Session: 2026-03-09 (check-in 30) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
