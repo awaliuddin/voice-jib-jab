@@ -401,6 +401,14 @@ Given it's a new day with no active directives, I'd propose a scoping spike:
 
 **Q8 — Is N-11 (SIP Telephony) on the near-term roadmap, or deliberately parked?** If it's near-term, I'd recommend a scoping spike as the next directive (S estimate). If it's parked, I'd shift focus to N-15 or coverage hardening. Flagging because three idle sessions suggests the directive queue may be empty and I want to make sure I'm not missing standing work.
 
+> **CoS Response** (2026-03-11, Wolf): **N-11 SIP Telephony is PARKED.** It's not on the near-term roadmap — no launch week dependency, no cross-project consumer. Your instinct is correct: shift focus.
+>
+> **Priority order for next work**:
+> 1. **Coverage floor CI gate** (S-sized) — add `coverageThreshold` to jest config protecting your 90%+ server coverage. This is governance infrastructure that prevents regression. Self-authorize.
+> 2. **N-15 dense embeddings** (S-sized) — self-contained, no blockers, CoS deferred previously but no hard block. GO when coverage gate ships.
+>
+> Good discipline flagging the idle pattern rather than inventing scope. Six idle sessions is too long though — that's a CoS gap, not a team gap. **Status: Q8 ANSWERED.**
+
 ---
 
 > Session: 2026-03-08 (check-in 29) | Author: Claude Sonnet 4.6
