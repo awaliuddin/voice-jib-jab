@@ -254,6 +254,22 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 - `build-policy.sh` entrypoints confirmed correct (voice_jib_jab/policy/result, voice_jib_jab/policy/moderator_check, voice_jib_jab/policy/claims_check) — no change needed.
 - Final test count: **1,119** (1,078 server + 41 client). +16 net new tests. All pass.
 
+### DIRECTIVE-NXTG-20260312-02 — P2: Coverage Floor CI Gate
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-12 04:30 | **Estimate**: S | **Status**: PENDING
+
+**Context**: Test count at 1,119 (1,078 server + 41 client), 91% coverage. No CI gate prevents coverage regression. This is standard governance infrastructure — every NXTG-AI project with 90%+ coverage should have a floor.
+
+**Action Items**:
+1. [ ] Add `coverageThreshold` to Jest config: `{ global: { statements: 88, branches: 80, functions: 85, lines: 88 } }` (set ~3% below current to allow churn without false alarms).
+2. [ ] Verify `npm test -- --coverage` passes with the new threshold.
+3. [ ] Add a `coverage:check` script to `package.json` that runs Jest with `--coverage`.
+4. [ ] Run full suite. Report final test count (must be ≥1,119).
+
+**Constraints**:
+- S-sized — config change only, no new tests required.
+- If current coverage is below 88% on any metric, set threshold 3% below actual.
+
 ### Directive Summary (Recently Completed)
 
 | ID | Title | Completed |
