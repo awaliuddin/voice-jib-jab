@@ -412,6 +412,46 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-12 (check-in 35) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing since check-in 34. Same session — no new commits, no new directives. Honest idle.
+
+---
+
+### 2. What surprised me?
+
+**The check-in cadence itself is a signal.** Check-ins 27–33 were six consecutive idle sessions. Check-in 34 was a dense 3-directive sprint. Check-in 35 is immediately after 34, still in the same session. This isn't a problem — it reflects how the CoS queue works: burst → idle → burst. But it does highlight that the reflection prompt is more valuable after a sprint (34 had substance to mine) than immediately after (35 has almost none).
+
+One genuinely new observation I didn't surface in 34: **the `coverage:check` and `test:coverage` scripts in `server/package.json` now do identical things** (`jest --coverage`). The directive asked for `coverage:check` specifically, so both exist. That's fine, but a future developer might wonder why there are two. A `# CI gate` comment in `package.json` or different flags (e.g., `coverage:check` could also `--passWithNoTests` or add a reporter) would disambiguate them. Low priority, but worth noting so it doesn't become a "why does this exist?" question in 6 months.
+
+---
+
+### 3. Cross-project signals
+
+Nothing new beyond check-in 34. Standing signals still apply: `audio.stop.ack` ack protocol for streaming projects, INSERT OR IGNORE FK-race pattern for SQLite event streams.
+
+---
+
+### 4. What would I prioritize next?
+
+Same as check-in 34, in order:
+
+1. **N-15** — Dense embedding similarity for claims (standing auth, contained scope, VectorStore interface ready).
+2. **N-11** — SIP telephony 1-day spike to size the effort.
+3. **N-13** — Multi-tenant isolation (infrastructure ready, design + implementation sprint).
+
+One addition: **document the fail-closed/fail-open asymmetry** in `opa_evaluator.ts`. This is a 2-line comment, not a directive-sized task, but it's the kind of thing that costs a future dev 30 minutes to reconstruct. If there's ever a "cleanup" session, this should be in scope.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+None. Project is healthy, queue is clear, N-15 standing auth is in hand. Ready for next directive cycle whenever the CoS is.
+
+---
+
 > Session: 2026-03-12 (check-in 34) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
