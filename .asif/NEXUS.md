@@ -270,6 +270,48 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 - S-sized — config change only, no new tests required.
 - If current coverage is below 88% on any metric, set threshold 3% below actual.
 
+
+### DIRECTIVE-CLX9-20260312-04 — P1: UAT Bug Verification & Documentation Alignment
+**From**: CLX9 Sr. CoS (Emma) | **Priority**: P1
+**Injected**: 2026-03-12 20:15 | **Estimate**: S | **Status**: PENDING
+
+**Context**: ASIF governance audit identified stale documentation across multiple artifacts. The 5 UAT findings (tracked since 2026-02-16) were all resolved by 2026-02-20 per NEXUS changelog, but intelligence/P-07-voice-jib-jab.md still shows "5 open" and CLAUDE.md still lists P-07 as AMBER. This directive ensures fixes are verified against current code and all artifacts are aligned.
+
+**UAT Findings Reference** (priority order):
+
+| # | Severity | Finding | Fix Applied | Verify |
+|---|----------|---------|-------------|--------|
+| 1 | CRITICAL | Audio feedback loop — AI responds to ambient noise endlessly | 3-layer defense: echo cancellation + cooldown + RMS gate | Confirm echo cancellation code still present and tested |
+| 5 | CRITICAL | Audit trail FK failure on WebSocket connect (race condition) | INSERT OR IGNORE placeholder row before audit events | Confirm placeholder insert pattern still in AuditTrail |
+| 2 | HIGH | Stop button unresponsive — requires 3 clicks | response.end deferred while audio playing + audio-aware click handler | Confirm audio-aware state transition in client code |
+| 3 | HIGH | Server keeps streaming after client stop (30s+ lag) | audioStopped guard on output handlers + cancel/stop ack protocol | Confirm ack protocol in WebSocket message handlers |
+| 4 | POSITIVE | Voice response latency near-instant (~500ms) | N/A — positive finding, not a bug | Confirm TTFB tracking still active |
+
+**Action Items**:
+1. [x] Run full test suite (`npm test`). Confirm all 1,119+ tests pass with zero regressions on UAT-related test files.
+2. [ ] Verify Bug #1 fix: grep for echo cancellation / RMS gate / cooldown logic. Confirm test coverage exists for the 3-layer defense.
+3. [ ] Verify Bug #5 fix: grep for INSERT OR IGNORE / placeholder pattern in AuditTrail. Confirm test coverage for FK race condition.
+4. [ ] Verify Bug #2 fix: confirm audio-aware stop handler exists and is tested.
+5. [ ] Verify Bug #3 fix: confirm audioStopped guard and ack protocol exist and are tested.
+6. [ ] Verify Bug #4 (positive): confirm TTFB tracking/display is still active.
+7. [ ] Report: for each bug, state (a) fix still present: YES/NO, (b) test coverage: YES/NO with test file reference.
+
+**Constraints**:
+- S-sized — verification and reporting only, no code changes expected unless a regression is found.
+- If any fix has regressed, escalate immediately as P0 to CoS with details.
+- Do NOT modify working code. This is a verification pass.
+
+**Cross-Project Impacts**:
+- **Kokoro TTS / cos-speak**: Bug #1 (echo cancellation) fix uses RMS gate thresholds calibrated for Kokoro TTS audio output levels. If Kokoro version changes (per PI-007 TTS modernization), the RMS thresholds may need recalibration. No action now — awareness item for any future TTS engine swap (Fish Speech, Qwen3-TTS per PI-007).
+- **Podcast-Pipeline (P-04)**: The WebSocket ack protocol (Bug #3 fix) is a pattern that could be referenced if P-04 adds real-time streaming. Document the pattern location in your response.
+- **Forge WebSocket (P-03)**: Forge's event confirmation protocol (PI-004) was referenced when fixing Bugs #2/#3. No current dependency, but the patterns are siblings.
+
+**Test Verification Steps** (for CoS review):
+1. Full suite green (1,119+ tests, 0 failures)
+2. Each bug fix location identified with file:line reference
+3. Each bug fix has at least one dedicated test (not just incidental coverage)
+4. TTFB tracking produces valid metrics (Bug #4 positive finding preserved)
+
 ### Directive Summary (Recently Completed)
 
 | ID | Title | Completed |
