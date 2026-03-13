@@ -426,6 +426,49 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-13 (check-in 41) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing. No code commits since `ec7fc2c`. Q10 was answered (`843611f`) — both N-15 design decisions confirmed. The pre-flight work from check-in 40 paid off: architecture is settled before a line is written.
+
+---
+
+### 2. What surprised me?
+
+**The pre-flight pattern works better than I expected.** Check-in 40's analysis of `VectorStore.ts` surfaced a genuine scope error (S→M reclassification) and two unresolved design questions. Q10 resolved both in under 24 hours. Net result: N-15 sprint now starts with confirmed architecture, correct size estimate, and no mid-sprint design conflicts. Contrast with a hypothetical sprint that started without the pre-flight — it would have hit the async propagation problem mid-implementation and either made the wrong call or had to pause for a question anyway. The 1-session pre-flight cost was worth it.
+
+**The OpaEvaluator pattern is becoming a template.** Q10 confirmed the async-init/sync-query approach for `AllowedClaimsRegistry` explicitly by reference to `OpaEvaluator`. This project now has two WASM-adjacent components (OPA policy engine, ONNX embedding model) that follow identical lifecycle patterns: download binary at setup → `async initialize()` at startup → synchronous hot path at runtime. That's a portfolio-level pattern worth naming. Call it the **binary-at-boundary pattern**: async at the startup boundary, sync everywhere a request touches it.
+
+---
+
+### 3. Cross-project signals
+
+**Binary-at-boundary pattern** (named above) is directly applicable to any ASIF project adding a local inference component. The pattern: (1) download binary via setup script, (2) load once at server startup via `async initialize()`, (3) all runtime calls are synchronous. Applied in P-07 for OPA (WASM) and about to be applied for ONNX embeddings. If P-04 (Podcast-Pipeline) adds local TTS inference or P-09 (oneDB) adds a local model for schema inference, this is the reference implementation.
+
+**`scripts/download-model.sh` will mirror `scripts/build-policy.sh` structurally.** Both follow: check if binary exists → download if not → verify. When N-15 ships, the `scripts/` directory will have two parallel setup scripts. That's a pattern the portfolio can standardise on for any project adding external runtime binaries.
+
+---
+
+### 4. What would I prioritize next?
+
+**Start N-15 Sprint Session 1.** All prerequisites satisfied:
+- Standing auth: Q9 ✓
+- Architecture: Q10 ✓ (async initialize + sync query, download-model.sh)
+- Size: M, 2 sessions
+- Regression harness: `getSimilarityScore` tests from check-in 34 ✓
+- Interface contract: `VectorStore.search()` signature unchanged ✓
+
+Session 1 scope: `scripts/download-model.sh`, new `EmbeddingStore` class (or modified `VectorStore`), `AllowedClaimsRegistry.initialize()`, updated tests. Session 2: integration, `OpaClaimsCheck` wiring, coverage verification, NEXUS update.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+None. Queue is clear. N-15 is fully unblocked. Ready.
+
+---
+
 > Session: 2026-03-13 (check-in 40) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
