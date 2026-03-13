@@ -412,6 +412,64 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-12 (check-in 34) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Three directives in one session — a dense morning after a long idle stretch.
+
+**DIRECTIVE-NXTG-20260312-01** — Governance/OPA test coverage push:
+- `AllowedClaimsRegistry.getSimilarityScore()`: 6 new tests (empty registry→0, word overlap→score>0, identical text→1.0, score range invariant, no-overlap→0, top-1 across corpus).
+- `OpaEvaluator.evaluateClaimsCheck()`: 10 new tests (throws-when-uninit, empty/null OPA result fallbacks, allow path, refuse path, custom reasonCode, `claims_check` key unwrap, non-number severity→3, non-string reasonCode→default, input passthrough).
+- `build-policy.sh` entrypoints confirmed correct from Q3 fix — no change needed.
+- Test count: 1,103 → **1,119** (+16). Commits: `0894c95`.
+
+**DIRECTIVE-NXTG-20260312-02** — Coverage floor CI gate:
+- Raised `coverageThreshold` in `server/jest.config.js`: 70% floor → `{ stmt: 88, branch: 78, fn: 87, lines: 88 }`.
+- Added `coverage:check` script to `server/package.json`.
+- Commit: `ebc41c1`.
+
+**DIRECTIVE-CLX9-20260312-04** — UAT bug verification (all 5 findings):
+- All 5 UAT fixes confirmed intact with dedicated tests. No regressions. Full findings table written to NEXUS.
+
+---
+
+### 2. What surprised me?
+
+**`evaluateClaimsCheck()` uses fail-closed defaults, `evaluate()` uses fail-open.** When OPA returns null/empty results, `evaluate()` defaults to `allow/0` but `evaluateClaimsCheck()` defaults to `refuse/3/CLAIMS:UNVERIFIED`. This is the right design — claims verification should be conservative — but the asymmetry is implicit. It's not documented anywhere in the source. Worth a comment in `opa_evaluator.ts` if someone later adds a third evaluator and picks the wrong default by analogy.
+
+**The `audioStopped` guard is more pervasive than the UAT fix description suggests.** It appears at 6 distinct check points in `websocket.ts` (lines 347, 560, 747, 827, 848, 887). UAT described it as "a guard on output handlers" — in practice it's a session-level flag checked throughout the entire inbound audio pipeline. This is correct and thorough, but a future refactor that consolidates the pipeline could accidentally drop one of those check points. The tests (gate 1 at `WebSocketMessages.test.ts:550`) cover the primary gate but not all 6 sites.
+
+**Coverage was already gated at 70%.** The directive framed this as "no CI gate exists" — but `jest.config.js` already had `coverageThreshold: { global: { branches: 70, functions: 70, lines: 70, statements: 70 } }`. It was just set too low to catch regressions. Worth noting: the gate existed, but the floor was stale relative to the project's actual coverage trajectory.
+
+---
+
+### 3. Cross-project signals
+
+**`audio.stop.ack` ack protocol** (`server/src/api/websocket.ts:~827`) is the pattern that fixed Bug #3 (server keeps streaming after client stop). Any ASIF project doing real-time bidirectional streaming over WebSocket should use this: client sends stop intent → server drains/cancels → server sends ack → client confirms receipt. P-04 (Podcast-Pipeline) is the most likely next recipient if they add streaming audio delivery. Pattern location: `websocket.ts` `audio.stop` handler block.
+
+**INSERT OR IGNORE placeholder row for FK races** (`audit_trail.ts:171`) is applicable to any project using SQLite + event-ordered writes where the parent entity (session) may not be committed before child events (audit rows) arrive. oneDB (P-09) pioneered OPA policy enforcement here — the SQLite pattern is ours and portable.
+
+**3-layer echo defense** (client: WebAudio constraints + server: cooldown + RMS gate) is a novel pattern for voice agent deployments. No ASIF sibling currently runs a voice capture loop. If N-11 (SIP Telephony) ships, the RMS threshold (200, ~-44 dBFS) will need recalibration for SIP audio levels vs browser WebAudio.
+
+---
+
+### 4. What would I prioritize next?
+
+1. **N-15 — Dense Embedding Similarity for Claims** (standing auth from Q8). TF-IDF cosine (VectorStore) is good but misses semantic overlap. A small local embedding model (e.g., `all-MiniLM-L6-v2` via ONNX) would make `getSimilarityScore()` meaningfully more accurate. The interface is already clean (`VectorStore.search()`), so the swap is contained.
+
+2. **N-11 — SIP Telephony spike**. Oldest IDEA initiative. A 1-day spike to evaluate a SIP library (e.g., `sip.js` or `drachtio`) would tell us if telephony is a 1-week or 1-month effort. The 3-lane architecture is media-source agnostic — SIP is an input-layer concern only.
+
+3. **N-13 — Multi-Tenant Isolation**. The audit trail is now well-tested and the OPA policy engine is in place. Multi-tenancy is mostly a session scoping + policy namespace problem. The infrastructure is ready; it's a design + implementation sprint.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+None. Q8 was answered (standing auth for N-15). Directive queue is clear. Project is healthy.
+
+---
+
 > Session: 2026-03-09 (check-in 33) | Author: Claude Sonnet 4.6
 
 Nothing new. Sixth consecutive idle session. Q8 still open. Awaiting directive.
