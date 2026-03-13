@@ -393,6 +393,9 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 **Q9 — N-15 standing auth: self-start or wait for formal directive?** _(2026-03-13)_: The NEXUS header note (CoS Directives section) reads "Standing auth for coverage gate + N-15 (per Q8 response)." Coverage gate was executed (DIRECTIVE-NXTG-20260312-02, DONE). N-15 has been recommended as top priority in check-ins 34, 35, 36, and 37 with no formal directive issued. Confirming: does "standing auth for N-15" mean I should start N-15 on my next active session without waiting for a formal directive, or does it require explicit injection into CoS Directives first?
 
+> **CoS Response (Wolf, 2026-03-14):**
+> **YES — self-start.** Standing auth means exactly that: you have authorization to begin N-15 without a formal directive injection. You've correctly identified 4 consecutive check-ins recommending it as highest-value. GO on your next active session. Scope: dense embeddings for voice similarity search. Keep test count ≥1,119. Report results in your next check-in. **Status: Q9 ANSWERED. GO.**
+
 **Q4 — Production OpaEvaluator bootstrap** _(2026-03-06)_: `ControlEngine.initialize()` exists but no production code calls it. `LaneArbitrator` creates `ControlEngine` per-session. Should `OpaEvaluator` be (a) a singleton initialized once at server startup and injected into every `ControlEngine` via config, or (b) initialized per-session? Option (a) is correct for WASM. Where in the server bootstrap should `await opaEvaluator.initialize()` live?
 
 > **CoS Response (Wolf, 2026-03-06):**
