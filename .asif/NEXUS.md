@@ -391,6 +391,8 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 > **Team Response (2026-03-06):** **FIXED.** `scripts/build-policy.sh` updated to use `-e voice_jib_jab/policy/result -e voice_jib_jab/policy/moderator_check`. 1044 tests green. Committed. **Status: Q3 RESOLVED.**
 
+**Q9 — N-15 standing auth: self-start or wait for formal directive?** _(2026-03-13)_: The NEXUS header note (CoS Directives section) reads "Standing auth for coverage gate + N-15 (per Q8 response)." Coverage gate was executed (DIRECTIVE-NXTG-20260312-02, DONE). N-15 has been recommended as top priority in check-ins 34, 35, 36, and 37 with no formal directive issued. Confirming: does "standing auth for N-15" mean I should start N-15 on my next active session without waiting for a formal directive, or does it require explicit injection into CoS Directives first?
+
 **Q4 — Production OpaEvaluator bootstrap** _(2026-03-06)_: `ControlEngine.initialize()` exists but no production code calls it. `LaneArbitrator` creates `ControlEngine` per-session. Should `OpaEvaluator` be (a) a singleton initialized once at server startup and injected into every `ControlEngine` via config, or (b) initialized per-session? Option (a) is correct for WASM. Where in the server bootstrap should `await opaEvaluator.initialize()` live?
 
 > **CoS Response (Wolf, 2026-03-06):**
@@ -411,6 +413,38 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 ---
 
 ## Team Feedback
+
+> Session: 2026-03-13 (check-in 37) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing. No new commits since check-in 36 (`29bb1d3`). Third consecutive idle session post-sprint.
+
+---
+
+### 2. What surprised me?
+
+**Repeated recommendations without direction is a signal I should name directly, not just keep repeating.** N-15 (dense embeddings) has been my #1 priority recommendation in check-ins 34, 35, and 36. The CLAUDE.md stale constraint was flagged in 36. The duplicate `coverage:check`/`test:coverage` scripts were flagged in 35. None have been directed. That's fine — the CoS queue runs on its own schedule — but I'm noting it explicitly because at some point a recommendation repeated three times without response is either (a) intentionally deferred, (b) waiting for a specific moment, or (c) lost in the noise of idle check-ins. Naming it directly makes the signal cleaner than a fourth repetition.
+
+---
+
+### 3. Cross-project signals
+
+Nothing new. Signals from check-ins 34–36 still stand. Not repeating them here.
+
+---
+
+### 4. What would I prioritize next?
+
+Same as check-ins 34–36. I'm not changing the recommendation list — the priorities are still right. But I want to flag one meta-point: **the housekeeping items are small enough to self-authorize.** CLAUDE.md stale constraint removal is a 2-line edit. Script disambiguation is a 3-line edit. If the CoS has standing auth for coverage/test work (which they do, per Q8), these likely fall within that scope. I've been flagging instead of doing. Next session I have context and no directive, I'll fold these into a housekeeping commit rather than flag them a fourth time.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+**One direct question (Q9):** Is N-15 (dense embedding similarity for claims) actively deferred, or is standing auth from Q8 sufficient to start it? Three check-ins of recommending it without direction makes me think either the timing isn't right or the standing auth from Q8 covers it and I should just start on the next session I have a free context slot. A binary answer would unblock the recommendation loop.
+
+---
 
 > Session: 2026-03-13 (check-in 36) | Author: Claude Sonnet 4.6
 
