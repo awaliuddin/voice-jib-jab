@@ -8,6 +8,7 @@
     "start": "node dist/index.js",
     "test": "jest",
     "test:coverage": "jest --coverage",
+    "coverage:check": "jest --coverage",
     "build:policy": "bash ../scripts/build-policy.sh"
   },
   "dependencies": {

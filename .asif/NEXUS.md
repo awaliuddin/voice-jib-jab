@@ -256,24 +256,31 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260312-02 — P2: Coverage Floor CI Gate
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-12 04:30 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-12 04:30 | **Estimate**: S | **Status**: DONE
 
 **Context**: Test count at 1,119 (1,078 server + 41 client), 91% coverage. No CI gate prevents coverage regression. This is standard governance infrastructure — every NXTG-AI project with 90%+ coverage should have a floor.
 
 **Action Items**:
-1. [ ] Add `coverageThreshold` to Jest config: `{ global: { statements: 88, branches: 80, functions: 85, lines: 88 } }` (set ~3% below current to allow churn without false alarms).
-2. [ ] Verify `npm test -- --coverage` passes with the new threshold.
-3. [ ] Add a `coverage:check` script to `package.json` that runs Jest with `--coverage`.
-4. [ ] Run full suite. Report final test count (must be ≥1,119).
+1. [x] Add `coverageThreshold` to Jest config: `{ global: { statements: 88, branches: 80, functions: 85, lines: 88 } }` (set ~3% below current to allow churn without false alarms).
+2. [x] Verify `npm test -- --coverage` passes with the new threshold.
+3. [x] Add a `coverage:check` script to `package.json` that runs Jest with `--coverage`.
+4. [x] Run full suite. Report final test count (must be ≥1,119).
 
 **Constraints**:
 - S-sized — config change only, no new tests required.
 - If current coverage is below 88% on any metric, set threshold 3% below actual.
 
+**Response** (2026-03-12):
+- Actual coverage: Stmt 91.05%, Branch 81.55%, Fn 90%, Lines 91.35%.
+- Branches (81.55%) is below 88% — applied 3%-below-actual rule: threshold set to 78.
+- Updated `server/jest.config.js` `coverageThreshold.global`: `{ statements: 88, branches: 78, functions: 87, lines: 88 }`.
+- Added `coverage:check` script to `server/package.json` (`jest --coverage`).
+- Full suite: **1,119 tests pass** (1,078 server + 41 client), 0 failures. Threshold enforced — CI will now fail if coverage drops below floor.
+
 
 ### DIRECTIVE-CLX9-20260312-04 — P1: UAT Bug Verification & Documentation Alignment
 **From**: CLX9 Sr. CoS (Emma) | **Priority**: P1
-**Injected**: 2026-03-12 20:15 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-12 20:15 | **Estimate**: S | **Status**: DONE
 
 **Context**: ASIF governance audit identified stale documentation across multiple artifacts. The 5 UAT findings (tracked since 2026-02-16) were all resolved by 2026-02-20 per NEXUS changelog, but intelligence/P-07-voice-jib-jab.md still shows "5 open" and CLAUDE.md still lists P-07 as AMBER. This directive ensures fixes are verified against current code and all artifacts are aligned.
 
@@ -312,10 +319,26 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 3. Each bug fix has at least one dedicated test (not just incidental coverage)
 4. TTFB tracking produces valid metrics (Bug #4 positive finding preserved)
 
+**Response** (2026-03-12):
+
+Full suite: **1,119 tests pass** (1,078 server + 41 client), 0 failures.
+
+| # | Fix still present | Test coverage | Details |
+|---|------------------|---------------|---------|
+| Bug #1 (feedback loop) | **YES** | **YES** | Layer 1: echo cancellation `client/src/audio/MicrophoneCapture.ts:25` — tested `client/src/__tests__/MicrophoneCapture.test.ts:28`. Layer 2: cooldown `server/src/api/websocket.ts:55` (RESPONSE_COOLDOWN_MS=1500) — tested `WebSocketMessages.test.ts:591`. Layer 3: RMS gate `server/src/api/websocket.ts:61` (MIN_AUDIO_RMS=200) — tested `WebSocketMessages.test.ts:652`. All 3 layers present and tested. |
+| Bug #5 (FK race) | **YES** | **YES** | `INSERT OR IGNORE INTO sessions` at `server/src/insurance/audit_trail.ts:171`. Dedicated test "should ensure session row exists before inserting event (FK fix)" at `server/src/__tests__/unit/AuditTrail.test.ts:362`. |
+| Bug #2 (stop button) | **YES** | **YES** | Audio-aware state check at `client/src/components/VoiceInterface.tsx:36` (`state === 'listening' && isAudioPlaying`). `isAudioPlaying` prop on `TalkButton.tsx:11`. Tested at `client/src/__tests__/SessionManager.test.ts:141`. |
+| Bug #3 (server streaming) | **YES** | **YES** | `audioStopped` guard at `server/src/api/websocket.ts:347` — tested "gate 1: drops audio when audioStopped is true" `WebSocketMessages.test.ts:550`. `audio.stop.ack` ack protocol server→client tested at `WebSocketMessages.test.ts:817`; client handler at `client/src/state/SessionManager.ts:282`. **P-04 pattern reference**: ack protocol at `server/src/api/websocket.ts` `audio.stop` handler (line ~827). |
+| Bug #4 (TTFB, positive) | **YES** | **YES** | `LaneB.getTTFB()` at `server/src/lanes/LaneB.ts:271`. Schema field `ttfb_ms` at `server/src/schemas/events.ts:130`. Multiple TTFB tests at `server/src/__tests__/LatencyBudget.test.ts:19+`. |
+
+No regressions found. All 5 UAT fixes are intact.
+
 ### Directive Summary (Recently Completed)
 
 | ID | Title | Completed |
 |----|-------|-----------|
+| CLX9-20260312-04 | UAT Bug Verification & Documentation Alignment | 2026-03-12 |
+| NXTG-20260312-02 | Coverage Floor CI Gate | 2026-03-12 |
 | NXTG-20260312-01 | Test Coverage Push — Governance/OPA Modules | 2026-03-12 |
 | NXTG-20260308-04 | Governance Hygiene: Archive + Initiative Audit | 2026-03-08 |
 
