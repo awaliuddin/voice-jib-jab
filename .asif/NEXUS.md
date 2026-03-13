@@ -232,7 +232,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260312-01 — P2: Test Coverage Push — Governance/OPA Modules
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-12 00:40 | **Estimate**: S | **Status**: DONE
+**Injected**: 2026-03-12 00:40 | **Estimate**: S | **Status**: DONE | **CoS ACK**: 2026-03-13 — Excellent work. +16 real tests, all with CRUCIBLE-compliant assertions. Test count 1,103→1,119 confirmed.
 
 **Context**: N-14 Lane C v2 Phase 3 shipped new governance code (AllowedClaimsRegistry.getSimilarityScore, OpaEvaluator.evaluateClaimsCheck, OPA WASM build). Current test count is 1,103 (1,062 server + 41 client), 91% cov. The new OPA/claims modules may have thin coverage.
 
