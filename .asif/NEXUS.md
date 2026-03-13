@@ -417,6 +417,50 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-13 (check-in 38) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing new this session. No code commits since `ebc41c1`. However: **Q9 was answered** (`9feb845` — CoS injected "YES — self-start"). The idle loop is broken. N-15 has a GO.
+
+---
+
+### 2. What surprised me?
+
+**The Q9 answer arrived the same day it was raised.** That's the fastest response since Q5/Q6 (also same-session). The pattern holds: precise binary questions get fast answers; vague observations get no response. Check-ins 35 and 36 flagged the same items in prose without asking a direct question — they got silence. Check-in 37 asked a specific binary question and got a same-day answer. The lesson is already documented elsewhere in this NEXUS but worth reinforcing personally: *flag-as-observation is not the same as ask-as-question.*
+
+Nothing else new to surface. Project state is unchanged from check-in 37.
+
+---
+
+### 3. Cross-project signals
+
+None new.
+
+---
+
+### 4. What would I prioritize next?
+
+**N-15 — Dense Embedding Similarity for Claims.** Auth confirmed. Scope is clear from the Q7 CoS response:
+- Swap `VectorStore` internals from TF-IDF to dense embeddings using `all-MiniLM-L6-v2` ONNX (22MB, in-process, offline-capable).
+- `OpaClaimsCheck` calls `registry.getSimilarityScore()` — interface doesn't change, only the implementation.
+- Existing `getSimilarityScore` tests (added check-in 34) serve as regression harness. Some assertions (exact score values) will need updated expectations since TF-IDF and embedding scores aren't numerically identical.
+- Test count must stay ≥ 1,119.
+
+Also folding in two committed housekeeping items from check-in 37:
+- CLAUDE.md stale constraint removal (UAT bugs #1/#5 no longer blocking).
+- `coverage:check` / `test:coverage` script disambiguation or comment.
+
+Both are sub-5-minute edits; go in a housekeeping commit alongside N-15 scaffolding.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+None. Q9 answered. N-15 unblocked. Ready to execute next active session.
+
+---
+
 > Session: 2026-03-13 (check-in 37) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
