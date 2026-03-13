@@ -67,10 +67,19 @@ describe("Voice Pipeline Integration", () => {
   });
 
   afterEach(async () => {
-    if (laneB.isConnected()) {
+    // Clear arbitrator timers (reflexTimer / reflexTimeoutTimer keep the event loop alive)
+    arbitrator.endSession();
+    // Disconnect unconditionally, even when already disconnected:
+    // - sets sessionId=null so any pending reconnect setTimeout bails immediately
+    //   (avoids a 30s pingInterval from the reconnect attempt)
+    // - drains the close-event nextTick when the adapter was still connected
+    try {
       await laneB.disconnect();
-      await new Promise((resolve) => process.nextTick(resolve));
+    } catch {
+      // adapter may already be in a closed/error state — ignore
     }
+    // Drain pending process.nextTick callbacks (MockWebSocket close events fire via nextTick).
+    await new Promise((resolve) => process.nextTick(resolve));
   });
 
   describe("Complete Voice Interaction Flow", () => {

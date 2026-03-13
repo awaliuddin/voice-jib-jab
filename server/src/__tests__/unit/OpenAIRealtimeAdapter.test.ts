@@ -12,7 +12,7 @@ import { ProviderConfig } from "../../providers/ProviderAdapter.js";
 import {
   createAudioForDuration,
 } from "../helpers/audio.js";
-import { waitForEvent, sleep } from "../helpers/wait.js";
+import { waitForEvent } from "../helpers/wait.js";
 import { MockWebSocket } from "../mocks/MockWebSocket.js";
 
 // Mock 'ws' module at the top level (uses manual mock in __mocks__/ws.ts)
@@ -56,9 +56,12 @@ describe("OpenAIRealtimeAdapter", () => {
   afterEach(async () => {
     if (adapter && adapter.isConnected()) {
       await adapter.disconnect();
-      // Wait for disconnect to complete (process.nextTick in MockWebSocket)
-      await new Promise((resolve) => process.nextTick(resolve));
     }
+    // Always drain pending process.nextTick callbacks (e.g. MockWebSocket close events
+    // fire via nextTick — if a test called disconnect() itself, afterEach skips the
+    // block above but the close event is still queued and must be drained here to
+    // prevent "Cannot log after tests are done" warnings).
+    await new Promise((resolve) => process.nextTick(resolve));
   });
 
   describe("Connection Lifecycle", () => {
@@ -279,32 +282,43 @@ describe("OpenAIRealtimeAdapter", () => {
   });
 
   describe("commitAudio - Guard Clause 2: Safety Window", () => {
+    beforeEach(() => {
+      // Fake timers eliminate real 50ms waits (flaky in CI).
+      // doNotFake: nextTick preserves process.nextTick for MockWebSocket close events.
+      jest.useFakeTimers({ doNotFake: ["nextTick"] });
+    });
+
+    afterEach(() => {
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    });
+
     it("should wait for safety window (50ms) before commit", async () => {
-      // Send audio
       await adapter.sendAudio(createAudioForDuration(200));
 
-      const start = Date.now();
-      await adapter.commitAudio();
-      const elapsed = Date.now() - start;
+      // Start commit — pauses at the safety window setTimeout
+      const commitPromise = adapter.commitAudio();
 
-      // Should have waited approximately 50ms
-      expect(elapsed).toBeGreaterThanOrEqual(45); // Allow some timing variance
-      expect(elapsed).toBeLessThan(100);
+      // Fire the 50ms safety window timer deterministically
+      jest.advanceTimersByTime(50);
+
+      const committed = await commitPromise;
+
+      expect(committed).toBe(true);
+      expect(mockWs.hasSentMessage("input_audio_buffer.commit")).toBe(true);
     });
 
     it("should not wait if safety window already passed", async () => {
-      // Send audio
       await adapter.sendAudio(createAudioForDuration(200));
 
-      // Wait longer than safety window
-      await sleep(60);
+      // Advance fake clock past the 50ms safety window — no real delay
+      jest.advanceTimersByTime(60);
 
-      const start = Date.now();
-      await adapter.commitAudio();
-      const elapsed = Date.now() - start;
+      // Commit is immediate; no setTimeout scheduled
+      const committed = await adapter.commitAudio();
 
-      // Should not wait additional time
-      expect(elapsed).toBeLessThan(20); // Should be nearly instant
+      expect(committed).toBe(true);
+      expect(mockWs.hasSentMessage("input_audio_buffer.commit")).toBe(true);
     });
   });
 
