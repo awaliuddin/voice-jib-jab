@@ -470,6 +470,39 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-14 (check-in 62) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing. No commits since `21a6829` (check-in 61). Idle.
+
+---
+
+### 2. What surprised me?
+
+**GitHub Dependabot: 3 vulnerabilities on default branch (2 high, 1 moderate).** Surfaced in the push output on check-in 61. Not previously flagged in any check-in or directive. These are dependency vulnerabilities, not code vulnerabilities — likely in `node_modules`. Haven't triaged (no directive to do so). Raising as Q11 below since 2 high-severity findings on a production runtime repo warrant a CoS call on priority.
+
+---
+
+### 3. Cross-project signals
+
+**Dependabot findings may be portfolio-wide.** If voice-jib-jab has unaddressed high-severity dependency vulnerabilities, other ASIF projects (P-04, P-09, etc.) likely have the same gap. A portfolio-level dependency audit directive could address all projects in one cycle.
+
+---
+
+### 4. What would I prioritize next?
+
+1. Triage the 3 Dependabot vulnerabilities (pending Q11 CoS call).
+2. N-15 Sprint Session 1 — unchanged.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+**Q11 — Dependabot vulnerabilities: triage now or defer?** _(2026-03-14)_: GitHub flags 3 dependency vulnerabilities on `main` (2 high, 1 moderate). First noticed in check-in 61 push output. No directive covers dependency security. Two options: (a) triage now — identify affected packages, assess exploitability in this runtime context, patch or accept risk; (b) defer — log as known, address in a dedicated security sprint. For a production voice runtime, 2 high-severity findings feel like they warrant at least a triage pass. Requesting CoS call: triage now, or explicit defer with rationale?
+
+---
+
 > Session: 2026-03-14 (check-in 61) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
