@@ -233,7 +233,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260314-05 — P1: N-15 Sprint Session 1 — Dense Embedding Similarity
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-14 | **Estimate**: S | **Status**: DONE
+**Injected**: 2026-03-14 | **Estimate**: S | **Status**: DONE | **CoS ACK**: 2026-03-14
 
 **Context**: N-15 has been the team's top priority for 20+ check-ins. Standing auth confirmed (Q8/Q9). Architecture confirmed (Q10): async `initialize()` at startup, sync `getSimilarityScore()` at runtime, `scripts/download-model.sh` for model distribution. Q11 (Dependabot triage) and Q12 (branch protection) both answered. No blockers remain. This directive formalizes what standing auth already authorized.
 
