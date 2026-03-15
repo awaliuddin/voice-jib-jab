@@ -14,6 +14,13 @@ import {
   type ApprovedClaim,
 } from "../../insurance/allowed_claims_registry.js";
 
+// Mock @huggingface/transformers so tests do not download real ONNX models.
+// The mock returns deterministic embeddings keyed by exact text content,
+// allowing semantic similarity assertions without network/model I/O.
+jest.mock("@huggingface/transformers", () => ({
+  pipeline: jest.fn(),
+}));
+
 // ── Helpers ────────────────────────────────────────────────────────────
 
 function makeRegistry(
@@ -362,6 +369,106 @@ describe("AllowedClaimsRegistry", () => {
     it("should not count disallowed patterns as claims", () => {
       const registry = makeRegistry([], ["pattern1", "pattern2"]);
       expect(registry.size).toBe(0);
+    });
+  });
+
+  // ── initialize / getEmbeddingSimilarityScore (N-15 dense embeddings) ──
+
+  describe("initialize + getEmbeddingSimilarityScore", () => {
+    // 4-dimensional mock embeddings. Vectors are designed so that
+    // semantically related pairs have high cosine similarity and
+    // unrelated pairs have near-zero similarity.
+    const EMB_DIM = 4;
+
+    // Claim embeddings (unit vectors along independent axes)
+    const LATENCY_VEC = [0.8, 0.6, 0.0, 0.0]; // CLAIM-L: "near-zero latency"
+    const FDA_VEC = [0.0, 0.0, 1.0, 0.0]; // FDA_CLAIM
+
+    // Query embeddings
+    const INSTANT_VEC = [0.707, 0.707, 0.0, 0.0]; // "response is instant" ≈ LATENCY_VEC
+    const UNRELATED_VEC = [0.0, 0.0, 0.0, 1.0]; // orthogonal to all claims
+
+    const TEXT_EMBEDDINGS: Record<string, number[]> = {
+      "The system responds with near-zero latency": LATENCY_VEC,
+      "Our product is FDA approved": FDA_VEC,
+      "response is instant": INSTANT_VEC,
+      "latency is minimal, well under a second": INSTANT_VEC,
+      "completely unrelated content about weather": UNRELATED_VEC,
+    };
+
+    const LATENCY_CLAIM: ApprovedClaim = {
+      id: "CLAIM-L",
+      text: "The system responds with near-zero latency",
+    };
+
+    function makeOutput(
+      input: string | string[],
+    ): { data: Float32Array; dims: number[] } {
+      const texts = Array.isArray(input) ? input : [input];
+      const data = new Float32Array(texts.length * EMB_DIM);
+      texts.forEach((text, i) => {
+        const vec = TEXT_EMBEDDINGS[text] ?? [0.1, 0.1, 0.1, 0.1];
+        data.set(vec, i * EMB_DIM);
+      });
+      return { data, dims: [texts.length, EMB_DIM] };
+    }
+
+    let mockExtractor: jest.Mock;
+
+    beforeEach(async () => {
+      const hf = await import("@huggingface/transformers");
+      mockExtractor = jest
+        .fn()
+        .mockImplementation(async (input: string | string[]) =>
+          makeOutput(input),
+        );
+      (hf.pipeline as jest.Mock).mockResolvedValue(mockExtractor);
+    });
+
+    afterEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it("should return TF-IDF score when not initialized (fallback)", async () => {
+      const registry = makeRegistry();
+      const score = await registry.getEmbeddingSimilarityScore("any text");
+      // Empty registry → getSimilarityScore() returns 0
+      expect(score).toBe(0);
+    });
+
+    it("should score semantically similar text higher than TF-IDF would", async () => {
+      const registry = makeRegistry([LATENCY_CLAIM]);
+      await registry.initialize();
+      expect(registry.isEmbeddingInitialized).toBe(true);
+
+      const query = "response is instant";
+      const embeddingScore =
+        await registry.getEmbeddingSimilarityScore(query);
+      const tfidfScore = registry.getSimilarityScore(query);
+
+      // TF-IDF: "response", "instant" share no tokens with "near-zero", "latency" → ≈ 0
+      // Dense: INSTANT_VEC · LATENCY_VEC = 0.707*0.8 + 0.707*0.6 = 0.990
+      expect(embeddingScore).toBeGreaterThan(tfidfScore);
+      expect(embeddingScore).toBeGreaterThan(0.8);
+    });
+
+    it("should score semantically unrelated text near zero", async () => {
+      const registry = makeRegistry([LATENCY_CLAIM]);
+      await registry.initialize();
+
+      const score = await registry.getEmbeddingSimilarityScore(
+        "completely unrelated content about weather",
+      );
+      // UNRELATED_VEC is orthogonal to LATENCY_VEC → cosine = 0
+      expect(score).toBeLessThan(0.1);
+    });
+
+    it("should not call pipeline again on second initialize() call (idempotent)", async () => {
+      const hf = await import("@huggingface/transformers");
+      const registry = makeRegistry([LATENCY_CLAIM]);
+      await registry.initialize();
+      await registry.initialize();
+      expect(hf.pipeline).toHaveBeenCalledTimes(1);
     });
   });
 

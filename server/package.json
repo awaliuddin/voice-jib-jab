@@ -12,6 +12,7 @@
     "build:policy": "bash ../scripts/build-policy.sh"
   },
   "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
     "@open-policy-agent/opa-wasm": "^1.10.0",
     "better-sqlite3": "^12.6.0",
     "dotenv": "^16.4.1",

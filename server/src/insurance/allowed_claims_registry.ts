@@ -19,6 +19,18 @@ import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 import { VectorStore } from "../retrieval/VectorStore.js";
 
+// Minimal interface for the @huggingface/transformers pipeline output (Tensor).
+// Using a structural type so the module can be dynamically imported and mocked.
+interface HFTensor {
+  data: ArrayLike<number>;
+  dims: number[];
+}
+
+type FeaturePipelineFn = (
+  input: string | string[],
+  options: Record<string, unknown>,
+) => Promise<HFTensor>;
+
 interface AllowedClaimsCatalogEntry {
   id?: unknown;
   claim?: unknown;
@@ -87,6 +99,11 @@ export class AllowedClaimsRegistry {
   private disallowedPatternsLower: string[];
   private config: AllowedClaimsRegistryConfig;
   private vectorStore: VectorStore<ApprovedClaim>;
+
+  // Dense embedding fields (N-15). Populated by initialize().
+  private embeddingPipeline: FeaturePipelineFn | null = null;
+  private claimEmbeddings: Float32Array[] = [];
+  private embeddingInitialized = false;
 
   constructor(config: Partial<AllowedClaimsRegistryConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -225,13 +242,100 @@ export class AllowedClaimsRegistry {
    * Compute TF-IDF cosine similarity between proposed text and the claims corpus.
    * Returns the top-1 cosine score (0.0–1.0) from the VectorStore index.
    *
-   * Used by OpaClaimsCheck to pass a similarity_score into the OPA threshold rule.
-   * Does NOT affect matchText() semantics — the two methods are independent.
+   * Synchronous. Used by OpaClaimsCheck (via the synchronous PolicyCheck.evaluate()
+   * call chain). Does NOT affect matchText() semantics.
    */
   getSimilarityScore(proposedText: string): number {
     if (this.claimTexts.length === 0) return 0;
     const results = this.vectorStore.search(proposedText, 1);
     return results.length > 0 && results[0] ? results[0].score : 0;
+  }
+
+  /**
+   * Load the all-MiniLM-L6-v2 ONNX embedding model and pre-compute dense
+   * embeddings for all registered claims.
+   *
+   * Idempotent — safe to call multiple times; subsequent calls are no-ops.
+   * Mirror of OpaEvaluator.initialize() lifecycle pattern.
+   *
+   * Requires @huggingface/transformers (v3+) and a pre-downloaded model
+   * (see scripts/download-model.sh). Dynamic import allows Jest to mock cleanly.
+   */
+  async initialize(): Promise<void> {
+    if (this.embeddingInitialized) return;
+
+    // Dynamic import so Jest can mock the module cleanly (mirrors OpaEvaluator pattern).
+    const hf = (await import("@huggingface/transformers")) as {
+      pipeline: (
+        task: string,
+        model: string,
+        options?: Record<string, unknown>,
+      ) => Promise<FeaturePipelineFn>;
+    };
+
+    const modelId = process.env.EMBEDDING_MODEL ?? "Xenova/all-MiniLM-L6-v2";
+    this.embeddingPipeline = await hf.pipeline("feature-extraction", modelId, {
+      dtype: "fp32",
+    });
+
+    if (this.claimTexts.length > 0) {
+      const output = await this.embeddingPipeline(
+        this.claimTexts.map((c) => c.text),
+        { pooling: "mean", normalize: true },
+      );
+      const embDim = output.dims[1] ?? 0;
+      this.claimEmbeddings = this.claimTexts.map((_, i) => {
+        const start = i * embDim;
+        // output.data may be a TypedArray or plain Array; slice works on both.
+        return new Float32Array(
+          Array.from(output.data).slice(start, start + embDim) as number[],
+        );
+      });
+    }
+
+    this.embeddingInitialized = true;
+  }
+
+  /** True after initialize() has completed successfully. */
+  get isEmbeddingInitialized(): boolean {
+    return this.embeddingInitialized;
+  }
+
+  /**
+   * Compute dense embedding cosine similarity between proposed text and the
+   * pre-computed claim embeddings.
+   *
+   * Returns the top-1 cosine score (0.0–1.0). Falls back to getSimilarityScore()
+   * (TF-IDF) when initialize() has not been called or the registry is empty.
+   *
+   * Async because query embedding requires a model inference call.
+   * Note: wiring this into OpaClaimsCheck requires PolicyCheck.evaluate() to
+   * become async — tracked as N-15 Phase 2.
+   */
+  async getEmbeddingSimilarityScore(proposedText: string): Promise<number> {
+    if (
+      !this.embeddingInitialized ||
+      !this.embeddingPipeline ||
+      this.claimEmbeddings.length === 0
+    ) {
+      return this.getSimilarityScore(proposedText);
+    }
+
+    const output = await this.embeddingPipeline(proposedText, {
+      pooling: "mean",
+      normalize: true,
+    });
+    const embDim = output.dims[1] ?? 0;
+    const queryVec = new Float32Array(
+      Array.from(output.data).slice(0, embDim) as number[],
+    );
+
+    let maxScore = 0;
+    for (const claimVec of this.claimEmbeddings) {
+      const score = cosineSimilarity(queryVec, claimVec);
+      if (score > maxScore) maxScore = score;
+    }
+    return Math.max(0, Math.min(1, maxScore));
   }
 
   /**
@@ -254,6 +358,21 @@ export class AllowedClaimsRegistry {
   get size(): number {
     return this.claims.size;
   }
+}
+
+/** Cosine similarity between two equal-length vectors. Returns 0 for zero vectors. */
+function cosineSimilarity(a: Float32Array, b: Float32Array): number {
+  if (a.length === 0 || a.length !== b.length) return 0;
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
 function loadClaimsCatalog(
