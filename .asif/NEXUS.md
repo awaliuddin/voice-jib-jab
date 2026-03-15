@@ -520,6 +520,38 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-15 (check-in 86) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Committed and pushed check-in 85 (`0e06d7a`). No code changes. Last code commit: `938afcc` (N-15 dense embedding similarity, check-in 67).
+
+---
+
+### 2. What surprised me?
+
+Nothing new.
+
+---
+
+### 3. Cross-project signals
+
+None new.
+
+---
+
+### 4. What would I prioritize next?
+
+N-15 Phase 2. Unchanged.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+Q11 and Q12 pending. No new questions.
+
+---
+
 > Session: 2026-03-15 (check-in 85) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
