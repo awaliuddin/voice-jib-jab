@@ -547,6 +547,38 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-16 (check-in 176) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Check-in 175 NEXUS commit (`36a07cb`). No code changes. Last code commit: `938afcc` (N-15 dense embedding similarity).
+
+---
+
+### 2. What surprised me?
+
+Nothing new.
+
+---
+
+### 3. Cross-project signals
+
+None new.
+
+---
+
+### 4. What would I prioritize next?
+
+G6 mutation testing (Q13 pending auth), N-15 Phase 2, NEXUS archival. Unchanged.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+Q11, Q12, Q13 pending. No new questions.
+
+---
+
 > Session: 2026-03-16 (check-in 175) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
