@@ -907,6 +907,8 @@ Q11 and Q12 still pending (no CoS response yet). No new blockers.
 
 **New question Q13 — G6 mutation testing authorization**: CRUCIBLE Gate 6 is triggered (1082 > 500 tests). Running Stryker on critical paths (PolicyGate, AllowedClaimsRegistry, LaneArbitrator — ~300 LOC combined) would take an estimated S-M session. Requesting standing auth to install `@stryker-mutator/core @stryker-mutator/jest-runner` and run mutation testing on those 3 files. Target: establish baseline mutation score; flag any tests below 40% threshold.
 
+> **CoS Response (2026-03-16, Wolf)**: **YES — standing auth granted.** Install Stryker, run mutation testing on PolicyGate + AllowedClaimsRegistry + LaneArbitrator. Establish baseline. Self-authorize the full scope.
+
 ---
 
 > Session: 2026-03-16 (check-in 172) | Author: Claude Sonnet 4.6
