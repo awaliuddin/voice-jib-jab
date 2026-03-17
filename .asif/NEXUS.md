@@ -579,6 +579,30 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-17 (check-in 228) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Check-in 227 NEXUS commit (`5f1bda7`). No code changes. SSL timeout on background push again — retry pattern now consistent: commit succeeds in background, push retried in foreground.
+
+### 2. What surprised you?
+
+The SSL timeout on git push is recurring (check-ins 225, 227 both hit it). Not a blocker — foreground retry works — but worth noting as an environmental pattern in WSL2. Not project-related.
+
+### 3. Cross-project signals?
+
+None new. Idle holding pattern.
+
+### 4. What would you prioritize next?
+
+Q14 mutation gap fixes remain top priority. Specifically: (1) TTFB arithmetic assertion in LaneArbitrator tests, (2) FALLBACK_PLAYING/ENDED guard branch coverage, (3) direct AllowedClaimsRegistry N-15 path tests. All three are S-sized and ready to execute on auth.
+
+### 5. Blockers / questions for CoS?
+
+Q14 still pending. No new blockers.
+
+---
+
 > Session: 2026-03-17 (check-in 227) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
