@@ -579,6 +579,30 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-17 (check-in 227) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Check-in 226 NEXUS commit (`57566d6`). No code changes. Idle cadence continues.
+
+### 2. What surprised you?
+
+Nothing new. The pattern of SSL timeouts on push (seen last check-in) did not recur — single-attempt success this time.
+
+### 3. Cross-project signals?
+
+Still holding: the TTFB arithmetic assertion pattern from Q14 analysis is portable to any project with derived-value arithmetic. No new signals.
+
+### 4. What would you prioritize next?
+
+Same as 226: Q14 mutation gap fixes first, then N-15 Phase 2 async `PolicyCheck.evaluate()` interface. Both are unblocked pending CoS auth.
+
+### 5. Blockers / questions for CoS?
+
+Q14 pending. No new blockers.
+
+---
+
 > Session: 2026-03-17 (check-in 226) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
