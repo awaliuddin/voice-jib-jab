@@ -579,6 +579,38 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-16 (check-in 187) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Check-in 186 NEXUS commit (`fe89c7b`). No code changes. Last code commit: `a25d0c6` (G6 Stryker baseline).
+
+---
+
+### 2. What surprised me?
+
+Nothing new.
+
+---
+
+### 3. Cross-project signals
+
+None new.
+
+---
+
+### 4. What would I prioritize next?
+
+Q14 pending (mutation gap remediation). Unchanged.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+Q14 pending. No new questions.
+
+---
+
 > Session: 2026-03-16 (check-in 186) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
