@@ -520,6 +520,38 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Self-Improvement Log
 
+### Gate 6 Mutation Testing — 2026-03-16 (Q13 Authorization Executed)
+
+**Tooling**: Stryker v9 + `@stryker-mutator/jest-runner`. Config: `server/stryker.config.mjs`. Jest variant `server/jest.stryker.config.js` excludes T-013/T-016 (real filesystem knowledge files unavailable in Stryker sandbox). Run time: 10m37s. 1189 total mutants across 3 files.
+
+| File | Mutation Score | Threshold | Status | Killed | Survived | No Cov |
+|------|---------------|-----------|--------|--------|----------|--------|
+| `policy_gate.ts` | **70.48%** | 60% (critical) | ✅ PASS | 350 | 125 | 22 |
+| `LaneArbitrator.ts` | **53.95%** | 60% (critical) | ⚠️ BELOW CRITICAL | 182 | 142 | 21 |
+| `allowed_claims_registry.ts` | **36.29%** | 40% (standard) | ❌ BELOW STANDARD | 124 | 93 | 130 |
+| **Overall** | **55.66%** | — | ⚠️ | 656 | 360 | 173 |
+
+**Key surviving mutations (actionable gaps):**
+
+1. **`LaneArbitrator.ts:561` TTFB arithmetic** — `bReadyTime - speechEndTime` mutatable to `bReadyTime + speechEndTime` and not caught. The TTFB calculation is never tested for correct arithmetic — tests assert TTFB value is present but not that it's correct.
+
+2. **`LaneArbitrator.ts:373,395,434` FALLBACK_PLAYING branch logic** — Multiple mutations on `this.state === "FALLBACK_PLAYING"` survive. No test starts in `FALLBACK_PLAYING` state and exercises barge-in/policy-cancel simultaneously.
+
+3. **`LaneArbitrator.ts:382,420,438` ENDED state guard** — `state !== "ENDED"` guards survive `if (true)` and `||` mutations. No test places arbitrator in ENDED state then calls barge-in or policy-cancel.
+
+4. **`allowed_claims_registry.ts` — 130 no-coverage mutants** — Large portions of the file not reached by related tests alone. The `initialize()` + `getEmbeddingSimilarityScore()` + `loadFromPath()` paths are outside what Stryker identified as related tests. Coverage appears via indirect calls from OpaClaimsCheck/ControlEngine tests.
+
+5. **`policy_gate.ts` log-string mutations survive** — Expected. Log message content is not semantically tested.
+
+**Baseline established**: `reports/mutation/mutation.json` committed. Future runs can track delta.
+
+**Recommended follow-up directive (S-sized)**:
+- Add TTFB arithmetic assertion: `expect(ttfb).toBe(bReadyTime - speechEndTime)` in latency test
+- Add `FALLBACK_PLAYING` + `ENDED` guard tests to LaneArbitrator
+- AllowedClaimsRegistry: wire `initialize()` path in unit tests directly (not via ControlEngine)
+
+---
+
 ### CRUCIBLE Gates 1-7 Audit — 2026-03-16
 
 **Trigger**: Idle Time Protocol (no pending directives). Full CRUCIBLE self-audit per protocol.
@@ -546,6 +578,47 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 ---
 
 ## Team Feedback
+
+> Session: 2026-03-16 (check-in 184) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+- **Stryker mutation testing baseline** (Q13 executed): Installed `@stryker-mutator/core` + `@stryker-mutator/jest-runner`. Created `server/stryker.config.mjs` and `server/jest.stryker.config.js`. Ran mutation testing on 3 critical paths. Results in Self-Improvement Log above.
+- **CRUCIBLE G6 gap closed**: First mutation testing run ever on this codebase.
+- Tests unchanged: **1123/1123 passing** (no regressions from Stryker install).
+
+---
+
+### 2. What surprised me?
+
+**AllowedClaimsRegistry at 36.29%** — below the 40% standard floor. The 130 no-coverage mutants are alarming at first, but the root cause is that Stryker's `enableFindRelatedTests` only runs tests that directly import the file. The `initialize()` and `getEmbeddingSimilarityScore()` paths (added in N-15) are only exercised via indirect call chains (OpaClaimsCheck → AllowedClaimsRegistry), which Stryker's static analysis doesn't trace. Real coverage is higher than the mutation score suggests — but the file still needs direct tests for those new paths.
+
+**TTFB arithmetic survives mutation** — `bReadyTime - speechEndTime` can become `bReadyTime + speechEndTime` with no test failing. The TTFB latency metric (our core performance claim) has a hollow assertion: tests check it's *present* but not that it's *correct*. This is the highest-priority gap found.
+
+---
+
+### 3. Cross-project signals
+
+Stryker setup pattern now proven. The `jest.stryker.config.js` (excludes filesystem-dependent tests) approach is reusable across any portfolio TypeScript project that has tests touching real files. oneDB (P-09) and dx3 likely have the same issue.
+
+---
+
+### 4. What would I prioritize next?
+
+1. **Fix TTFB arithmetic assertion** (S — 1 test): `expect(ttfb).toBe(bReadyTime - speechEndTime)`. Highest-impact gap found.
+2. **LaneArbitrator ENDED/FALLBACK guards** (S — 2-3 tests): Cover barge-in from FALLBACK_PLAYING, policy-cancel from ENDED.
+3. **AllowedClaimsRegistry direct tests** (S): Test `initialize()` and `getEmbeddingSimilarityScore()` directly to bring mutation score above 40%.
+4. **N-15 Phase 2**: async `PolicyCheck.evaluate()` interface.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+Q12 and Q11 answered (noted). Q13 executed.
+
+**New Q14 — mutation score remediation authorization**: Found 3 concrete gaps from G6 run: (a) TTFB arithmetic assertion, (b) ENDED/FALLBACK_PLAYING guard tests in LaneArbitrator, (c) AllowedClaimsRegistry direct tests for N-15 paths. Combined S-sized. Standing auth to fix all 3 and re-run mutation testing to verify scores improve?
+
+---
 
 > Session: 2026-03-16 (check-in 183) | Author: Claude Sonnet 4.6
 
