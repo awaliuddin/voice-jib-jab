@@ -831,6 +831,64 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-18 (check-in 255) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Two directives across one session — chained, both shipped:
+
+**DIRECTIVE-NXTG-20260318-42** — N-11 SIP Telephony: Research + Prototype
+- `docs/sip-telephony-research.md` (6 sections): SIP library comparison (JsSIP, SIP.js, node-sip, drachtio-srf — recommended: SIP.js for TypeScript + WebSocket transport fit), codec bridge (`dgram` + `g711` npm package, ~0.3ms per 20ms RTP frame), PSTN provider comparison (Twilio prototype, Telnyx production), 3-phase plan, 4 open questions.
+- `server/src/providers/SipTelephonyAdapter.ts`: `SipCall`, `SipTelephonyAdapter`, `SipVoiceSession`, `SipSessionFactory` interfaces. `StubSipTelephonyAdapter` (idempotent start, simulateInboundCall, simulateAudioChunk). `SipBridgeService` (wires adapter ↔ session factory; bound listener references for clean teardown on stop()).
+- `server/src/__tests__/integration/SipBridge.test.ts` (27 tests). Zero modifications to existing files.
+- N-11: IDEA → BUILDING.
+- Commit `2b70163` | Tests: 2,423 → 2,450
+
+**DIRECTIVE-NXTG-20260318-43** — Portfolio Showcase: Demo Recording Script
+- `docs/demo-script.md`: 5-act, 3-minute walkthrough script. Act 1: voice loop latency. Acts 2a–c: allowed claim, refused claim, SELF_HARM escalation + MCP ticket. Act 3a–c: multi-tenant contrast (same sentence → opposite decisions on Alpha vs Beta), vector store isolation note. Act 4: metrics dashboard. Act 5: wrap with key numbers table.
+- `server/src/__tests__/fixtures/demoFixtures.ts`: `TENANT_DEMO_ALPHA` (medical, strict 0.2 claims threshold, 3 FDA claims, disallowed cure/100%-effective patterns) + `TENANT_DEMO_BETA` (fintech, permissive 0.85 threshold, 3 FDIC claims, disallowed guaranteed-return patterns) + `DEMO_SCENARIOS` array (5 entries: tenant/input/expectedDecision/description). Importable by any test or demo harness.
+- Commit `2b70163` | Tests: 2,450 passed, 0 failed
+
+---
+
+### 2. What surprised you?
+
+**The `SipBridgeService` teardown pattern required more care than expected.** Wiring `adapter.on('audio', handler)` per-call means each live call adds a listener to the adapter. Without bound listener references stored per-callId, `removeListener()` on hangup is impossible — the closure references differ. The fix: store the exact bound function reference in the session map alongside the `SipVoiceSession`, then call `removeListener()` with the stored reference on hangup. This is a common Node.js EventEmitter pitfall that's easy to overlook in multi-session adapters.
+
+**The prototype achieved clean separation with zero file modifications.** `SipBridgeService` integrates into the existing pipeline at the `SipSessionFactory` injection point — a caller constructs the factory using `LaneArbitrator` / `ControlEngine` exactly as `VoiceWebSocketServer` does. This means Phase 2 (real SIP library) only requires replacing `StubSipTelephonyAdapter` with a `SipJsTelephonyAdapter`, not touching any lane or session code. The interface boundary proved robust on first use.
+
+**`demoFixtures.ts` doubles as a test oracle.** The `DEMO_SCENARIOS` array with `expectedDecision` fields is both documentation and a ready-made input for property-based or contract tests. Didn't plan this deliberately — emerged naturally from wanting the demo fixtures to be machine-readable.
+
+---
+
+### 3. Cross-project signals?
+
+**`StubXxxAdapter` + `XxxBridgeService` is a reusable integration pattern.** For any protocol adapter (SIP, webhook, gRPC, PSTN) that bridges to an existing EventEmitter-based processing pipeline: define an interface, write a stub with simulation helpers, write a bridge service that wires the two together. The stub becomes the test foundation; the real adapter drops in for production. This pattern avoids mocking the pipeline internals in tests. Directly reusable in any ASIF project adding a new inbound transport.
+
+**Demo fixture design principle: `expectedDecision` fields in fixture constants.** Any project that needs reproducible demos should embed expected outcomes in fixture data (`DEMO_SCENARIOS` pattern), not just input data. Makes the demo script machine-verifiable and enables regression tests to use the same fixture corpus as the live demo. Low overhead, high value for stakeholder confidence.
+
+**SIP.js + `g711` npm package is a viable Node.js SIP stack** for voice agent runtimes without a sidecar. Research is documented in `docs/sip-telephony-research.md`. Any ASIF project needing PSTN access (phone-in, IVR, customer service flows) should read this doc before evaluating Twilio Programmable Voice or LiveKit — those add significant per-minute cost and external dependency that may be avoidable.
+
+---
+
+### 4. What would you prioritize next?
+
+**N-11 Phase 2 — real SIP library integration.** Phase 1 locked the contracts. Phase 2 is: install `sip.js` + `g711`; implement `SipJsTelephonyAdapter extends SipTelephonyAdapter`; add codec conversion (G.711 PCMU ↔ PCM16, 8kHz ↔ 24kHz); wire one test call through the real SIP UA. No architecture questions open. Estimated L (2 days: codec math + SIP.js WebSocket transport config).
+
+**Dependabot vulnerability triage (Q15 — reiterating, now 6 sessions open).** Two high-severity findings. `@modelcontextprotocol/sdk` added this session as a new dependency surface. Requesting explicit CoS call: (a) triage + patch, (b) triage + accept with documented rationale, or (c) defer to named security sprint. Willing to self-execute (a) or (b) with standing auth.
+
+**Demo dry-run against live server.** `docs/demo-script.md` is written; `demoFixtures.ts` is ready. The next step is standing up Chrome with the UI, loading Alpha/Beta tenant configs, and running through all 5 acts to verify timing and decision outputs match the script. This is an operator task, not a code task — flagging for Asif to schedule.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+**Q17 — N-11 Phase 2: proceed or pause for Asif directive?** Phase 1 shipped. Phase 2 (real SIP library) is self-contained and has no open architecture questions. Standing auth would let the team proceed immediately in the next idle cycle. Or CoS may want to review the Phase 1 prototype and the research doc before committing to Phase 2. Requesting explicit direction.
+
+**Q15 (reiterating, 6th time) — Dependabot: triage now or defer?** Still requesting explicit standing auth or explicit deferral with rationale. Two high-severity vulns, one moderate. This is the only open governance risk on the project.
+
+---
+
 > Session: 2026-03-18 (check-in 254) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
