@@ -21,7 +21,7 @@
 | N-09 | Unit Test Coverage (14%→85%) | OBSERVABILITY | SHIPPED | P0 | 2026-02 |
 | N-10 | Production Readiness QA | OBSERVABILITY | SHIPPED | P0 | 2026-02 |
 | N-11 | SIP Telephony | EXTENSIBILITY | IDEA | P1 | — |
-| N-12 | Ticketing Integration (MCP) | EXTENSIBILITY | IDEA | P1 | — |
+| N-12 | Ticketing Integration (MCP) | EXTENSIBILITY | SHIPPED | P1 | 2026-03-18 |
 | N-13 | Multi-Tenant Isolation | GOVERNANCE | IDEA | P1 | — |
 | N-14 | Lane C v2: Semantic Governance | GOVERNANCE | SHIPPED | P2 | 2026-03-07 |
 | N-15 | Dense Embedding Similarity for Claims | GOVERNANCE | SHIPPED | P1 | 2026-03-17 |
@@ -59,7 +59,8 @@
 ### EXTENSIBILITY — "Provider Pluggability"
 - OpenAI Realtime adapter shipped. SIP, Zendesk, ServiceNow ready for v2
 - MCP tool integration framework. Local-first PostgreSQL option
-- **Ideas**: N-11, N-12
+- **Shipped**: N-12
+- **Ideas**: N-11
 
 ---
 
@@ -132,8 +133,8 @@
 **What**: StubTelephonyAdapter v1 (testing). LiveKitSIPTelephonyAdapter for v2 (real SIP).
 
 ### N-12: Ticketing Integration (MCP)
-**Pillar**: EXTENSIBILITY | **Status**: IDEA | **Priority**: P1
-**What**: LocalTicketingAdapter v1 (PostgreSQL). Zendesk/ServiceNow MCP adapters for enterprise.
+**Pillar**: EXTENSIBILITY | **Status**: SHIPPED | **Priority**: P1 | **Shipped**: 2026-03-18
+**What**: `GitHubIssuesMcpClient` via `@modelcontextprotocol/sdk`. `TicketingClient` interface reusable for Linear/Jira. Fire-and-forget escalation tickets from Lane C. 48 new tests (2,251→2,299).
 
 ### N-13: Multi-Tenant Isolation
 **Pillar**: GOVERNANCE | **Status**: IDEA | **Priority**: P1
@@ -233,16 +234,16 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260318-09 — P1: N-12 Ticketing Integration via MCP
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-18 10:00 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-18 10:00 | **Estimate**: M | **Status**: DONE
 
 **Context**: 15/15 SHIPPED. Docs done. CRUCIBLE clean. N-12 is the next initiative — MCP-based ticketing integration for enterprise support workflows. When a voice agent detects an issue, it creates a ticket.
 
 **Action Items**:
-1. [ ] **Research MCP ticketing integration** — assess Linear, Jira, and GitHub Issues as targets. Which has the best MCP server?
-2. [ ] **Implement MCP client** in the voice agent — connect to a ticketing MCP server. Create tickets when `ControlEngine` detects escalation (Lane C `escalate_to_human` verdict).
-3. [ ] **Ticket schema** — incident summary, transcript excerpt, severity, customer context. Auto-populated from voice session.
-4. [ ] **Tests**: 2,251 → 2,300+ target. Mock MCP server for testing.
-5. [ ] Update N-12 status to BUILDING in Executive Dashboard.
+1. [x] **Research MCP ticketing integration** — GitHub Issues selected: best MCP ecosystem, zero cost, widely available in enterprise.
+2. [x] **Implement MCP client** — `server/src/services/TicketingMcpClient.ts`: `TicketingClient` interface + `GitHubIssuesMcpClient` via `@modelcontextprotocol/sdk`. Spawns `npx -y @github/mcp-server` at runtime.
+3. [x] **Ticket schema** — `TicketPayload`: title, summary, transcriptExcerpt (200 chars), severity, sessionId, reasonCodes, optional customerContext. Auto-populated in `createEscalationTicket()`.
+4. [x] **Tests**: 2,251 → 2,299 (48 new). `TicketingMcpClient.test.ts` (27) + `ControlEngine.test.ts` ticketing describe (~21). Zero regressions.
+5. [x] N-12 status updated: IDEA → SHIPPED.
 
 **Constraints**:
 - USE PLAN MODE — M-sized, new integration pattern
@@ -252,7 +253,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 **CHAIN**: When you complete this, immediately start DIRECTIVE-NXTG-20260318-10 below.
 
 **Response** (filled by team):
->
+> **SHIPPED 2026-03-18**. GitHub Issues provider via MCP. Fire-and-forget from `evaluate()` — zero latency impact. `TicketingClient` interface is the reuse hook for Linear/Jira. 2,299 tests, zero regressions. Proceeding to DIRECTIVE-NXTG-20260318-10.
 
 ---
 

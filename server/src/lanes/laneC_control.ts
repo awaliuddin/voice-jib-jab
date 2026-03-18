@@ -91,6 +91,7 @@ import {
 import type { OpaEvaluator } from "../insurance/opa_evaluator.js";
 import { OpaModeratorCheck } from "../insurance/opa_moderator.js";
 import { OpaClaimsCheck } from "../insurance/opa_claims.js";
+import type { TicketingClient, TicketPayload } from "../services/TicketingMcpClient.js";
 
 // ── Configuration ──────────────────────────────────────────────────────
 
@@ -129,6 +130,11 @@ export interface ControlEngineConfig {
    * Only used when opaEvaluator is provided.
    */
   opaClaimsThreshold?: number;
+  /**
+   * Optional ticketing client for automatic escalation ticket creation.
+   * When provided, an escalation decision triggers a fire-and-forget ticket.
+   */
+  ticketingClient?: TicketingClient;
 }
 
 const DEFAULT_CONFIG: ControlEngineConfig = {
@@ -364,6 +370,9 @@ export class ControlEngine extends EventEmitter {
     if (!this.config.claimsRegistry.isEmbeddingInitialized) {
       await this.config.claimsRegistry.initialize();
     }
+    if (this.config.ticketingClient) {
+      await this.config.ticketingClient.connect();
+    }
   }
 
   /**
@@ -377,7 +386,31 @@ export class ControlEngine extends EventEmitter {
     this.recordMetrics(result);
     this.emitAuditEvent(ctx, result, evaluationId);
     this.override.act(result, ctx, evaluationId);
+    if (result.decision === "escalate" && this.config.ticketingClient) {
+      void this.createEscalationTicket(ctx, result, evaluationId);
+    }
     return result;
+  }
+
+  private async createEscalationTicket(
+    ctx: EvaluationContext,
+    result: GateResult,
+    evaluationId: string,
+  ): Promise<void> {
+    const payload: TicketPayload = {
+      title: `Voice Escalation: ${result.reasonCodes.join(", ") || "Policy violation"}`,
+      summary: `Session ${this.sessionId} triggered escalation at ${new Date().toISOString()}`,
+      transcriptExcerpt: ctx.text.slice(0, 200),
+      severity: result.severity,
+      sessionId: this.sessionId,
+      reasonCodes: result.reasonCodes,
+    };
+    try {
+      const ticket = await this.config.ticketingClient!.createTicket(payload);
+      this.emit("ticket_created", { evaluationId, ticket });
+    } catch (err) {
+      this.emit("ticket_error", { evaluationId, error: err });
+    }
   }
 
   /**

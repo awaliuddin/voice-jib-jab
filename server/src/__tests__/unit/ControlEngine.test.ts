@@ -1055,3 +1055,362 @@ describe("ControlEngine edge cases (uncovered paths)", () => {
     expect(result.checksRun).toContain("moderator");
   });
 });
+
+// ── Ticketing Integration ───────────────────────────────────────────────
+
+describe("ControlEngine — Ticketing integration", () => {
+  const TICKET_SESSION = "test-session-ticketing";
+
+  const mockTicketResult = {
+    ticketId: "42",
+    url: "https://github.com/o/r/issues/42",
+    provider: "github",
+  };
+
+  function makeMockTicketingClient() {
+    return {
+      connect: jest.fn().mockResolvedValue(undefined),
+      createTicket: jest.fn().mockResolvedValue(mockTicketResult),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+  }
+
+  function makeEscalateEngine(
+    ticketingClient: ReturnType<typeof makeMockTicketingClient> | undefined,
+    extra: Partial<import("../../lanes/laneC_control.js").ControlEngineConfig> = {},
+  ) {
+    return new ControlEngine(TICKET_SESSION, {
+      claimsRegistry: createRegistry(),
+      moderationCategories: [
+        {
+          name: "SELF_HARM",
+          patterns: [/self.harm/i],
+          decision: "escalate" as const,
+          severity: 3,
+        },
+      ],
+      moderationDenyPatterns: [],
+      cancelOutputThreshold: 10, // prevent upgrade to cancel_output
+      enabled: false,
+      ...(ticketingClient ? { ticketingClient } : {}),
+      ...extra,
+    });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // ── evaluate() triggers createTicket on escalate ──────────────────
+
+  it("calls createTicket() when evaluate() returns escalate", async () => {
+    const client = makeMockTicketingClient();
+    const engine = makeEscalateEngine(client);
+    await engine.evaluate(makeContext({ text: "self harm thoughts", sessionId: TICKET_SESSION }));
+    // fire-and-forget: flush micro-task queue
+    await Promise.resolve();
+    expect(client.createTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT call createTicket() on allow decision", async () => {
+    const client = makeMockTicketingClient();
+    const engine = makeEscalateEngine(client);
+    await engine.evaluate(makeContext({ text: "Hello world", sessionId: TICKET_SESSION }));
+    await Promise.resolve();
+    expect(client.createTicket).not.toHaveBeenCalled();
+  });
+
+  it("does NOT call createTicket() on refuse decision", async () => {
+    const client = makeMockTicketingClient();
+    const engine = new ControlEngine(TICKET_SESSION, {
+      claimsRegistry: createRegistry(),
+      moderationDenyPatterns: [/banned_word/i],
+      moderationCategories: [],
+      cancelOutputThreshold: 10,
+      enabled: false,
+      ticketingClient: client,
+    });
+    await engine.evaluate(makeContext({ text: "Contains banned_word", sessionId: TICKET_SESSION }));
+    await Promise.resolve();
+    expect(client.createTicket).not.toHaveBeenCalled();
+  });
+
+  it("does NOT call createTicket() on rewrite decision", async () => {
+    const client = makeMockTicketingClient();
+    const engine = makeEscalateEngine(client);
+    await engine.evaluate(makeContext({ text: "My number is 555-123-4567", sessionId: TICKET_SESSION }));
+    await Promise.resolve();
+    expect(client.createTicket).not.toHaveBeenCalled();
+  });
+
+  it("does NOT call createTicket() when no ticketingClient configured", async () => {
+    const engine = makeEscalateEngine(undefined);
+    // Should not throw even without a client
+    const result = await engine.evaluate(makeContext({ text: "self harm thoughts", sessionId: TICKET_SESSION }));
+    expect(result.decision).toBe("escalate");
+  });
+
+  // ── fire-and-forget: evaluate() resolves before createTicket settles ──
+
+  it("evaluate() resolves before createTicket Promise settles (fire-and-forget)", async () => {
+    let resolveTicket!: () => void;
+    const neverSettles = new Promise<typeof mockTicketResult>((resolve) => {
+      resolveTicket = () => resolve(mockTicketResult);
+    });
+    const client = {
+      connect: jest.fn().mockResolvedValue(undefined),
+      createTicket: jest.fn().mockReturnValue(neverSettles),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const engine = makeEscalateEngine(client);
+    // This must resolve even though createTicket hasn't settled
+    await engine.evaluate(makeContext({ text: "self harm thoughts", sessionId: TICKET_SESSION }));
+    // evaluate() returned — test passes; resolve to avoid dangling promise
+    resolveTicket();
+  });
+
+  // ── Ticket payload shape ───────────────────────────────────────────
+
+  it("ticket payload sessionId matches engine session ID", async () => {
+    const client = makeMockTicketingClient();
+    const engine = makeEscalateEngine(client);
+    await engine.evaluate(makeContext({ text: "self harm thoughts", sessionId: TICKET_SESSION }));
+    await Promise.resolve();
+    expect(client.createTicket).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: TICKET_SESSION }),
+    );
+  });
+
+  it("ticket payload severity matches gate result severity", async () => {
+    const client = makeMockTicketingClient();
+    const engine = makeEscalateEngine(client);
+    await engine.evaluate(makeContext({ text: "self harm thoughts", sessionId: TICKET_SESSION }));
+    await Promise.resolve();
+    expect(client.createTicket).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 3 }),
+    );
+  });
+
+  it("ticket payload reasonCodes match gate result reasonCodes", async () => {
+    const client = makeMockTicketingClient();
+    const engine = makeEscalateEngine(client);
+    await engine.evaluate(makeContext({ text: "self harm thoughts", sessionId: TICKET_SESSION }));
+    await Promise.resolve();
+    expect(client.createTicket).toHaveBeenCalledWith(
+      expect.objectContaining({ reasonCodes: expect.arrayContaining(["MODERATION:SELF_HARM"]) }),
+    );
+  });
+
+  it("ticket payload transcriptExcerpt is first 200 chars of ctx.text", async () => {
+    const client = makeMockTicketingClient();
+    const engine = makeEscalateEngine(client);
+    const longText = "self harm " + "x".repeat(300);
+    await engine.evaluate(makeContext({ text: longText, sessionId: TICKET_SESSION }));
+    await Promise.resolve();
+    const call = client.createTicket.mock.calls[0][0];
+    expect(call.transcriptExcerpt).toBe(longText.slice(0, 200));
+    expect(call.transcriptExcerpt.length).toBe(200);
+  });
+
+  it("ticket payload title contains reasonCodes", async () => {
+    const client = makeMockTicketingClient();
+    const engine = makeEscalateEngine(client);
+    await engine.evaluate(makeContext({ text: "self harm thoughts", sessionId: TICKET_SESSION }));
+    await Promise.resolve();
+    const call = client.createTicket.mock.calls[0][0];
+    expect(call.title).toContain("MODERATION:SELF_HARM");
+  });
+
+  // ── ticket_created event ────────────────────────────────────────────
+
+  it("emits ticket_created event after successful createTicket", async () => {
+    const client = makeMockTicketingClient();
+    const engine = makeEscalateEngine(client);
+    const createdHandler = jest.fn();
+    engine.on("ticket_created", createdHandler);
+
+    await engine.evaluate(makeContext({ text: "self harm thoughts", sessionId: TICKET_SESSION }));
+    await Promise.resolve();
+    // flush one more microtask tick for the async createEscalationTicket
+    await new Promise((r) => setImmediate(r));
+
+    expect(createdHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it("ticket_created payload contains evaluationId and ticket", async () => {
+    const client = makeMockTicketingClient();
+    const engine = makeEscalateEngine(client);
+    const createdHandler = jest.fn();
+    engine.on("ticket_created", createdHandler);
+
+    await engine.evaluate(makeContext({ text: "self harm thoughts", sessionId: TICKET_SESSION }));
+    await new Promise((r) => setImmediate(r));
+
+    expect(createdHandler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evaluationId: expect.any(String),
+        ticket: mockTicketResult,
+      }),
+    );
+  });
+
+  // ── ticket_error event ──────────────────────────────────────────────
+
+  it("emits ticket_error event when createTicket rejects", async () => {
+    const ticketError = new Error("GitHub API error");
+    const client = {
+      connect: jest.fn().mockResolvedValue(undefined),
+      createTicket: jest.fn().mockRejectedValue(ticketError),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const engine = makeEscalateEngine(client);
+    const errorHandler = jest.fn();
+    engine.on("ticket_error", errorHandler);
+
+    await engine.evaluate(makeContext({ text: "self harm thoughts", sessionId: TICKET_SESSION }));
+    await new Promise((r) => setImmediate(r));
+
+    expect(errorHandler).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evaluationId: expect.any(String),
+        error: ticketError,
+      }),
+    );
+  });
+
+  it("ticket_error does NOT reject/throw from evaluate() (fire-and-forget swallows error)", async () => {
+    const client = {
+      connect: jest.fn().mockResolvedValue(undefined),
+      createTicket: jest.fn().mockRejectedValue(new Error("fail")),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const engine = makeEscalateEngine(client);
+    // Must not throw
+    await expect(
+      engine.evaluate(makeContext({ text: "self harm thoughts", sessionId: TICKET_SESSION })),
+    ).resolves.toBeDefined();
+    await new Promise((r) => setImmediate(r));
+  });
+
+  // ── initialize() with ticketingClient ─────────────────────────────
+
+  it("initialize() calls ticketingClient.connect() when provided", async () => {
+    const client = makeMockTicketingClient();
+    const mockRegistry = {
+      isEmbeddingInitialized: true, // already initialized → skip inner call
+      initialize: jest.fn().mockResolvedValue(undefined),
+      size: 0,
+      matchText: jest.fn().mockReturnValue({ matchType: "none" }),
+      matchDisallowedPatterns: jest.fn().mockReturnValue({ matched: false, patterns: [] }),
+      getById: jest.fn().mockReturnValue(null),
+      getSimilarityScore: jest.fn().mockReturnValue(0),
+      getEmbeddingSimilarityScore: jest.fn().mockResolvedValue(0),
+    } as any;
+    const engine = new ControlEngine(TICKET_SESSION, {
+      claimsRegistry: mockRegistry,
+      moderationCategories: [],
+      moderationDenyPatterns: [],
+      enabled: false,
+      ticketingClient: client,
+    });
+    await engine.initialize();
+    expect(client.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it("initialize() does not call ticketingClient.connect() when not configured", async () => {
+    const mockRegistry = {
+      isEmbeddingInitialized: true,
+      initialize: jest.fn().mockResolvedValue(undefined),
+      size: 0,
+      matchText: jest.fn().mockReturnValue({ matchType: "none" }),
+      matchDisallowedPatterns: jest.fn().mockReturnValue({ matched: false, patterns: [] }),
+      getById: jest.fn().mockReturnValue(null),
+      getSimilarityScore: jest.fn().mockReturnValue(0),
+      getEmbeddingSimilarityScore: jest.fn().mockResolvedValue(0),
+    } as any;
+    const engine = new ControlEngine(TICKET_SESSION, {
+      claimsRegistry: mockRegistry,
+      moderationCategories: [],
+      moderationDenyPatterns: [],
+      enabled: false,
+      // no ticketingClient
+    });
+    await expect(engine.initialize()).resolves.toBeUndefined();
+  });
+
+  // ── Multiple escalations ───────────────────────────────────────────
+
+  it("multiple escalate evaluations result in multiple createTicket() calls", async () => {
+    const client = makeMockTicketingClient();
+    const engine = makeEscalateEngine(client);
+    await engine.evaluate(makeContext({ text: "self harm thoughts", sessionId: TICKET_SESSION }));
+    await engine.evaluate(makeContext({ text: "self harm again", sessionId: TICKET_SESSION }));
+    await new Promise((r) => setImmediate(r));
+    expect(client.createTicket).toHaveBeenCalledTimes(2);
+  });
+
+  // ── Override / cancel_output interactions ─────────────────────────
+
+  it("escalate→cancel_output upgrade: createTicket still called (original gate result was escalate)", async () => {
+    const client = makeMockTicketingClient();
+    // cancelOutputThreshold=3 so severity=3 escalate gets upgraded to cancel_output
+    // But createEscalationTicket checks result.decision BEFORE override, which is "escalate"
+    const engine = new ControlEngine(TICKET_SESSION, {
+      claimsRegistry: createRegistry(),
+      moderationCategories: [
+        {
+          name: "SELF_HARM",
+          patterns: [/self.harm/i],
+          decision: "escalate" as const,
+          severity: 4,
+        },
+      ],
+      moderationDenyPatterns: [],
+      cancelOutputThreshold: 4, // severity=4 escalate → upgraded to cancel_output
+      enabled: false,
+      ticketingClient: client,
+    });
+    await engine.evaluate(makeContext({ text: "self harm thoughts", sessionId: TICKET_SESSION }));
+    await new Promise((r) => setImmediate(r));
+    expect(client.createTicket).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuse→cancel_output upgrade: createTicket NOT called", async () => {
+    const client = makeMockTicketingClient();
+    const engine = new ControlEngine(TICKET_SESSION, {
+      claimsRegistry: createRegistry(),
+      moderationDenyPatterns: [/banned_word/i],
+      moderationCategories: [],
+      cancelOutputThreshold: 4, // severity=4 refuse → cancel_output
+      enabled: false,
+      ticketingClient: client,
+    });
+    await engine.evaluate(makeContext({ text: "Contains banned_word", sessionId: TICKET_SESSION }));
+    await new Promise((r) => setImmediate(r));
+    // Original gate result is "refuse", not "escalate" → no ticket
+    expect(client.createTicket).not.toHaveBeenCalled();
+  });
+
+  it("cancel_output direct gate result: createTicket NOT called", async () => {
+    const client = makeMockTicketingClient();
+    // Use a category that directly returns cancel_output
+    const engine = new ControlEngine(TICKET_SESSION, {
+      claimsRegistry: createRegistry(),
+      moderationCategories: [
+        {
+          name: "CRITICAL",
+          patterns: [/critical_word/i],
+          decision: "cancel_output" as const,
+          severity: 5,
+        },
+      ],
+      moderationDenyPatterns: [],
+      cancelOutputThreshold: 10,
+      enabled: false,
+      ticketingClient: client,
+    });
+    await engine.evaluate(makeContext({ text: "critical_word here", sessionId: TICKET_SESSION }));
+    await new Promise((r) => setImmediate(r));
+    expect(client.createTicket).not.toHaveBeenCalled();
+  });
+});
