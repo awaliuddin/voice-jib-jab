@@ -55,6 +55,102 @@ app.get("/status", (_req, res) => {
   });
 });
 
+// Metrics endpoint
+app.get("/metrics", (_req, res) => {
+  const activeSessions = sessionManager.getActiveSessions();
+  res.json({
+    timestamp: new Date().toISOString(),
+    uptime_seconds: Math.floor(process.uptime()),
+    sessions: {
+      active: activeSessions.length,
+      total: sessionManager.getSessionCount(),
+    },
+    memory: {
+      rss_mb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+      heap_used_mb: Math.round(
+        process.memoryUsage().heapUsed / 1024 / 1024,
+      ),
+      heap_total_mb: Math.round(
+        process.memoryUsage().heapTotal / 1024 / 1024,
+      ),
+    },
+    session_detail: activeSessions.map((s) => ({
+      id: s.id,
+      state: s.state,
+      uptime_ms: Date.now() - s.createdAt,
+    })),
+  });
+});
+
+// Dashboard endpoint — inline HTML with auto-refresh metrics display
+app.get("/dashboard", (_req, res) => {
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>voice-jib-jab — Live Metrics</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0f; color: #fff; font-family: 'Courier New', monospace; padding: 2rem; }
+    h1 { color: #3b82f6; margin-bottom: 0.5rem; font-size: 1.4rem; }
+    .updated { color: #888; font-size: 0.85rem; margin-bottom: 1.5rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .card { background: #111118; border: 1px solid #1e1e2e; border-radius: 8px; padding: 1rem; }
+    .card .label { color: #888; font-size: 0.75rem; text-transform: uppercase; }
+    .card .value { color: #3b82f6; font-size: 1.8rem; font-weight: bold; margin-top: 0.25rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 0.5rem 1rem; border-bottom: 1px solid #1e1e2e; }
+    th { color: #3b82f6; font-size: 0.75rem; text-transform: uppercase; }
+    td { color: #ccc; }
+    #no-sessions { color: #555; padding: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>voice-jib-jab &mdash; Live Metrics</h1>
+  <div class="updated" id="updated">Last updated: --:--:--</div>
+  <div class="grid">
+    <div class="card"><div class="label">Uptime</div><div class="value" id="uptime">--</div></div>
+    <div class="card"><div class="label">Active Sessions</div><div class="value" id="active">--</div></div>
+    <div class="card"><div class="label">RSS (MB)</div><div class="value" id="rss">--</div></div>
+    <div class="card"><div class="label">Heap Used (MB)</div><div class="value" id="heap-used">--</div></div>
+    <div class="card"><div class="label">Heap Total (MB)</div><div class="value" id="heap-total">--</div></div>
+  </div>
+  <h2 style="color:#3b82f6;font-size:1rem;margin-bottom:0.5rem;">Active Sessions</h2>
+  <table>
+    <thead><tr><th>ID</th><th>State</th><th>Uptime (s)</th></tr></thead>
+    <tbody id="sessions"><tr><td id="no-sessions" colspan="3">Loading...</td></tr></tbody>
+  </table>
+  <script>
+    async function refresh() {
+      try {
+        const r = await fetch('/metrics');
+        const d = await r.json();
+        document.getElementById('uptime').textContent = d.uptime_seconds + 's';
+        document.getElementById('active').textContent = d.sessions.active;
+        document.getElementById('rss').textContent = d.memory.rss_mb;
+        document.getElementById('heap-used').textContent = d.memory.heap_used_mb;
+        document.getElementById('heap-total').textContent = d.memory.heap_total_mb;
+        const tb = document.getElementById('sessions');
+        if (d.session_detail.length === 0) {
+          tb.innerHTML = '<tr><td id="no-sessions" colspan="3">No active sessions</td></tr>';
+        } else {
+          tb.innerHTML = d.session_detail.map(s =>
+            '<tr><td>' + s.id + '</td><td>' + s.state + '</td><td>' + Math.round(s.uptime_ms / 1000) + '</td></tr>'
+          ).join('');
+        }
+        const now = new Date();
+        document.getElementById('updated').textContent =
+          'Last updated: ' + now.toTimeString().split(' ')[0];
+      } catch (e) { console.error('Fetch failed', e); }
+    }
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>`);
+});
+
 // ── OPA singleton initialization ─────────────────────────────────────────
 // WASM bundle loads once at startup and is shared across all sessions via the
 // JS event loop (single-threaded — no locking required).
@@ -110,7 +206,9 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Environment: ${config.nodeEnv}`);
     console.log(`[Server] WebSocket: ws://localhost:${config.port}`);
     console.log(`[Server] Health: http://localhost:${config.port}/health`);
-    console.log(`[Server] Status: http://localhost:${config.port}/status\n`);
+    console.log(`[Server] Status: http://localhost:${config.port}/status`);
+    console.log(`[Server] Metrics: http://localhost:${config.port}/metrics`);
+    console.log(`[Server] Dashboard: http://localhost:${config.port}/dashboard\n`);
 
     console.log("Features:");
     console.log(

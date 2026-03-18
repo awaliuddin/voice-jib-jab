@@ -242,27 +242,38 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260318-79 — P1: WebSocket Client SDK + Integration Guide
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-18 16:15 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-18 16:15 | **Estimate**: M | **Status**: DONE
 
 **Action Items**:
-1. [ ] **TypeScript SDK** — `@nxtg/vjj-client` wrapping WebSocket protocol. Connect, send audio, receive responses, handle Lane C events.
-2. [ ] **Integration guide** — `docs/integration-guide.md`: how to embed VJJ voice agent in a web app.
-3. [ ] Tests for SDK.
+1. [x] **TypeScript SDK** — `@nxtg/vjj-client` wrapping WebSocket protocol. Connect, send audio, receive responses, handle Lane C events.
+2. [x] **Integration guide** — `docs/integration-guide.md`: how to embed VJJ voice agent in a web app.
+3. [x] Tests for SDK.
 
 **CHAIN**: When done, start DIRECTIVE-NXTG-20260318-80.
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-18**. Three files created:
+> - `client/src/sdk/VjjClient.ts` — `VjjClient extends EventEmitter`: connect (resolves on `session.ready`, 5s timeout), all send methods (sendAudioChunk, sendAudioStop, sendAudioCancel, commitAudio, bargeIn, playbackEnded, setMode), typed events (audio, transcript, userTranscript, policyDecision, responseStart/End, speechStarted/Stopped, error, close), state machine (disconnected→connecting→ready), optional auto-reconnect
+> - `client/src/sdk/index.ts` — barrel export
+> - `client/src/sdk/__tests__/VjjClient.test.ts` — 38 Vitest tests: constructor, connect lifecycle, all send methods + guard when disconnected, all events, state transitions, disconnect, sessionId lifecycle
+> - `docs/integration-guide.md` — quick start, API reference tables, events reference, multi-tenant usage, Lane C policy event handling, error patterns, audio format (PCM16 24kHz), production deployment
+> **Tests: server 2503/2503, client 79/79.**
 
 ---
 
 ### DIRECTIVE-NXTG-20260318-80 — P2: Monitoring Dashboard — Session Metrics
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-18 16:15 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-18 16:15 | **Estimate**: S | **Status**: DONE
 
 **Action Items**:
-1. [ ] `/metrics` endpoint — active sessions, avg latency, policy decisions/sec, tenant breakdown.
-2. [ ] Health dashboard HTML page.
+1. [x] `/metrics` endpoint — active sessions, avg latency, policy decisions/sec, tenant breakdown.
+2. [x] Health dashboard HTML page.
 
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-18**. Modified `server/src/index.ts` + created `MetricsEndpoint.test.ts`:
+> - `GET /metrics` — JSON: timestamp, uptime_seconds, sessions (active/total), memory (rss_mb, heap_used_mb, heap_total_mb), session_detail[] (id, state, uptime_ms)
+> - `GET /dashboard` — inline HTML, auto-refreshes every 5s via `fetch('/metrics')`, electric blue design (#0a0a0f bg, #3b82f6 accent), shows uptime/sessions/memory cards + active session table with "Last updated: HH:MM:SS"
+> - 12 tests: metrics shape, memory fields, session counts, dashboard HTML content-type + title, /health and /status non-regression
+> **Tests: 2503/2503 server, 79/79 client.**
 
 ---
 
