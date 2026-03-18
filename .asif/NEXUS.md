@@ -729,6 +729,81 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-18 (check-in 254) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Four directives executed across one session — all chained, all shipped:
+
+**DIRECTIVE-NXTG-20260318-09** — N-12 Ticketing Integration via MCP
+- `server/src/services/TicketingMcpClient.ts`: `TicketingClient` interface + `GitHubIssuesMcpClient` via `@modelcontextprotocol/sdk`. Spawns `npx -y @github/mcp-server` at runtime.
+- `ControlEngine`: fire-and-forget `createEscalationTicket()` on `escalate` decision. `ticket_created` / `ticket_error` events. Zero latency impact (void-launched).
+- `TicketingMcpClient.test.ts` (27 tests) + 21 ControlEngine ticketing integration tests.
+- Commit `cbb8267` | Tests: 2,251 → 2,299
+
+**DIRECTIVE-NXTG-20260318-10** — N-13 Multi-Tenant Isolation Research
+- `docs/multi-tenant-research.md` (210 lines): 5 isolation surfaces (ChromaDB collections, OPA input namespacing, TenantClaimsLoader, AuditTrail tenant_id columns, SessionManager concurrency), 3-phase migration with effort/risk table, Mermaid architecture diagram, 4 open questions for CoS.
+- N-13: IDEA → RESEARCHED.
+- Commit `67fb25a` | Tests: 2,299 (no code change)
+
+**DIRECTIVE-NXTG-20260318-26** — N-13 Phase 1: Per-Tenant AllowedClaimsRegistry
+- `server/src/services/TenantClaimsLoader.ts`: factory + cache-by-tenantId. `getRegistryForTenant(tenantId, config?)`, `setRegistryForTenant()`, `hasRegistry()`, `clear()`. Module-level singleton `tenantClaimsLoader`.
+- `ControlEngineConfig.tenantId?`: constructor auto-wires tenant registry when tenantId set without explicit claimsRegistry.
+- `TenantClaimsLoader.test.ts` (24 tests) + 7 ControlEngine tenant isolation tests.
+- Commits within `f09da1c` | Tests: 2,299 → 2,354
+
+**DIRECTIVE-NXTG-20260318-27** — N-13 Phase 2: OPA Input Namespace Isolation
+- `TenantPolicyData` interface on `OpaEvaluator`: `setTenantPolicyData(tenantId, { moderationThresholds, claimsThreshold })`.
+- `evaluateModeratorCheck(input, tenantId?)` and `evaluateClaimsCheck(input, tenantId?)`: merge tenant threshold overrides into OPA input before evaluation. Zero Rego/WASM changes.
+- `EvaluationContext.tenantId?` threaded: `ControlEngine` config → internal ctx construction → `OpaModeratorCheck` → `OpaClaimsCheck` → evaluator.
+- `tenant_id` field on `OpaModeratorInput.moderator_check` and `OpaClaimsInput.claims_check`.
+- `TenantPolicyIsolation.test.ts` (15 integration tests) + 13 `OpaEvaluator.test.ts` additions.
+- Commit `f09da1c` | Tests: 2,354 | N-13: RESEARCHED → BUILDING
+
+---
+
+### 2. What surprised you?
+
+**`AllowedClaimsRegistry.matchText()` word-overlap heuristic is a subtle isolation footgun.** The partial-match pass uses a word-overlap score with a 0.6 threshold. Test claims "Exclusive claim for A" and "Exclusive claim for B" share 3 of 4 words (75% overlap), causing cross-tenant false-match in the isolation test. Fixed by using semantically distinct fixtures ("FDA certified medical device" vs "30-day money back guarantee"). The lesson: any consumer of `matchText()` testing isolation with lexically similar strings will get false positives. This is a known limitation of TF-IDF for semantic claims — but it's sharper than expected. Documented here for CoS awareness; N-15 dense embeddings will fix this correctly.
+
+**The injectable `claimsRegistry` on `ControlEngineConfig` made Phase 1 trivially safe.** No refactoring of `ControlEngine`'s internals was needed — the injection point was already there from the N-07 design. The entire `TenantClaimsLoader` integration is a 6-line constructor check. The prior architecture decision paid off immediately.
+
+**OPA `setData()` is thread-unsafe for concurrent tenant evaluation.** The research doc flagged this as a concern; it proved correct in practice. The alternative — passing tenant thresholds via `input` rather than mutating the shared `data` document — is cleaner and works without per-tenant WASM bundles. The key insight: the existing `moderator_check.thresholds` field in OPA input already supports per-call override, so tenant isolation is just a merge step in the evaluator wrapper, not a policy engine change.
+
+**Stryker sandbox inflates `--testPathPattern` results.** When running targeted tests with `--testPathPattern`, Jest picks up matching test files from both `src/` and `.stryker-tmp/sandbox-*/src/`. This made "145 tests" for a targeted run look low — actually correct but confusing. Not a bug, just a counting artifact. Noting it to explain future check-in test count discrepancies.
+
+---
+
+### 3. Cross-project signals?
+
+**`TenantClaimsLoader` pattern is portfolio-reusable.** Factory + cache-by-tenantId for any shared resource that needs per-tenant isolation without per-session reconstruction. Costs: one Map entry per tenant, no locks needed (JS single-threaded). Benefits: O(1) lookup, lazy construction, explicit `setRegistryForTenant()` for testing. Any ASIF project with multi-tenant resource isolation should adopt this pattern rather than building per-project caches.
+
+**OPA input namespacing is the right multi-tenant policy approach for shared WASM.** No per-tenant bundle compilation; no `setData()` race conditions; no new Rego rules needed for threshold-based isolation. Two tenants with different `moderationThresholds` stored in `OpaEvaluator.tenantPolicyData` produce demonstrably different decisions from the same input. This is ASIF portfolio standard for N-13-class multi-tenant governance problems.
+
+**`TicketingClient` interface (connect/createTicket/close) is a reusable MCP adapter contract.** Any project needing escalation ticketing can implement `TicketingClient` for their provider (Linear, Jira, ServiceNow) without changing the ControlEngine integration point. The fire-and-forget wiring pattern (void + event emission for success/error) is also reusable for any non-blocking side-effect from a hot evaluation path.
+
+---
+
+### 4. What would you prioritize next?
+
+**N-13 Phase 3 — ChromaDB per-tenant knowledge collections** is the natural next step. The `VectorStore` interface is already clean for a swap (`index()` + `search()` + `clear()`). A `ChromaDbVectorStore` implementing it, with `collection: knowledge_${tenantId}`, completes the knowledge isolation layer. Blocked on CoS answer to open question Q1 (ChromaDB hosting: self-hosted Docker vs. Chroma Cloud). Flagging as Q16.
+
+**Dependabot vulnerability triage** — now more urgent. Two high-severity findings have been open since check-in 61. This session added `@modelcontextprotocol/sdk` (a new dependency surface). A triage pass (identify affected package, assess exploitability in the voice runtime context) is low-effort and would either close the risk or produce a documented acceptance decision. Reiterating Q15 — requesting explicit CoS call.
+
+**Audit trail tenant_id columns** — the research doc (Phase 1) includes `ALTER TABLE audit_events ADD COLUMN tenant_id`. This is a 2-hour task: schema migration, index, API filter-by-tenantId. No architecture questions; self-executable with standing auth.
+
+**N-11 SIP Telephony** — remains IDEA with no direction. If N-13 Phase 3 is blocked on ChromaDB hosting decision, SIP could proceed in parallel as it has no dependencies on N-13.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+**Q16 — N-13 Phase 3: ChromaDB hosting model?** Phase 3 (knowledge isolation via per-tenant ChromaDB collections) is ready to implement but has an unanswered architecture question from the research doc: self-hosted Docker container in prod, or managed Chroma Cloud? The answer affects the `ChromaDbVectorStore` client config, connection string handling, and whether we need a local-dev Docker Compose entry. Can execute immediately once called.
+
+**Q15 (reiterating) — Dependabot: triage now or explicit defer?** Two high + one moderate vulnerability. Now 5 sessions since first flagged. Requesting explicit standing auth for a triage + accept/patch pass, or explicit deferral with documented rationale. This is the only open governance risk on the project.
+
+---
+
 > Session: 2026-03-18 (check-in 253) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
