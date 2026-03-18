@@ -231,6 +231,27 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-02 — P2: Quality Hardening — Coverage Push + CRUCIBLE Self-Audit
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 08:00 | **Estimate**: S | **Status**: PENDING
+
+**Context**: 15/15 initiatives SHIPPED. 2,168 tests. 91% coverage. All roadmap items complete. Next M-sized initiatives (N-11 SIP, N-12 Ticketing, N-13 Multi-Tenant) need Asif's direction. Meanwhile: harden what's built.
+
+**Action Items**:
+1. [ ] **CRUCIBLE Gates 1-7 self-audit** — run the audit on your test suite. Check for hollow assertions, mock proliferation, coverage config accuracy, dead tests, silent catch blocks.
+2. [ ] **Coverage push from 91% to 95%** — focus on untested error paths in `ControlEngine`, `PolicyGate`, and `OpenAIRealtimeAdapter` (the 73.8% outlier from N-09).
+3. [ ] **README update** — test count (2,168), coverage (91%), all 15 initiatives SHIPPED, N-15 Dense Embedding architecture note.
+4. [ ] Tests: 2,168 → 2,200+ target.
+
+**Constraints**:
+- S-sized quality work — no new features
+- Do NOT start N-11/N-12/N-13 without explicit directive
+
+**Response** (filled by team):
+>
+
+---
+
 ### DIRECTIVE-NXTG-20260317-01 — P1: N-15 Sprint 2 — Async PolicyCheck + Dense Embedding Wiring
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-17 19:15 | **Estimate**: M | **Status**: DONE
