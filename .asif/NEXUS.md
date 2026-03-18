@@ -239,6 +239,39 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-48 — P1: Performance Profiling + Optimization
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-18 14:00 | **Estimate**: M | **Status**: PENDING
+
+**Context**: N-11 SIP, N-12 Ticketing, N-13 Multi-Tenant all SHIPPED. Full feature set complete. Optimize for production.
+
+**Action Items**:
+1. [ ] **Profile voice pipeline latency** — measure each stage: audio capture → Lane A → Lane B → Lane C → TTS → output. Identify bottleneck.
+2. [ ] **Memory profiling** — track per-tenant memory usage. Identify leaks in long-running sessions.
+3. [ ] **Optimize hot paths** — if OPA eval or embedding similarity is >10ms, optimize.
+4. [ ] Document in `docs/performance-profile.md` with flame graph or timing breakdown.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-49.
+
+**Response** (filled by team):
+>
+
+---
+
+### DIRECTIVE-NXTG-20260318-49 — P2: NEXUS Archive + Project Showcase
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 14:00 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] Archive all DONE directives (10+ today).
+2. [ ] README refresh — full feature showcase.
+3. [ ] Update all initiative statuses in Executive Dashboard.
+
+**Response** (filled by team):
+>
+
+---
+
 ### DIRECTIVE-NXTG-20260318-42 — P1: N-11 SIP Telephony — Research + Prototype
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-18 13:30 | **Estimate**: M | **Status**: DONE
