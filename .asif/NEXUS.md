@@ -20,7 +20,7 @@
 | N-08 | Knowledge Pack Retrieval | GROUNDING | SHIPPED | P1 | 2026-02 |
 | N-09 | Unit Test Coverage (14%→85%) | OBSERVABILITY | SHIPPED | P0 | 2026-02 |
 | N-10 | Production Readiness QA | OBSERVABILITY | SHIPPED | P0 | 2026-02 |
-| N-11 | SIP Telephony | EXTENSIBILITY | IDEA | P1 | — |
+| N-11 | SIP Telephony | EXTENSIBILITY | BUILDING | P1 | 2026-03-18 |
 | N-12 | Ticketing Integration (MCP) | EXTENSIBILITY | SHIPPED | P1 | 2026-03-18 |
 | N-13 | Multi-Tenant Isolation | GOVERNANCE | SHIPPED | P1 | 2026-03-18 |
 | N-14 | Lane C v2: Semantic Governance | GOVERNANCE | SHIPPED | P2 | 2026-03-07 |
@@ -129,8 +129,10 @@
 **Shipped scope**: Load test (200 concurrent WS sessions, p95 TTFB 126.7ms vs 1200ms SLA), SLA baseline, security audit (0 production vulns, 36 devDeps-only), secrets review (clean), production runbook (`RUNBOOK.md`), UAT guide (`UAT-Guide.md`). Monitoring/alerting deferred to production deployment (requires Prometheus/Grafana infrastructure).
 
 ### N-11: SIP Telephony
-**Pillar**: EXTENSIBILITY | **Status**: IDEA | **Priority**: P1
+**Pillar**: EXTENSIBILITY | **Status**: BUILDING | **Priority**: P1
 **What**: StubTelephonyAdapter v1 (testing). LiveKitSIPTelephonyAdapter for v2 (real SIP).
+**Research**: `docs/sip-telephony-research.md` — SIP.js recommended, `dgram`+`g711` codec bridge, Telnyx for production.
+**Phase 1 SHIPPED**: `SipTelephonyAdapter` interface + `StubSipTelephonyAdapter` + `SipBridgeService`. 27 tests. Zero existing file modifications.
 
 ### N-12: Ticketing Integration (MCP)
 **Pillar**: EXTENSIBILITY | **Status**: SHIPPED | **Priority**: P1 | **Shipped**: 2026-03-18
@@ -239,33 +241,33 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260318-42 — P1: N-11 SIP Telephony — Research + Prototype
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-18 13:30 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-18 13:30 | **Estimate**: M | **Status**: DONE
 
 **Context**: N-13 Multi-Tenant SHIPPED (all 3 phases). N-12 Ticketing MCP SHIPPED. 15 original + 2 new initiatives complete. N-11 SIP Telephony is the last major IDEA — research and prototype.
 
 **Action Items**:
-1. [ ] **Research doc** at `docs/sip-telephony-research.md` — assess SIP libraries (JsSIP, SIP.js, Opal), WebRTC bridge options, PSTN gateway providers (Twilio, Vonage, Telnyx).
-2. [ ] **Architecture proposal** — how SIP connects to existing voice pipeline: SIP trunk → audio stream → Lane A/B/C → response TTS → SIP audio out.
-3. [ ] **Minimal prototype** — accept inbound SIP call, pipe audio to existing WebSocket voice pipeline, return TTS response.
-4. [ ] Tests: integration test for SIP→WebSocket bridge (mock SIP endpoint).
+1. [x] **Research doc** at `docs/sip-telephony-research.md` — assess SIP libraries (JsSIP, SIP.js, Opal), WebRTC bridge options, PSTN gateway providers (Twilio, Vonage, Telnyx).
+2. [x] **Architecture proposal** — how SIP connects to existing voice pipeline: SIP trunk → audio stream → Lane A/B/C → response TTS → SIP audio out.
+3. [x] **Minimal prototype** — accept inbound SIP call, pipe audio to existing WebSocket voice pipeline, return TTS response.
+4. [x] Tests: integration test for SIP→WebSocket bridge (mock SIP endpoint).
 
 **CHAIN**: When done, start DIRECTIVE-NXTG-20260318-43.
 
 **Response** (filled by team):
->
+> **SHIPPED 2026-03-18**. `docs/sip-telephony-research.md` covers library comparison (recommended: SIP.js — TypeScript-native, WebSocket transport aligns with existing ws infrastructure), codec bridge (`dgram` + `g711` package, ~0.3ms per 20ms RTP frame), PSTN provider comparison (Twilio for prototype, Telnyx for production economics), and 3-phase implementation plan. Architecture: `SipBridgeService` sits between `SipTelephonyAdapter` and the existing LaneArbitrator session construction path — zero modification to existing files. Prototype: `StubSipTelephonyAdapter` + `SipBridgeService` in `server/src/providers/SipTelephonyAdapter.ts`. 27 integration tests. N-11 IDEA → BUILDING.
 
 ---
 
 ### DIRECTIVE-NXTG-20260318-43 — P2: Portfolio Showcase — Demo Recording Script
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-18 13:30 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-18 13:30 | **Estimate**: S | **Status**: DONE
 
 **Action Items**:
-1. [ ] **Demo script** at `docs/demo-script.md` — 3-minute walkthrough showing: voice call → Lane C governance → ticketing MCP → multi-tenant isolation.
-2. [ ] **Test fixtures** — pre-configured demo data (tenants, claims, policies) for reproducible demos.
+1. [x] **Demo script** at `docs/demo-script.md` — 3-minute walkthrough showing: voice call → Lane C governance → ticketing MCP → multi-tenant isolation.
+2. [x] **Test fixtures** — pre-configured demo data (tenants, claims, policies) for reproducible demos.
 
 **Response** (filled by team):
->
+> **SHIPPED 2026-03-18**. `docs/demo-script.md` — 5-act 3-minute walkthrough: voice loop latency → allowed claim (Alpha) → refused claim (Alpha) → SELF_HARM escalation + MCP ticket → multi-tenant contrast (same sentence, opposite decisions on Alpha vs Beta) → metrics dashboard. `server/src/__tests__/fixtures/demoFixtures.ts` — `TENANT_DEMO_ALPHA` (medical, strict 0.2 threshold, 3 FDA claims, disallowed cure patterns) + `TENANT_DEMO_BETA` (fintech, permissive 0.85 threshold, 3 FDIC claims, disallowed guaranteed-return patterns) + `DEMO_SCENARIOS` array documenting 5 expected decisions with tenant/input/expectedDecision. Tests: 2,450 passed, zero regressions.
 
 ---
 
