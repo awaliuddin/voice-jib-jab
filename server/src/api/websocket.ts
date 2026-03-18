@@ -29,6 +29,7 @@ import {
 import type { OpaEvaluator } from "../insurance/opa_evaluator.js";
 import type { SessionRecorder } from "../services/SessionRecorder.js";
 import type { VoiceTriggerService } from "../services/VoiceTriggerService.js";
+import type { ConversationMemoryStore } from "../services/ConversationMemoryStore.js";
 
 interface ClientConnection {
   ws: WebSocket;
@@ -68,13 +69,15 @@ export class VoiceWebSocketServer {
   private opaEvaluator: OpaEvaluator | undefined;
   private sessionRecorder: SessionRecorder | undefined;
   private voiceTriggerService: VoiceTriggerService | undefined;
+  private memoryStore: ConversationMemoryStore | undefined;
 
-  constructor(server: any, opaEvaluator?: OpaEvaluator, sessionRecorder?: SessionRecorder, voiceTriggerService?: VoiceTriggerService) {
+  constructor(server: any, opaEvaluator?: OpaEvaluator, sessionRecorder?: SessionRecorder, voiceTriggerService?: VoiceTriggerService, memoryStore?: ConversationMemoryStore) {
     this.wss = new WebSocketServer({ server });
     this.connections = new Map();
     this.opaEvaluator = opaEvaluator;
     this.sessionRecorder = sessionRecorder;
     this.voiceTriggerService = voiceTriggerService;
+    this.memoryStore = memoryStore;
 
     // Initialize storage if persistent memory or audit trail is enabled
     if (
@@ -712,6 +715,15 @@ export class VoiceWebSocketServer {
                 "[WebSocket] Failed to setup session context:",
                 error,
               );
+            }
+          }
+
+          // Inject tenant memory context if available
+          if (this.memoryStore && message.tenantId) {
+            const memCtx = this.memoryStore.getContextString(message.tenantId);
+            if (memCtx) {
+              (connection as any).tenantMemoryContext = memCtx;
+              console.log(`[WebSocket] Injected tenant memory context (${message.tenantId})`);
             }
           }
 

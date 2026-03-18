@@ -19,6 +19,8 @@ import { createAnalyticsRouter } from "./api/analytics.js";
 import { tenantRegistry, initTenantRegistry } from "./services/TenantRegistry.js";
 import { systemConfigStore } from "./services/SystemConfigStore.js";
 import { VoiceTriggerService } from "./services/VoiceTriggerService.js";
+import { initConversationMemoryStore } from "./services/ConversationMemoryStore.js";
+import { createMemoryRouter } from "./api/memory.js";
 import { createRateLimiter } from "./middleware/rateLimiter.js";
 import { securityHeaders } from "./middleware/securityHeaders.js";
 
@@ -213,6 +215,10 @@ app.use("/analytics", analyticsLimiter, createAnalyticsRouter(analyticsService))
 initTenantRegistry(resolve(dirname(config.storage.databasePath), "tenants.json"));
 app.use("/admin", adminLimiter, createAdminRouter(tenantRegistry, systemConfigStore));
 
+// ── Conversation Memory Store + API ─────────────────────────────────
+const memoryStore = initConversationMemoryStore(resolve(dirname(config.storage.databasePath), "memory"));
+app.use("/tenants", createMemoryRouter(memoryStore));
+
 // ── Voice Trigger Service + Voice API ────────────────────────────────
 export const voiceTriggerService = new VoiceTriggerService(
   `http://localhost:${config.port}`,
@@ -226,7 +232,7 @@ async function startServer(): Promise<void> {
 
   // Initialize WebSocket server — passes pre-initialized OPA singleton
   // so every per-session ControlEngine receives the same loaded bundle.
-  new VoiceWebSocketServer(server, opaEvaluator, sessionRecorder, voiceTriggerService);
+  new VoiceWebSocketServer(server, opaEvaluator, sessionRecorder, voiceTriggerService, memoryStore);
 
   server.listen(config.port, () => {
     console.log(
@@ -258,6 +264,7 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Sessions: http://localhost:${config.port}/sessions`);
     console.log(`[Server] Analytics: http://localhost:${config.port}/analytics/sessions`);
     console.log(`[Server] Admin API: http://localhost:${config.port}/admin`);
+    console.log(`[Server] Memory API: http://localhost:${config.port}/tenants/{tenantId}/memory`);
     console.log(`[Server] Voice Triggers: http://localhost:${config.port}/voice/trigger\n`);
 
     console.log("Features:");

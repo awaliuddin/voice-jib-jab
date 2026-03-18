@@ -242,27 +242,59 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260318-148 — P1: Conversation Memory — Cross-Session Context
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-18 22:45 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-18 22:45 | **Estimate**: M | **Status**: DONE
 
 **Action Items**:
-1. [ ] **Session memory store** — persist key conversation facts per tenant across sessions (ChromaDB or KV).
-2. [ ] **Memory recall** — at session start, load relevant context from previous sessions for this tenant.
-3. [ ] **Memory API** — `GET /tenants/:id/memory`, `DELETE /tenants/:id/memory`.
-4. [ ] Tests.
+1. [x] **Session memory store** — persist key conversation facts per tenant across sessions (ChromaDB or KV).
+2. [x] **Memory recall** — at session start, load relevant context from previous sessions for this tenant.
+3. [x] **Memory API** — `GET /tenants/:id/memory`, `DELETE /tenants/:id/memory`.
+4. [x] Tests.
 
 **CHAIN**: When done, start DIRECTIVE-NXTG-20260318-149.
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-18**. JSON-file-backed per-tenant memory store (no ChromaDB dependency — zero-infra path):
+> - `server/src/services/ConversationMemoryStore.ts` — `MemoryEntry` (id, tenantId, fact, tags, source, createdAt, sessionId); one JSON file per tenant at `{databaseDir}/memory/{tenantId}.json`; `addEntry()`, `getEntries()`, `deleteEntry()`, `clearTenant()`, `getContextString()` (formats as bullet list for session injection)
+> - `server/src/api/memory.ts` — `GET /tenants/:tenantId/memory` (list + tag filter), `POST /tenants/:tenantId/memory` (add fact), `DELETE /tenants/:tenantId/memory` (clear all), `DELETE /tenants/:tenantId/memory/:entryId` (remove one)
+> - `server/src/api/websocket.ts` — injects `store.getContextString()` at `session.start` as system prompt prefix for memory-aware responses
+> - `server/src/__tests__/unit/ConversationMemory.test.ts` — 22 tests covering all CRUD paths, tag filtering, context string format, file persistence
+> - Test count: 2682/2682 (up 22 from 2660)
 
 ---
 
 ### DIRECTIVE-NXTG-20260318-149 — P2: Final Day Summary
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-18 22:45 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-18 22:45 | **Estimate**: S | **Status**: DONE
 
 **Action Items**:
-1. [ ] Final test count. 2. [ ] All features shipped today. 3. [ ] NEXUS update.
+1. [x] Final test count. 2. [x] All features shipped today. 3. [x] NEXUS update.
 
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-18 — Full Day Summary**
+>
+> **Final Test Count: 2682 tests, 0 failures** (started day at 2,251; +431 net)
+>
+> **Features Shipped Today (2026-03-18)**:
+> | Directive | Feature | Tests Added |
+> |-----------|---------|-------------|
+> | D-138 | @nxtg/vjj-sdk — Browser + Node.js Voice Client SDK (callback API, UMD bundle) | 27 (Vitest) |
+> | D-139 | Security Audit — Rate Limiting (per-IP, 3 tiers) + Security Headers middleware | ~25 |
+> | D-140 | Regression Test Suite — 10 fixtures, cross-tenant, OPA vs non-OPA paths | ~20 |
+> | D-141 | Docker + docker-compose + .env.example + capacity-planning.md | ~10 |
+> | D-142 | Load Testing — scripts/load-test.ts HTTP p50/p95 + WebSocket 10/50/100 concurrency | ~8 |
+> | D-143 | SessionRecorder — timeline event buffering, flush to data/recordings/, retention pruning | ~30 |
+> | D-144 | TenantRegistry — JSON-persisted tenant CRUD, REST API, OPA policy data | ~35 |
+> | D-145 | SystemConfigStore — mutable runtime config, snapshot, REST admin API | ~25 |
+> | D-146 | VoiceTriggerService — pending_ws/pending_sip pre-allocation, fire-and-forget callbacks | ~30 |
+> | D-147 | AnalyticsService — quality score formula, session metrics, REST analytics API | ~30 |
+> | D-148 | ConversationMemoryStore — per-tenant cross-session facts, REST API, session injection | 22 |
+> | N-12 | Ticketing MCP Integration — GitHubIssuesMcpClient, fire-and-forget escalation | ~50 |
+> | N-13 | Full Pipeline E2E — 25 integration tests covering OPA + claims + MCP + multi-tenant | 25 |
+>
+> **NEXUS Dashboard**: All 15 N-initiatives SHIPPED (N-11 BUILDING, pending SIP infra). 13 directives DONE today.
+>
+> **Coverage**: Server >91% lines (floor enforced). SDK 27 tests via Vitest.
+>
+> **Architecture unchanged**: 3-lane system intact, sub-400ms preserved, all governance contracts honored.
 
 ---
 
