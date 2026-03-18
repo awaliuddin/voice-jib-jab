@@ -2,7 +2,7 @@
 
 A production voice agent runtime focused on eliminating the two things that kill enterprise voice deployments: **bad latency** and **ungoverned output**. Browser-based speech-to-speech assistant with lane-based orchestration, async policy enforcement, and retrieval-augmented generation.
 
-**Status:** 15/15 roadmap initiatives SHIPPED | 2,200+ tests | 91%+ coverage
+**Status:** 17/17 initiatives SHIPPED + 1 BUILDING | 2,450+ tests | 91%+ coverage
 
 ## Architecture
 
@@ -27,6 +27,43 @@ Lane C runs in parallel with Lane B, never blocking audio. As of N-15 (2026-03-1
 **Voice Provider:** OpenAI Realtime API (pluggable)
 **Vector Store:** ChromaDB
 **Real-time:** WebSocket
+
+## Enterprise Features
+
+### Multi-Tenant Isolation (N-13)
+- Per-tenant `AllowedClaimsRegistry` via `TenantClaimsLoader` — isolated claim sets, zero cross-tenant leakage
+- OPA input namespace isolation — per-tenant moderation thresholds via `OpaEvaluator.setTenantPolicyData()`
+- ChromaDB collection-per-tenant — `knowledge_{tenantId}` collections via `TenantVectorStoreFactory`
+- Full E2E verified: `MultiTenantE2E.test.ts` (24 tests, dual-tenant, all 3 phases)
+
+### Ticketing Integration (N-12)
+- Fire-and-forget escalation tickets via `GitHubIssuesMcpClient` (`@modelcontextprotocol/sdk`)
+- `TicketingClient` interface reusable for Linear, Jira, ServiceNow
+- Zero latency impact: ticket creation void-launched from `evaluate()`
+
+### Governance Engine (N-14)
+- OPA WASM policy evaluation — sub-1ms, in-process, no sidecar
+- Two-tier moderation: pattern engine (Tier 1, <0.5ms) + OPA threshold (Tier 2)
+- Dense embedding claims matching via `all-MiniLM-L6-v2` ONNX (22MB, offline)
+- 7 moderation categories: JAILBREAK, SELF_HARM, VIOLENCE_THREATS, HATE_SPEECH, ILLEGAL_ACTIVITY, EXPLICIT_CONTENT, HARASSMENT
+
+### SIP Telephony (N-11 — BUILDING)
+- `SipTelephonyAdapter` interface + `StubSipTelephonyAdapter` prototype
+- `SipBridgeService` wires inbound SIP calls to existing Lane A/B/C pipeline
+- Phase 2 (real SIP.js adapter + G.711 codec) pending
+
+## Performance
+
+| Metric | Value |
+|--------|-------|
+| TTFB p50 | <200ms |
+| TTFB p95 | <400ms (load test: 126.7ms at 200 concurrent sessions) |
+| Barge-in stop | <250ms |
+| OPA policy eval | <1ms (WASM in-process) |
+| Tenant registry lookup | <0.1ms (O(1) Map) |
+| Fire-and-forget ticket overhead | 0ms |
+| Test suite | 2,450 tests, 0 failures |
+| Server coverage | >91% lines |
 
 ## Getting Started
 
@@ -106,26 +143,24 @@ npm run lint
 npm run format
 ```
 
-## Performance Targets
-
-- **TTFB p50:** <400ms (p95: <900ms)
-- **Barge-in stop p95:** <250ms
-- **Turn latency p95:** <1200ms
-
 ## Quality
 
 | Metric | Value |
 |--------|-------|
-| Test count | 2,200+ |
+| Test count | 2,450+ |
 | Statement coverage | 91%+ |
 | Branch coverage | 81%+ |
 | Coverage floor (enforced) | stmt 88 / branch 78 / fn 87 / lines 88 |
-| Roadmap initiatives SHIPPED | 15/15 |
+| Roadmap initiatives SHIPPED | 17/17 + 1 BUILDING |
 | Mutation testing | Stryker baseline established (PolicyGate, AllowedClaimsRegistry, LaneArbitrator) |
 
 ## Documentation
 
 - [Project Spec](docs/PROJECT-SPEC.md)
+- [Architecture](docs/architecture/ARCHITECTURE.md)
+- [API Reference](docs/API.md)
+- [Contributing](CONTRIBUTING.md)
+- [Demo Guide](DEMO-GUIDE.md)
 - [Voice UX Principles](.claude/skills/domain/voice-ux.md)
 - [Lane System Architecture](.claude/skills/domain/lane-system.md)
 

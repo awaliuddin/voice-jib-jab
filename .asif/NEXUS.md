@@ -233,188 +233,43 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ## CoS Directives
 
-> 7 completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
+> 15 completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
 > - Batch 1: 6 directives (2026-03-08, team)
 > - Batch 2: 1 directive (2026-03-11, Wolf — governance hygiene)
+> - Batch 3: 8 directives (2026-03-18, team)
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
 ### DIRECTIVE-NXTG-20260318-48 — P1: Performance Profiling + Optimization
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-18 14:00 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-18 14:00 | **Estimate**: M | **Status**: DONE
 
 **Context**: N-11 SIP, N-12 Ticketing, N-13 Multi-Tenant all SHIPPED. Full feature set complete. Optimize for production.
 
 **Action Items**:
-1. [ ] **Profile voice pipeline latency** — measure each stage: audio capture → Lane A → Lane B → Lane C → TTS → output. Identify bottleneck.
-2. [ ] **Memory profiling** — track per-tenant memory usage. Identify leaks in long-running sessions.
-3. [ ] **Optimize hot paths** — if OPA eval or embedding similarity is >10ms, optimize.
-4. [ ] Document in `docs/performance-profile.md` with flame graph or timing breakdown.
+1. [x] **Profile voice pipeline latency** — measure each stage: audio capture → Lane A → Lane B → Lane C → TTS → output. Identify bottleneck.
+2. [x] **Memory profiling** — track per-tenant memory usage. Identify leaks in long-running sessions.
+3. [x] **Optimize hot paths** — if OPA eval or embedding similarity is >10ms, optimize.
+4. [x] Document in `docs/performance-profile.md` with flame graph or timing breakdown.
 
 **CHAIN**: When done, start DIRECTIVE-NXTG-20260318-49.
 
 **Response** (filled by team):
->
+> **SHIPPED 2026-03-18**. `docs/performance-profile.md` — 6-section profile: executive summary table, stage-by-stage timing breakdown (Lane B OpenAI Realtime is the dominant cost at p95 ~300ms; all Lane C ops <5ms), hot path analysis (OPA WASM <1ms incl. JS wrapper, TF-IDF <5ms, pattern moderation <0.5ms, fire-and-forget 0ms), memory footprint table (100 tenants ~5MB for claims registries, ChromaDB data lives server-side), optimization findings (no regressions; N-15 dense embeddings will reduce TF-IDF O(vocab) to O(d) dot product; AuditTrail batching noted as future option). `server/src/__tests__/performance/PipelineLatency.test.ts` — 16 benchmark tests with measured p50/p95 assertions: matchText() p95 <5ms ✓, tenant lookup p95 <0.1ms ✓, OpaEvaluator p95 <1ms ✓, 100-tenant heap delta <50MB ✓, AuditTrail write queue drains cleanly ✓, ControlEngine.evaluate() p95 <50ms ✓, fire-and-forget non-blocking ✓. Tests: 2,450 → 2,466.
 
 ---
 
 ### DIRECTIVE-NXTG-20260318-49 — P2: NEXUS Archive + Project Showcase
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-18 14:00 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-18 14:00 | **Estimate**: S | **Status**: DONE
 
 **Action Items**:
-1. [ ] Archive all DONE directives (10+ today).
-2. [ ] README refresh — full feature showcase.
-3. [ ] Update all initiative statuses in Executive Dashboard.
+1. [x] Archive all DONE directives (10+ today).
+2. [x] README refresh — full feature showcase.
+3. [x] Update all initiative statuses in Executive Dashboard.
 
 **Response** (filled by team):
->
-
----
-
-### DIRECTIVE-NXTG-20260318-42 — P1: N-11 SIP Telephony — Research + Prototype
-**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-18 13:30 | **Estimate**: M | **Status**: DONE
-
-**Context**: N-13 Multi-Tenant SHIPPED (all 3 phases). N-12 Ticketing MCP SHIPPED. 15 original + 2 new initiatives complete. N-11 SIP Telephony is the last major IDEA — research and prototype.
-
-**Action Items**:
-1. [x] **Research doc** at `docs/sip-telephony-research.md` — assess SIP libraries (JsSIP, SIP.js, Opal), WebRTC bridge options, PSTN gateway providers (Twilio, Vonage, Telnyx).
-2. [x] **Architecture proposal** — how SIP connects to existing voice pipeline: SIP trunk → audio stream → Lane A/B/C → response TTS → SIP audio out.
-3. [x] **Minimal prototype** — accept inbound SIP call, pipe audio to existing WebSocket voice pipeline, return TTS response.
-4. [x] Tests: integration test for SIP→WebSocket bridge (mock SIP endpoint).
-
-**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-43.
-
-**Response** (filled by team):
-> **SHIPPED 2026-03-18**. `docs/sip-telephony-research.md` covers library comparison (recommended: SIP.js — TypeScript-native, WebSocket transport aligns with existing ws infrastructure), codec bridge (`dgram` + `g711` package, ~0.3ms per 20ms RTP frame), PSTN provider comparison (Twilio for prototype, Telnyx for production economics), and 3-phase implementation plan. Architecture: `SipBridgeService` sits between `SipTelephonyAdapter` and the existing LaneArbitrator session construction path — zero modification to existing files. Prototype: `StubSipTelephonyAdapter` + `SipBridgeService` in `server/src/providers/SipTelephonyAdapter.ts`. 27 integration tests. N-11 IDEA → BUILDING.
-
----
-
-### DIRECTIVE-NXTG-20260318-43 — P2: Portfolio Showcase — Demo Recording Script
-**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-18 13:30 | **Estimate**: S | **Status**: DONE
-
-**Action Items**:
-1. [x] **Demo script** at `docs/demo-script.md` — 3-minute walkthrough showing: voice call → Lane C governance → ticketing MCP → multi-tenant isolation.
-2. [x] **Test fixtures** — pre-configured demo data (tenants, claims, policies) for reproducible demos.
-
-**Response** (filled by team):
-> **SHIPPED 2026-03-18**. `docs/demo-script.md` — 5-act 3-minute walkthrough: voice loop latency → allowed claim (Alpha) → refused claim (Alpha) → SELF_HARM escalation + MCP ticket → multi-tenant contrast (same sentence, opposite decisions on Alpha vs Beta) → metrics dashboard. `server/src/__tests__/fixtures/demoFixtures.ts` — `TENANT_DEMO_ALPHA` (medical, strict 0.2 threshold, 3 FDA claims, disallowed cure patterns) + `TENANT_DEMO_BETA` (fintech, permissive 0.85 threshold, 3 FDIC claims, disallowed guaranteed-return patterns) + `DEMO_SCENARIOS` array documenting 5 expected decisions with tenant/input/expectedDecision. Tests: 2,450 passed, zero regressions.
-
----
-
-### DIRECTIVE-NXTG-20260318-36 — P1: N-13 Phase 3 — ChromaDB Collection-Per-Tenant
-**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-18 13:00 | **Estimate**: M | **Status**: DONE
-
-**Context**: N-13 Phases 1+2 SHIPPED. Phase 3: ChromaDB collection-per-tenant for isolated vector stores.
-
-**Action Items**:
-1. [x] **VectorStore interface swap** — `getCollectionForTenant(tenantId)` returns tenant-scoped ChromaDB collection.
-2. [x] **Migration path** — existing shared collection becomes `default` tenant.
-3. [x] **Embedding isolation test** — prove tenant A's embeddings invisible to tenant B.
-4. [x] Tests: +30 new isolation tests (26 ChromaDbVectorStore + 18 TenantVectorStoreFactory = 44 new).
-
-**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-37.
-
-**Response** (filled by team):
-> **SHIPPED 2026-03-18**. `AsyncVectorStore<TMeta>` interface + `ChromaDbVectorStore` implementation (cosine distance, metadata as JSON `_meta`, score = 1-distance). `TenantVectorStoreFactory` gives each tenant a `knowledge_{tenantId}` collection; existing shared store migrates to `knowledge_default`. 44 new tests (26 unit + 18 factory). Chroma fully mocked — no external process needed in CI. Proceeding to DIRECTIVE-NXTG-20260318-37.
-
----
-
-### DIRECTIVE-NXTG-20260318-37 — P2: Full Multi-Tenant E2E Integration Test
-**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-18 13:00 | **Estimate**: S | **Status**: DONE
-
-**Action Items**:
-1. [x] Full E2E: two tenants, different claims/policies/embeddings. Verify complete isolation.
-2. [x] Performance benchmark: single vs multi-tenant overhead.
-3. [x] Update N-13 to SHIPPED if all 3 phases pass.
-
-**Response** (filled by team):
-> **SHIPPED 2026-03-18**. `MultiTenantE2E.test.ts` (24 tests): TENANT_ALPHA (medical, strict — 0.1 claims threshold) vs TENANT_BETA (fintech, permissive — 0.9). Phase 1 isolation: alpha blocks "guaranteed cure", beta blocks "guaranteed returns", neither leaks. Phase 2 OPA: tenant policy data confirmed isolated via `getTenantPolicyData()`. Phase 3 ChromaDB: collection names `knowledge_org_alpha` / `knowledge_org_beta` — upsert/query calls routed to correct mock collections. Combined: two ControlEngines with distinct tenantIds refuse each other's blocked claims. Performance: Map.get O(1) < 0.1ms per lookup across 1,000 iterations. Tests: 2,423 passed, zero regressions. **N-13 → SHIPPED.**
-
----
-
-### DIRECTIVE-NXTG-20260318-26 — P1: N-13 Phase 1 — Per-Tenant AllowedClaimsRegistry
-**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-18 12:00 | **Estimate**: S | **Status**: DONE
-
-**Context**: N-13 research done. Phase 1 = lowest-risk isolation: per-tenant `AllowedClaimsRegistry` via `ControlEngineConfig`. Already injectable.
-
-**Action Items**:
-1. [x] **`tenantId` field** on `ControlEngineConfig` — optional string.
-2. [x] **Per-tenant claims registry** — `TenantClaimsLoader` (new service): `getRegistryForTenant(tenantId, config?)` caches isolated `AllowedClaimsRegistry` per tenant. Module-level singleton `tenantClaimsLoader`.
-3. [x] **Wire into ControlEngine** — constructor checks `config.tenantId && !config.claimsRegistry` → uses `tenantClaimsLoader`. Explicit registry always wins.
-4. [x] **Tests**: `TenantClaimsLoader.test.ts` (24 tests), `ControlEngine.test.ts` tenant describe (+7 tests). 2,299→2,354 total.
-5. [x] N-13 status updated to BUILDING.
-
-**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-27.
-
-**Response** (filled by team):
-> **DONE 2026-03-18**. `TenantClaimsLoader` service with cache-by-tenantId. `ControlEngineConfig.tenantId` wired in constructor. Tenant A's approved claims cannot leak to Tenant B. 24 loader tests + 7 ControlEngine isolation tests. Chained immediately to Directive 27.
-
----
-
-### DIRECTIVE-NXTG-20260318-27 — P2: N-13 Phase 2 — OPA Namespace Isolation
-**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-18 12:00 | **Estimate**: M | **Status**: DONE
-
-**Context**: Per your research: OPA input namespacing preferred over per-tenant WASM bundles.
-
-**Action Items**:
-1. [x] **Namespace OPA input** — `tenant_id` added to `OpaModeratorInput.moderator_check` and `OpaClaimsInput.claims_check`. Flows from `EvaluationContext.tenantId` → `OpaModeratorCheck`/`OpaClaimsCheck` → `OpaEvaluator`.
-2. [x] **Per-tenant policy loading** — `OpaEvaluator.setTenantPolicyData(tenantId, data)` stores per-tenant threshold overrides; `evaluateModeratorCheck(input, tenantId?)` and `evaluateClaimsCheck(input, tenantId?)` merge tenant data into OPA input before evaluation.
-3. [x] **Integration tests** — `TenantPolicyIsolation.test.ts` (15 tests): two tenants with different thresholds produce different decisions; ctx.tenantId flows through correctly; edge cases (no data, cleared data, threshold 0.0/1.0).
-4. [x] Tests: 2,299 → 2,354 (+55 across OpaEvaluator, OpaClaimsCheck, TenantPolicyIsolation).
-
-**Response** (filled by team):
-> **DONE 2026-03-18**. `TenantPolicyData` interface on `OpaEvaluator` with threshold-override map. `evaluateModeratorCheck/evaluateClaimsCheck` accept optional `tenantId` and merge stored overrides into OPA input — zero Rego changes needed. `tenantId` threads from `ControlEngine` config → `EvaluationContext` → checks → evaluator. Two tenants with different moderation thresholds now get provably different OPA decisions. 2,354 tests, 0 failures.
-
----
-
-### DIRECTIVE-NXTG-20260318-09 — P1: N-12 Ticketing Integration via MCP
-**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-18 10:00 | **Estimate**: M | **Status**: DONE
-
-**Context**: 15/15 SHIPPED. Docs done. CRUCIBLE clean. N-12 is the next initiative — MCP-based ticketing integration for enterprise support workflows. When a voice agent detects an issue, it creates a ticket.
-
-**Action Items**:
-1. [x] **Research MCP ticketing integration** — GitHub Issues selected: best MCP ecosystem, zero cost, widely available in enterprise.
-2. [x] **Implement MCP client** — `server/src/services/TicketingMcpClient.ts`: `TicketingClient` interface + `GitHubIssuesMcpClient` via `@modelcontextprotocol/sdk`. Spawns `npx -y @github/mcp-server` at runtime.
-3. [x] **Ticket schema** — `TicketPayload`: title, summary, transcriptExcerpt (200 chars), severity, sessionId, reasonCodes, optional customerContext. Auto-populated in `createEscalationTicket()`.
-4. [x] **Tests**: 2,251 → 2,299 (48 new). `TicketingMcpClient.test.ts` (27) + `ControlEngine.test.ts` ticketing describe (~21). Zero regressions.
-5. [x] N-12 status updated: IDEA → SHIPPED.
-
-**Constraints**:
-- USE PLAN MODE — M-sized, new integration pattern
-- Start with ONE ticketing provider, not all three
-- MCP client pattern should be reusable for other integrations
-
-**CHAIN**: When you complete this, immediately start DIRECTIVE-NXTG-20260318-10 below.
-
-**Response** (filled by team):
-> **SHIPPED 2026-03-18**. GitHub Issues provider via MCP. Fire-and-forget from `evaluate()` — zero latency impact. `TicketingClient` interface is the reuse hook for Linear/Jira. 2,299 tests, zero regressions. Proceeding to DIRECTIVE-NXTG-20260318-10.
-
----
-
-### DIRECTIVE-NXTG-20260318-10 — P2: N-13 Multi-Tenant Isolation Research
-**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-18 10:00 | **Estimate**: S | **Status**: DONE
-
-**Context**: Chain directive. After N-12, research N-13 Multi-Tenant Isolation.
-
-**Action Items**:
-1. [x] **Research doc** at `docs/multi-tenant-research.md` — 5 isolation surfaces: ChromaDB collections, OPA input namespacing, per-tenant AllowedClaimsRegistry, AuditTrail tenant_id column, SessionManager concurrency limits.
-2. [x] **Architecture proposal** — Mermaid diagram (tenant auth flow → per-session factories → tenant-scoped resources → shared infra). 3-phase migration path with effort/risk table.
-3. [x] N-13 status updated: IDEA → RESEARCHED.
-
-**Constraints**:
-- Research only — no implementation. This informs the next directive.
-
-**Response** (filled by team):
-> **DONE 2026-03-18**. `docs/multi-tenant-research.md` (210 lines). Key findings: (1) `AllowedClaimsRegistry` is the lowest-risk first isolation point — already injectable via `ControlEngineConfig`; (2) OPA input namespacing preferred over per-tenant WASM bundles for Phase 2; (3) ChromaDB collection-per-tenant is straightforward but requires VectorStore interface swap (Phase 3, highest effort). 4 open questions logged for CoS (ChromaDB hosting, onboarding flow, enterprise OPA tier, knowledge ingestion). Phased: Phase 1 (S) → Phase 2 (M) → Phase 3 (L).
+> **SHIPPED 2026-03-18**. Archived 8 DONE directives (D-09, D-10, D-26, D-27, D-36, D-37, D-42, D-43) → NEXUS-archive.md Batch 3; CoS Directives section trimmed. README refreshed: status badge `17/17 SHIPPED + 1 BUILDING | 2,450+ tests | 91%+ coverage`; new Enterprise Features section (Multi-Tenant N-13, Ticketing N-12, Governance N-14, SIP N-11 BUILDING); Performance table with load test data. Executive Dashboard verified correct — no changes required.
 
 ---
 
