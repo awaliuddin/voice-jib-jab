@@ -308,6 +308,7 @@ export class ControlEngine extends EventEmitter {
     cancel_output: 0,
   };
   private durationSamples: number[] = [];
+  private _ticketingConnected = false;
 
   constructor(sessionId: string, config: Partial<ControlEngineConfig> = {}) {
     super();
@@ -385,8 +386,9 @@ export class ControlEngine extends EventEmitter {
     if (!this.config.claimsRegistry.isEmbeddingInitialized) {
       await this.config.claimsRegistry.initialize();
     }
-    if (this.config.ticketingClient) {
+    if (this.config.ticketingClient && !this._ticketingConnected) {
       await this.config.ticketingClient.connect();
+      this._ticketingConnected = true;
     }
   }
 
