@@ -72,6 +72,32 @@ export function createAdminRouter(
       return;
     }
 
+    // Validate claimsThreshold if provided
+    if (req.body.claimsThreshold !== undefined) {
+      const ct = req.body.claimsThreshold;
+      if (typeof ct !== "number" || !Number.isFinite(ct) || ct < 0 || ct > 1) {
+        res.status(400).json({ error: "claimsThreshold must be a number between 0.0 and 1.0" });
+        return;
+      }
+    }
+
+    // Validate claims if provided
+    if (req.body.claims !== undefined) {
+      if (!Array.isArray(req.body.claims)) {
+        res.status(400).json({ error: "claims must be an array" });
+        return;
+      }
+      for (const claim of req.body.claims) {
+        if (
+          typeof claim !== "object" || claim === null ||
+          typeof claim.id !== "string" || typeof claim.text !== "string"
+        ) {
+          res.status(400).json({ error: "Each claim must have string 'id' and 'text' fields" });
+          return;
+        }
+      }
+    }
+
     try {
       const tenant = tenantRegistry.createTenant({
         tenantId,
@@ -111,6 +137,32 @@ export function createAdminRouter(
 
   /** PUT /tenants/:id — update a tenant. */
   router.put("/tenants/:id", (req, res) => {
+    // Validate claimsThreshold if provided
+    if (req.body?.claimsThreshold !== undefined) {
+      const ct = req.body.claimsThreshold;
+      if (typeof ct !== "number" || !Number.isFinite(ct) || ct < 0 || ct > 1) {
+        res.status(400).json({ error: "claimsThreshold must be a number between 0.0 and 1.0" });
+        return;
+      }
+    }
+
+    // Validate claims if provided
+    if (req.body?.claims !== undefined) {
+      if (!Array.isArray(req.body.claims)) {
+        res.status(400).json({ error: "claims must be an array" });
+        return;
+      }
+      for (const claim of req.body.claims) {
+        if (
+          typeof claim !== "object" || claim === null ||
+          typeof claim.id !== "string" || typeof claim.text !== "string"
+        ) {
+          res.status(400).json({ error: "Each claim must have string 'id' and 'text' fields" });
+          return;
+        }
+      }
+    }
+
     try {
       const { tenantId: _tid, createdAt: _ca, ...update } = req.body ?? {};
       const tenant = tenantRegistry.updateTenant(req.params.id, update);

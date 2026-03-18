@@ -19,12 +19,17 @@ import { createAnalyticsRouter } from "./api/analytics.js";
 import { tenantRegistry, initTenantRegistry } from "./services/TenantRegistry.js";
 import { systemConfigStore } from "./services/SystemConfigStore.js";
 import { VoiceTriggerService } from "./services/VoiceTriggerService.js";
+import { createRateLimiter } from "./middleware/rateLimiter.js";
+import { securityHeaders } from "./middleware/securityHeaders.js";
 
 const app = express();
 const server = createServer(app);
 
 // Middleware
 app.use(express.json());
+
+// Security headers
+app.use(securityHeaders);
 
 // CORS for development
 app.use((_req, res, next) => {
@@ -191,23 +196,29 @@ export const sessionRecorder = new SessionRecorder({
   retentionDays: 7,
 });
 
+// ── Rate limiters ────────────────────────────────────────────────────
+const adminLimiter = createRateLimiter({ windowMs: 60_000, max: 30, message: "Admin API rate limit exceeded" });
+const voiceLimiter = createRateLimiter({ windowMs: 60_000, max: 10, message: "Voice API rate limit exceeded" });
+const analyticsLimiter = createRateLimiter({ windowMs: 60_000, max: 60, message: "Analytics API rate limit exceeded" });
+const sessionsLimiter = createRateLimiter({ windowMs: 60_000, max: 60, message: "Sessions API rate limit exceeded" });
+
 // Mount sessions API
-app.use("/sessions", createSessionsRouter(sessionRecorder));
+app.use("/sessions", sessionsLimiter, createSessionsRouter(sessionRecorder));
 
 // ── Analytics Service + API ───────────────────────────────────────────
 const analyticsService = new AnalyticsService(sessionRecorder);
-app.use("/analytics", createAnalyticsRouter(analyticsService));
+app.use("/analytics", analyticsLimiter, createAnalyticsRouter(analyticsService));
 
 // ── Tenant Registry + Admin API ──────────────────────────────────────
 initTenantRegistry(resolve(dirname(config.storage.databasePath), "tenants.json"));
-app.use("/admin", createAdminRouter(tenantRegistry, systemConfigStore));
+app.use("/admin", adminLimiter, createAdminRouter(tenantRegistry, systemConfigStore));
 
 // ── Voice Trigger Service + Voice API ────────────────────────────────
 export const voiceTriggerService = new VoiceTriggerService(
   `http://localhost:${config.port}`,
   systemConfigStore,
 );
-app.use("/voice", createVoiceRouter(voiceTriggerService, `http://localhost:${config.port}`));
+app.use("/voice", voiceLimiter, createVoiceRouter(voiceTriggerService, `http://localhost:${config.port}`));
 
 async function startServer(): Promise<void> {
   // Initialize OPA singleton before accepting any sessions

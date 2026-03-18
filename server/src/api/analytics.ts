@@ -40,19 +40,39 @@ export function createAnalyticsRouter(
     if (typeof req.query.tenantId === "string" && req.query.tenantId) {
       filter.tenantId = req.query.tenantId;
     }
+
+    // Validate date params
     if (typeof req.query.from === "string" && req.query.from) {
+      if (isNaN(Date.parse(req.query.from))) {
+        res.status(400).json({ error: "from must be a valid ISO date string" });
+        return;
+      }
       filter.fromDate = req.query.from;
     }
     if (typeof req.query.to === "string" && req.query.to) {
+      if (isNaN(Date.parse(req.query.to))) {
+        res.status(400).json({ error: "to must be a valid ISO date string" });
+        return;
+      }
       filter.toDate = req.query.to;
     }
 
+    // Validate limit — reject invalid values, clamp valid values to range
     const rawLimit = parseInt(req.query.limit as string, 10);
+    if (req.query.limit !== undefined && (!Number.isFinite(rawLimit) || rawLimit < 1)) {
+      res.status(400).json({ error: `limit must be between 1 and ${MAX_LIMIT}` });
+      return;
+    }
     filter.limit = Number.isFinite(rawLimit)
       ? Math.min(Math.max(rawLimit, 1), MAX_LIMIT)
       : DEFAULT_LIMIT;
 
+    // Validate offset
     const rawOffset = parseInt(req.query.offset as string, 10);
+    if (req.query.offset !== undefined && (!Number.isFinite(rawOffset) || rawOffset < 0)) {
+      res.status(400).json({ error: "offset must be >= 0" });
+      return;
+    }
     filter.offset = Number.isFinite(rawOffset) ? Math.max(rawOffset, 0) : 0;
 
     const metrics = deps.analyticsService.getAggregateMetrics(filter);

@@ -45,6 +45,20 @@ export function createVoiceRouter(
       return;
     }
 
+    // Reject path traversal in tenantId
+    if (tenantId.includes("../") || tenantId.includes("..\\")) {
+      res.status(400).json({ error: "tenantId contains invalid characters" });
+      return;
+    }
+
+    // Validate phoneNumber format if provided
+    if (phoneNumber !== undefined && phoneNumber !== null) {
+      if (typeof phoneNumber !== "string" || !/^\+?[\d\s\-().]+$/.test(phoneNumber)) {
+        res.status(400).json({ error: "phoneNumber format is invalid" });
+        return;
+      }
+    }
+
     const record = triggerService.createTrigger({
       tenantId,
       callbackUrl,

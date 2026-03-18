@@ -26,6 +26,10 @@ export function createSessionsRouter(recorder: SessionRecorder): Router {
    * GET /sessions/:id — get full recording with timeline.
    */
   router.get("/:id", (req, res) => {
+    if (!/^[a-zA-Z0-9_-]+$/.test(req.params.id)) {
+      res.status(400).json({ error: "Invalid session ID" });
+      return;
+    }
     const recording = recorder.loadRecording(req.params.id);
     if (!recording) {
       res.status(404).json({ error: "Recording not found" });
@@ -39,6 +43,10 @@ export function createSessionsRouter(recorder: SessionRecorder): Router {
    * Returns: { sessionId, timeline, summary: { eventCount, policyDecisions } }
    */
   router.get("/:id/replay", async (req, res) => {
+    if (!/^[a-zA-Z0-9_-]+$/.test(req.params.id)) {
+      res.status(400).json({ error: "Invalid session ID" });
+      return;
+    }
     try {
       const { loadSessionTimeline } = await import("../insurance/audit_trail.js");
       const sessionId = req.params.id;

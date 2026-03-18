@@ -242,27 +242,43 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260318-138 — P1: Voice SDK — Browser + Node.js Client Library
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-18 21:45 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-18 21:45 | **Estimate**: M | **Status**: DONE
 
 **Action Items**:
-1. [ ] **`@nxtg/vjj-sdk`** — TypeScript package. `VoiceClient` class: connect(wsUrl), startSession(config), sendAudio(buffer), onResponse(cb), onPolicyEvent(cb), endSession().
-2. [ ] **Browser bundle** — UMD build for `<script>` tag embedding.
-3. [ ] **npm package ready** — `package.json`, types, README with examples.
-4. [ ] Tests.
+1. [x] **`@nxtg/vjj-sdk`** — TypeScript package. `VoiceClient` class: connect(wsUrl), startSession(config), sendAudio(buffer), onResponse(cb), onPolicyEvent(cb), endSession().
+2. [x] **Browser bundle** — UMD build for `<script>` tag embedding.
+3. [x] **npm package ready** — `package.json`, types, README with examples.
+4. [x] Tests.
 
 **CHAIN**: When done, start DIRECTIVE-NXTG-20260318-139.
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-18**. Standalone `sdk/` package (NOT in workspaces — zero server deps):
+> - `sdk/src/VoiceClient.ts` — callback-based API (not EventEmitter): `connect(sessionConfig?)→Promise<string>` (returns sessionId), `sendAudio()`, `stopAudio()`, `cancelAudio()`, `playbackEnded()`, `on(callbacks)`, `endSession()`; state machine disconnected→connecting→ready; 5s connect timeout; autoReconnect option
+> - `sdk/src/types.ts` — `VoiceClientOptions`, `VoiceClientCallbacks`, `SessionConfig`, `PolicyEvent`, `TranscriptEvent` + enums
+> - `sdk/src/index.ts` — barrel export
+> - `sdk/package.json` — `@nxtg/vjj-sdk` v0.1.0, ESM+CJS+IIFE build via tsup (`--global-name VjjSdk`)
+> - `sdk/README.md` — install, quick start, script tag example, full API + callbacks reference
+> - 27 Vitest tests (in `sdk/src/__tests__/VoiceClient.test.ts`)
+> Server tests unaffected: 2660/2660.
 
 ---
 
 ### DIRECTIVE-NXTG-20260318-139 — P2: Security Audit — Input Validation + Rate Limiting
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-18 21:45 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-18 21:45 | **Estimate**: S | **Status**: DONE
 
 **Action Items**:
-1. [ ] Audit all API inputs for injection/overflow. 2. [ ] Add rate limiting per tenant. 3. [ ] Document security model.
+1. [x] Audit all API inputs for injection/overflow. 2. [x] Add rate limiting per tenant. 3. [x] Document security model.
 
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-18**. Four files created + 5 modified:
+> - `server/src/middleware/rateLimiter.ts` — minimal in-memory rate limiter (no external deps); per-IP hit counter with sliding window reset
+> - `server/src/middleware/securityHeaders.ts` — X-Content-Type-Options/X-Frame-Options/X-XSS-Protection/Referrer-Policy on all responses
+> - Applied: admin 30/min, voice trigger 10/min, analytics 60/min, sessions 60/min
+> - Validation added: `claimsThreshold` 0.0–1.0 check (admin), tenantId path-traversal rejection, phoneNumber format (`/^\+?[\d\s\-().]+$/`), ISO date validation (analytics), session ID allowlist `[a-zA-Z0-9_-]` (sessions)
+> - `docs/security-model.md` — threat model table, rate limit table, input validation catalog, auth posture, known risks
+> - `SecurityMiddleware.test.ts` — 23 tests
+> **Tests: 2660/2660, 85 suites, 0 failures.**
 
 ---
 
