@@ -22,7 +22,7 @@
 | N-10 | Production Readiness QA | OBSERVABILITY | SHIPPED | P0 | 2026-02 |
 | N-11 | SIP Telephony | EXTENSIBILITY | IDEA | P1 | — |
 | N-12 | Ticketing Integration (MCP) | EXTENSIBILITY | SHIPPED | P1 | 2026-03-18 |
-| N-13 | Multi-Tenant Isolation | GOVERNANCE | IDEA | P1 | — |
+| N-13 | Multi-Tenant Isolation | GOVERNANCE | RESEARCHED | P1 | — |
 | N-14 | Lane C v2: Semantic Governance | GOVERNANCE | SHIPPED | P2 | 2026-03-07 |
 | N-15 | Dense Embedding Similarity for Claims | GOVERNANCE | SHIPPED | P1 | 2026-03-17 |
 
@@ -137,8 +137,9 @@
 **What**: `GitHubIssuesMcpClient` via `@modelcontextprotocol/sdk`. `TicketingClient` interface reusable for Linear/Jira. Fire-and-forget escalation tickets from Lane C. 48 new tests (2,251→2,299).
 
 ### N-13: Multi-Tenant Isolation
-**Pillar**: GOVERNANCE | **Status**: IDEA | **Priority**: P1
+**Pillar**: GOVERNANCE | **Status**: RESEARCHED | **Priority**: P1
 **What**: Org-scoped knowledge, policy, audit. Admin console. RBAC (admin, agent, viewer).
+**Research**: `docs/multi-tenant-research.md` — 5 isolation surfaces, 3-phase migration, Mermaid diagram.
 
 ### N-15: Dense Embedding Similarity for Claims
 **Pillar**: GOVERNANCE | **Status**: IDEA | **Priority**: P2
@@ -259,20 +260,20 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260318-10 — P2: N-13 Multi-Tenant Isolation Research
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-18 10:00 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-18 10:00 | **Estimate**: S | **Status**: DONE
 
 **Context**: Chain directive. After N-12, research N-13 Multi-Tenant Isolation.
 
 **Action Items**:
-1. [ ] **Research doc** at `docs/multi-tenant-research.md` — how to isolate voice sessions per tenant: separate ChromaDB collections, OPA policy namespacing, session-scoped claims registries.
-2. [ ] **Architecture proposal** — Mermaid diagram showing tenant isolation boundaries.
-3. [ ] Update N-13 status to RESEARCHED in Executive Dashboard.
+1. [x] **Research doc** at `docs/multi-tenant-research.md` — 5 isolation surfaces: ChromaDB collections, OPA input namespacing, per-tenant AllowedClaimsRegistry, AuditTrail tenant_id column, SessionManager concurrency limits.
+2. [x] **Architecture proposal** — Mermaid diagram (tenant auth flow → per-session factories → tenant-scoped resources → shared infra). 3-phase migration path with effort/risk table.
+3. [x] N-13 status updated: IDEA → RESEARCHED.
 
 **Constraints**:
 - Research only — no implementation. This informs the next directive.
 
 **Response** (filled by team):
->
+> **DONE 2026-03-18**. `docs/multi-tenant-research.md` (210 lines). Key findings: (1) `AllowedClaimsRegistry` is the lowest-risk first isolation point — already injectable via `ControlEngineConfig`; (2) OPA input namespacing preferred over per-tenant WASM bundles for Phase 2; (3) ChromaDB collection-per-tenant is straightforward but requires VectorStore interface swap (Phase 3, highest effort). 4 open questions logged for CoS (ChromaDB hosting, onboarding flow, enterprise OPA tier, knowledge ingestion). Phased: Phase 1 (S) → Phase 2 (M) → Phase 3 (L).
 
 ---
 
