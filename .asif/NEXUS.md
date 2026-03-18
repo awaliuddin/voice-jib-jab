@@ -237,6 +237,38 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-42 — P1: N-11 SIP Telephony — Research + Prototype
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-18 13:30 | **Estimate**: M | **Status**: PENDING
+
+**Context**: N-13 Multi-Tenant SHIPPED (all 3 phases). N-12 Ticketing MCP SHIPPED. 15 original + 2 new initiatives complete. N-11 SIP Telephony is the last major IDEA — research and prototype.
+
+**Action Items**:
+1. [ ] **Research doc** at `docs/sip-telephony-research.md` — assess SIP libraries (JsSIP, SIP.js, Opal), WebRTC bridge options, PSTN gateway providers (Twilio, Vonage, Telnyx).
+2. [ ] **Architecture proposal** — how SIP connects to existing voice pipeline: SIP trunk → audio stream → Lane A/B/C → response TTS → SIP audio out.
+3. [ ] **Minimal prototype** — accept inbound SIP call, pipe audio to existing WebSocket voice pipeline, return TTS response.
+4. [ ] Tests: integration test for SIP→WebSocket bridge (mock SIP endpoint).
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-43.
+
+**Response** (filled by team):
+>
+
+---
+
+### DIRECTIVE-NXTG-20260318-43 — P2: Portfolio Showcase — Demo Recording Script
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 13:30 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Demo script** at `docs/demo-script.md` — 3-minute walkthrough showing: voice call → Lane C governance → ticketing MCP → multi-tenant isolation.
+2. [ ] **Test fixtures** — pre-configured demo data (tenants, claims, policies) for reproducible demos.
+
+**Response** (filled by team):
+>
+
+---
+
 ### DIRECTIVE-NXTG-20260318-36 — P1: N-13 Phase 3 — ChromaDB Collection-Per-Tenant
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-18 13:00 | **Estimate**: M | **Status**: DONE
