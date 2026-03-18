@@ -240,6 +240,23 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-56 — P0: E2E Smoke Test — Full Voice Pipeline
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P0
+**Injected**: 2026-03-18 15:00 | **Estimate**: S | **Status**: PENDING
+
+**Context**: N-11 SIP + N-12 Ticketing + N-13 Multi-Tenant all shipped today. Verify everything integrates.
+
+**Action Items**:
+1. [ ] E2E: voice input → Lane A/B/C → PolicyGate (async) → dense embedding match → OPA per-tenant → ticketing MCP trigger → TTS response. One flow, two tenants.
+2. [ ] Fix anything broken. 3. [ ] Final test count.
+
+**CHAIN**: When done, final NEXUS update with all initiative statuses.
+
+**Response** (filled by team):
+>
+
+---
+
 ### DIRECTIVE-NXTG-20260318-48 — P1: Performance Profiling + Optimization
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-18 14:00 | **Estimate**: M | **Status**: DONE
