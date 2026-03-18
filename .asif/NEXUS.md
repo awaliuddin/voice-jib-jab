@@ -781,6 +781,60 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-18 (check-in 258) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Dense directive sprint — 5 directives executed across 3 commits:
+
+| Commit | Directive | Deliverable | Tests added |
+|--------|-----------|-------------|-------------|
+| `c482e0c` | D-56 | `FullPipelineE2E.test.ts` (25 tests) + `ControlEngine._ticketingConnected` fix | +25 |
+| `8dd44c8` | D-70 + D-71 | `Dockerfile`, `docker-compose.yml`, `.env.example`, `scripts/load-test.ts`, `docs/capacity-planning.md` | 0 (infra) |
+| `49ba1b7` | D-79 + D-80 | `VjjClient` SDK (38 tests), `docs/integration-guide.md`, `GET /metrics`, `GET /dashboard`, `MetricsEndpoint.test.ts` (12 tests) | +50 |
+
+**Final server test count: 2503 (was 2491). Client: 79 (was 41). Zero failures.**
+
+---
+
+### 2. What surprised you?
+
+**`ControlEngine.initialize()` had a silent double-connect bug.** The OPA evaluator and claims registry both had `isInitialized`/`isEmbeddingInitialized` guards, but the ticketing client had none — calling `initialize()` twice would reconnect. Added `_ticketingConnected` flag. Not caught by existing tests because the ControlEngine tests used `beforeEach` resets. The E2E test was the first to exercise the idempotency contract end-to-end. This is precisely the kind of bug an integration test exists to catch.
+
+**`OpaClaimsCheck` deny-unless-approved model required two engine factories in E2E tests.** When `opaEvaluator` is provided, `ControlEngine` uses `OpaClaimsCheck` (no role guard, refuses all text with TF-IDF similarity < threshold). The E2E test needed neutral text (role: "user") to pass through, but `OpaClaimsCheck` would refuse it regardless of role. Solution: separate `makeOpaEngine()` and `makeSimpleEngine()` factories. This complexity is intentional production behaviour — it just means neutral-text tests must use the simpler path.
+
+**The mock-by-class-extend pattern scaled to a second class cleanly.** Used the same approach for `OpaEvaluator` as for `AllowedClaimsRegistry`: extend + override `initialize()` as a no-op. No need to mock `fs` or the wasm module directly.
+
+---
+
+### 3. Cross-project signals?
+
+**`_ticketingConnected` / connection-state flag pattern** — any service that wraps an external connection (MCP client, database pool, WebSocket upstream) should guard `connect()` calls in `initialize()` with a boolean flag. The guards on `OpaEvaluator` (`.isInitialized`) and `AllowedClaimsRegistry` (`.isEmbeddingInitialized`) do this via property checks; for injected clients (whose state you don't own), an internal flag is the right approach. Reusable ASIF pattern.
+
+**`VjjClient` WebSocket SDK design** — the state machine (`disconnected→connecting→ready`) + typed EventEmitter + 5s connect timeout is a clean, reusable pattern for any project wrapping a WebSocket server. The SDK separates protocol concerns (message routing) from application concerns (audio pipeline), which is the right abstraction boundary.
+
+**Docker multi-stage + non-root user pattern** — the `Dockerfile` here (builder stage for tsc compile, production stage for non-root `vjj` user + prod deps only) is the standard production Node.js container pattern. ASIF portfolio projects without Docker configs should adopt this directly.
+
+---
+
+### 4. What would you prioritize next?
+
+**N-11 SIP Telephony** — currently BUILDING. The stub adapter and bridge service are in place. The next step is wiring a real SIP provider (Telnyx or Twilio). Blocked on external account setup, but the integration layer is ready.
+
+**NEXUS archive batch 4** — D-56 through D-80 are all DONE. That's 7 completed directives ready to archive. Batch 4 would reduce NEXUS context load.
+
+**Dependabot triage** — GitHub continues to flag 1 high + 1 moderate vulnerability. With the codebase now fully documented and containerised, a triage pass is low-risk and high-value. Q15 asked for explicit CoS direction on this; still waiting.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+**Q18 (NEXUS context growth)** — still unacknowledged since check-in 254. The Team Feedback section is now ~800 tokens of the most recent entries alone. Requesting guidance: (a) archive check-ins older than 30 days to NEXUS-archive.md, (b) truncate to last 5 check-ins inline, or (c) maintain current full-history approach. I can self-execute (a) with standing auth if the CoS confirms.
+
+**Q19 — N-11 SIP next step?** The stub adapter is complete and tests pass. Is the next directive to wire a real SIP provider (Telnyx/SIP.js), or is N-11 on hold pending other portfolio priorities? If proceeding: Telnyx has the best MCP ecosystem support per the research doc at `docs/sip-telephony-research.md`.
+
+---
+
 > Session: 2026-03-18 (check-in 257) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
