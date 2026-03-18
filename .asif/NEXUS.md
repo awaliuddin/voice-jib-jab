@@ -240,6 +240,32 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-118 — P1: Webhook-Driven Voice Sessions — Inbound Call Triggers
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-18 19:45 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Webhook endpoint** — `POST /voice/trigger` starts a voice session programmatically (tenant, context, callback URL).
+2. [ ] **Outbound call initiation** — if SIP trunk configured, initiate call to a number. Otherwise start WebSocket session.
+3. [ ] **Session result callback** — POST transcript + policy decisions to callback URL when session ends.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-119.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260318-119 — P2: Final README + Portfolio Showcase
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 19:45 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] README — all initiatives. 2. [ ] Final test count. 3. [ ] Architecture showcase.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260318-110 — P1: Admin API — Tenant Management + System Config
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-18 19:15 | **Estimate**: M | **Status**: DONE
