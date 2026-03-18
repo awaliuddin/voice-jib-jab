@@ -43,6 +43,7 @@ export interface EvaluationContext {
   text: string;
   isFinal: boolean;
   metadata?: Record<string, unknown>;
+  tenantId?: string;
 }
 
 // ── Gate result (aggregated) ───────────────────────────────────────────

@@ -43,6 +43,7 @@ export interface OpaModeratorInput {
   moderator_check: {
     categories: Array<{ name: string; score: number }>;
     thresholds: Record<string, number>;
+    tenant_id?: string;
   };
 }
 
@@ -56,6 +57,7 @@ export interface OpaClaimsInput {
   claims_check: {
     similarity_score: number;
     threshold: number;
+    tenant_id?: string;
   };
 }
 
@@ -77,11 +79,21 @@ interface OpaWasmModule {
   loadPolicy(data: ArrayBuffer | Buffer): Promise<OpaPolicy>;
 }
 
+// ── TenantPolicyData ───────────────────────────────────────────────────
+
+export interface TenantPolicyData {
+  /** Per-category moderation thresholds that override global config for this tenant. */
+  moderationThresholds?: Record<string, number>;
+  /** Cosine similarity threshold for claims evaluation for this tenant. */
+  claimsThreshold?: number;
+}
+
 // ── OpaEvaluator ──────────────────────────────────────────────────────
 
 export class OpaEvaluator {
   private policy: OpaPolicy | null = null;
   private readonly bundlePath: string;
+  private readonly tenantPolicyData = new Map<string, TenantPolicyData>();
 
   constructor(bundlePath: string) {
     this.bundlePath = bundlePath;
@@ -102,6 +114,29 @@ export class OpaEvaluator {
     )) as OpaWasmModule;
 
     this.policy = await opaWasm.loadPolicy(bundleData);
+  }
+
+  /**
+   * Register per-tenant policy data (threshold overrides).
+   * When a tenantId is present in OPA input, these values override the
+   * caller-supplied thresholds, enabling tenant-specific moderation policies.
+   */
+  setTenantPolicyData(tenantId: string, data: TenantPolicyData): void {
+    this.tenantPolicyData.set(tenantId, data);
+  }
+
+  /** Remove policy data for a specific tenant (or all if no argument). */
+  clearTenantPolicyData(tenantId?: string): void {
+    if (tenantId !== undefined) {
+      this.tenantPolicyData.delete(tenantId);
+    } else {
+      this.tenantPolicyData.clear();
+    }
+  }
+
+  /** Get stored policy data for a tenant (undefined if not set). */
+  getTenantPolicyData(tenantId: string): TenantPolicyData | undefined {
+    return this.tenantPolicyData.get(tenantId);
   }
 
   /**
@@ -150,14 +185,32 @@ export class OpaEvaluator {
    *
    * @throws {Error} if initialize() has not been called.
    */
-  evaluateModeratorCheck(input: OpaModeratorInput): OpaModeratorOutput {
+  evaluateModeratorCheck(input: OpaModeratorInput, tenantId?: string): OpaModeratorOutput {
     if (!this.policy) {
       throw new Error(
         "OpaEvaluator not initialized. Call initialize() before evaluateModeratorCheck().",
       );
     }
 
-    const results = this.policy.evaluate(input);
+    // Merge tenant-specific thresholds if available
+    let effectiveInput = input;
+    if (tenantId) {
+      const tenantData = this.tenantPolicyData.get(tenantId);
+      if (tenantData?.moderationThresholds) {
+        effectiveInput = {
+          moderator_check: {
+            ...input.moderator_check,
+            thresholds: {
+              ...input.moderator_check.thresholds,
+              ...tenantData.moderationThresholds,
+            },
+            tenant_id: tenantId,
+          },
+        };
+      }
+    }
+
+    const results = this.policy.evaluate(effectiveInput);
 
     const raw = results?.[0]?.expressions?.[0]?.value as
       | Record<string, unknown>
@@ -184,14 +237,28 @@ export class OpaEvaluator {
    *
    * @throws {Error} if initialize() has not been called.
    */
-  evaluateClaimsCheck(input: OpaClaimsInput): OpaClaimsOutput {
+  evaluateClaimsCheck(input: OpaClaimsInput, tenantId?: string): OpaClaimsOutput {
     if (!this.policy) {
       throw new Error(
         "OpaEvaluator not initialized. Call initialize() before evaluateClaimsCheck().",
       );
     }
 
-    const results = this.policy.evaluate(input);
+    let effectiveInput = input;
+    if (tenantId) {
+      const tenantData = this.tenantPolicyData.get(tenantId);
+      if (tenantData?.claimsThreshold !== undefined) {
+        effectiveInput = {
+          claims_check: {
+            ...input.claims_check,
+            threshold: tenantData.claimsThreshold,
+            tenant_id: tenantId,
+          },
+        };
+      }
+    }
+
+    const results = this.policy.evaluate(effectiveInput);
 
     const raw = results?.[0]?.expressions?.[0]?.value as
       | Record<string, unknown>

@@ -301,7 +301,7 @@ describe("OpaClaimsCheck — ControlEngine integration", () => {
     expect(mockRegistry.getSimilarityScore).not.toHaveBeenCalled();
     expect(mockOpa.evaluateClaimsCheck).toHaveBeenCalledWith({
       claims_check: { similarity_score: 0.8, threshold: 0.6 },
-    });
+    }, undefined);
   });
 
   it("uses TF-IDF getSimilarityScore when isEmbeddingInitialized is false", async () => {

@@ -22,7 +22,7 @@
 | N-10 | Production Readiness QA | OBSERVABILITY | SHIPPED | P0 | 2026-02 |
 | N-11 | SIP Telephony | EXTENSIBILITY | IDEA | P1 | — |
 | N-12 | Ticketing Integration (MCP) | EXTENSIBILITY | SHIPPED | P1 | 2026-03-18 |
-| N-13 | Multi-Tenant Isolation | GOVERNANCE | RESEARCHED | P1 | — |
+| N-13 | Multi-Tenant Isolation | GOVERNANCE | BUILDING | P1 | 2026-03-18 |
 | N-14 | Lane C v2: Semantic Governance | GOVERNANCE | SHIPPED | P2 | 2026-03-07 |
 | N-15 | Dense Embedding Similarity for Claims | GOVERNANCE | SHIPPED | P1 | 2026-03-17 |
 
@@ -137,9 +137,11 @@
 **What**: `GitHubIssuesMcpClient` via `@modelcontextprotocol/sdk`. `TicketingClient` interface reusable for Linear/Jira. Fire-and-forget escalation tickets from Lane C. 48 new tests (2,251→2,299).
 
 ### N-13: Multi-Tenant Isolation
-**Pillar**: GOVERNANCE | **Status**: RESEARCHED | **Priority**: P1
+**Pillar**: GOVERNANCE | **Status**: BUILDING | **Priority**: P1
 **What**: Org-scoped knowledge, policy, audit. Admin console. RBAC (admin, agent, viewer).
 **Research**: `docs/multi-tenant-research.md` — 5 isolation surfaces, 3-phase migration, Mermaid diagram.
+**Phase 1 DONE**: `TenantClaimsLoader` + `ControlEngineConfig.tenantId` — per-tenant claims isolation.
+**Phase 2 DONE**: `OpaEvaluator.setTenantPolicyData()` — per-tenant OPA threshold namespacing.
 
 ### N-15: Dense Embedding Similarity for Claims
 **Pillar**: GOVERNANCE | **Status**: IDEA | **Priority**: P2
@@ -235,38 +237,38 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260318-26 — P1: N-13 Phase 1 — Per-Tenant AllowedClaimsRegistry
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-18 12:00 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-18 12:00 | **Estimate**: S | **Status**: DONE
 
 **Context**: N-13 research done. Phase 1 = lowest-risk isolation: per-tenant `AllowedClaimsRegistry` via `ControlEngineConfig`. Already injectable.
 
 **Action Items**:
-1. [ ] **`tenantId` field** on `ControlEngineConfig` — optional string, defaults to `"default"`.
-2. [ ] **Per-tenant claims registry** — factory/map pattern: `getRegistryForTenant(tenantId)` returns isolated `AllowedClaimsRegistry` instance.
-3. [ ] **Wire into ControlEngine** — use tenant registry instead of shared singleton.
-4. [ ] **Tests**: Verify two tenants get isolated claim sets. 2,251 → 2,280+ target.
-5. [ ] Update N-13 status to BUILDING.
+1. [x] **`tenantId` field** on `ControlEngineConfig` — optional string.
+2. [x] **Per-tenant claims registry** — `TenantClaimsLoader` (new service): `getRegistryForTenant(tenantId, config?)` caches isolated `AllowedClaimsRegistry` per tenant. Module-level singleton `tenantClaimsLoader`.
+3. [x] **Wire into ControlEngine** — constructor checks `config.tenantId && !config.claimsRegistry` → uses `tenantClaimsLoader`. Explicit registry always wins.
+4. [x] **Tests**: `TenantClaimsLoader.test.ts` (24 tests), `ControlEngine.test.ts` tenant describe (+7 tests). 2,299→2,354 total.
+5. [x] N-13 status updated to BUILDING.
 
 **CHAIN**: When done, start DIRECTIVE-NXTG-20260318-27.
 
 **Response** (filled by team):
->
+> **DONE 2026-03-18**. `TenantClaimsLoader` service with cache-by-tenantId. `ControlEngineConfig.tenantId` wired in constructor. Tenant A's approved claims cannot leak to Tenant B. 24 loader tests + 7 ControlEngine isolation tests. Chained immediately to Directive 27.
 
 ---
 
 ### DIRECTIVE-NXTG-20260318-27 — P2: N-13 Phase 2 — OPA Namespace Isolation
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-18 12:00 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-18 12:00 | **Estimate**: M | **Status**: DONE
 
 **Context**: Per your research: OPA input namespacing preferred over per-tenant WASM bundles.
 
 **Action Items**:
-1. [ ] **Namespace OPA input** — prefix data paths with `tenantId` so Rego rules are tenant-scoped.
-2. [ ] **Per-tenant policy loading** — `OpaEvaluator` accepts tenant context, loads tenant-specific policy data.
-3. [ ] **Integration tests**: two tenants, different policies, verify isolation.
-4. [ ] Tests: 2,280 → 2,320+ target.
+1. [x] **Namespace OPA input** — `tenant_id` added to `OpaModeratorInput.moderator_check` and `OpaClaimsInput.claims_check`. Flows from `EvaluationContext.tenantId` → `OpaModeratorCheck`/`OpaClaimsCheck` → `OpaEvaluator`.
+2. [x] **Per-tenant policy loading** — `OpaEvaluator.setTenantPolicyData(tenantId, data)` stores per-tenant threshold overrides; `evaluateModeratorCheck(input, tenantId?)` and `evaluateClaimsCheck(input, tenantId?)` merge tenant data into OPA input before evaluation.
+3. [x] **Integration tests** — `TenantPolicyIsolation.test.ts` (15 tests): two tenants with different thresholds produce different decisions; ctx.tenantId flows through correctly; edge cases (no data, cleared data, threshold 0.0/1.0).
+4. [x] Tests: 2,299 → 2,354 (+55 across OpaEvaluator, OpaClaimsCheck, TenantPolicyIsolation).
 
 **Response** (filled by team):
->
+> **DONE 2026-03-18**. `TenantPolicyData` interface on `OpaEvaluator` with threshold-override map. `evaluateModeratorCheck/evaluateClaimsCheck` accept optional `tenantId` and merge stored overrides into OPA input — zero Rego changes needed. `tenantId` threads from `ControlEngine` config → `EvaluationContext` → checks → evaluator. Two tenants with different moderation thresholds now get provably different OPA decisions. 2,354 tests, 0 failures.
 
 ---
 

@@ -66,7 +66,7 @@ export class OpaClaimsCheck implements PolicyCheck {
         similarity_score: similarityScore,
         threshold: this.threshold,
       },
-    });
+    }, ctx.tenantId);
 
     if (opaResult.decision === "allow") {
       return { decision: "allow", reasonCodes: [], severity: 0 };

@@ -90,7 +90,7 @@ export class OpaModeratorCheck implements PolicyCheck {
         categories,
         thresholds: this.config.thresholds,
       },
-    });
+    }, ctx.tenantId);
 
     if (opaResult.decision === "allow") {
       return { decision: "allow", reasonCodes: [], severity: 0 };

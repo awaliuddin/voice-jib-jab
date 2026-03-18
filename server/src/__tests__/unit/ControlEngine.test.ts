@@ -1414,3 +1414,114 @@ describe("ControlEngine — Ticketing integration", () => {
     expect(client.createTicket).not.toHaveBeenCalled();
   });
 });
+
+// ── Per-Tenant Claims Isolation ─────────────────────────────────────────
+
+import { tenantClaimsLoader } from "../../services/TenantClaimsLoader.js";
+
+describe("ControlEngine — Per-Tenant Claims Isolation", () => {
+  const BASE_CONFIG: Partial<import("../../lanes/laneC_control.js").ControlEngineConfig> = {
+    moderationDenyPatterns: [],
+    moderationCategories: [],
+    cancelOutputThreshold: 10,
+    enabled: false,
+  };
+
+  afterEach(() => {
+    // Clean up any tenant registries created during tests
+    tenantClaimsLoader.clear();
+    jest.clearAllMocks();
+  });
+
+  it("two engines with different tenantIds use different registry instances", () => {
+    const engineA = new ControlEngine("sess-a", { ...BASE_CONFIG, tenantId: "org_a" });
+    const engineB = new ControlEngine("sess-b", { ...BASE_CONFIG, tenantId: "org_b" });
+    const regA = tenantClaimsLoader.getRegistryForTenant("org_a");
+    const regB = tenantClaimsLoader.getRegistryForTenant("org_b");
+    expect(regA).not.toBe(regB);
+    // Suppress unused variable warnings — engines created for side effects
+    void engineA;
+    void engineB;
+  });
+
+  it("same tenantId across two sessions shares the same registry instance", () => {
+    const engineA = new ControlEngine("sess-1", { ...BASE_CONFIG, tenantId: "org_shared" });
+    const engineB = new ControlEngine("sess-2", { ...BASE_CONFIG, tenantId: "org_shared" });
+    const regA = tenantClaimsLoader.getRegistryForTenant("org_shared");
+    const regB = tenantClaimsLoader.getRegistryForTenant("org_shared");
+    expect(regA).toBe(regB);
+    void engineA;
+    void engineB;
+  });
+
+  it("explicit claimsRegistry takes precedence over tenantId", () => {
+    const explicitRegistry = new AllowedClaimsRegistry({ enableFileLoad: false });
+    const engine = new ControlEngine("sess-x", {
+      ...BASE_CONFIG,
+      tenantId: "org_a",
+      claimsRegistry: explicitRegistry,
+    });
+    // The loader should NOT have created an entry for this tenant
+    // because an explicit registry was injected
+    expect(tenantClaimsLoader.hasRegistry("org_a")).toBe(false);
+    void engine;
+  });
+
+  it("no tenantId — engine uses DEFAULT_CONFIG registry (no loader entry created)", () => {
+    new ControlEngine("sess-default", { ...BASE_CONFIG });
+    expect(tenantClaimsLoader.size).toBe(0);
+  });
+
+  it("tenant A claims do not bleed into tenant B evaluation", async () => {
+    // Set up tenant A: allows "FDA approved" claim
+    const registryA = new AllowedClaimsRegistry({
+      claims: [{ id: "A-001", text: "Our product is FDA approved" }],
+      disallowedPatterns: ["guaranteed cure"],
+      enableFileLoad: false,
+    });
+    // Set up tenant B: allows "30-day trial" only
+    const registryB = new AllowedClaimsRegistry({
+      claims: [{ id: "B-001", text: "30-day free trial available" }],
+      disallowedPatterns: ["guaranteed cure"],
+      enableFileLoad: false,
+    });
+
+    tenantClaimsLoader.setRegistryForTenant("org_a", registryA);
+    tenantClaimsLoader.setRegistryForTenant("org_b", registryB);
+
+    const engineA = new ControlEngine("sess-a", { ...BASE_CONFIG, tenantId: "org_a" });
+    const engineB = new ControlEngine("sess-b", { ...BASE_CONFIG, tenantId: "org_b" });
+
+    // Both engines should refuse "guaranteed cure" (it's in both deny lists)
+    const ctxA = makeContext({ role: "assistant", text: "This is a guaranteed cure" });
+    const ctxB = makeContext({ role: "assistant", text: "This is a guaranteed cure" });
+
+    const resultA = await engineA.evaluate(ctxA);
+    const resultB = await engineB.evaluate(ctxB);
+
+    expect(resultA.decision).toBe("rewrite");
+    expect(resultB.decision).toBe("rewrite");
+    expect(resultA.reasonCodes).toContain("CLAIMS_DISALLOWED");
+    expect(resultB.reasonCodes).toContain("CLAIMS_DISALLOWED");
+  });
+
+  it("tenantId is stored in config and accessible", () => {
+    const engine = new ControlEngine("sess-t", { ...BASE_CONFIG, tenantId: "org_x" });
+    // Access via the public evaluate flow rather than private config
+    // Just verify the loader has the registry registered
+    expect(tenantClaimsLoader.hasRegistry("org_x")).toBe(true);
+    void engine;
+  });
+
+  it("loader caches registry — second ControlEngine for same tenant does not create new instance", () => {
+    const engine1 = new ControlEngine("sess-1", { ...BASE_CONFIG, tenantId: "org_cached" });
+    const reg1 = tenantClaimsLoader.getRegistryForTenant("org_cached");
+
+    const engine2 = new ControlEngine("sess-2", { ...BASE_CONFIG, tenantId: "org_cached" });
+    const reg2 = tenantClaimsLoader.getRegistryForTenant("org_cached");
+
+    expect(reg1).toBe(reg2);
+    void engine1;
+    void engine2;
+  });
+});

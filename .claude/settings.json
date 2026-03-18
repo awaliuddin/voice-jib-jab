@@ -26,5 +26,19 @@
     "auto_open_files": [],
     "sidebar_visible": true,
     "panel_visible": true
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /home/axw/ASIF/scripts/post-push-ci-check.sh",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
   }
 }

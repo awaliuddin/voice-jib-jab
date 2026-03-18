@@ -1,0 +1,17 @@
+{
+  "id": "F-006",
+  "description": "test inline capture works great",
+  "severity": "positive",
+  "finding_type": "positive",
+  "related_tasks": [
+    "T-012",
+    "T-013",
+    "T-015",
+    "T-016",
+    "V-010",
+    "V-011",
+    "V-012",
+    "V-013"
+  ],
+  "created_at": "2026-02-14T05:15:31.881593304Z"
+}

@@ -32,7 +32,7 @@ jest.mock("fs", () => ({
 // ── Imports (after mocks) ─────────────────────────────────────────────────
 
 import { OpaEvaluator } from "../../insurance/opa_evaluator.js";
-import type { OpaCheckInput, OpaOutput } from "../../insurance/opa_evaluator.js";
+import type { OpaCheckInput, OpaOutput, TenantPolicyData, OpaModeratorInput, OpaClaimsInput } from "../../insurance/opa_evaluator.js";
 import {
   PolicyGate,
   type EvaluationContext,
@@ -554,5 +554,227 @@ describe("OpaEvaluator — edge cases", () => {
     const result = await gate.evaluate(makeCtx());
     expect(result.safeRewrite).toBeUndefined();
     expect(result.requiredDisclaimerId).toBeUndefined();
+  });
+});
+
+// ── Group 8: TenantPolicyData ─────────────────────────────────────────────
+
+describe("OpaEvaluator — TenantPolicyData", () => {
+  // ── Storage / retrieval ────────────────────────────────────────────
+
+  test("setTenantPolicyData() stores data retrievable via getTenantPolicyData()", () => {
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    const data: TenantPolicyData = { moderationThresholds: { HATE: 0.3 }, claimsThreshold: 0.7 };
+    ev.setTenantPolicyData("tenant-A", data);
+    expect(ev.getTenantPolicyData("tenant-A")).toEqual(data);
+  });
+
+  test("getTenantPolicyData() returns undefined for unknown tenantId", () => {
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    expect(ev.getTenantPolicyData("non-existent")).toBeUndefined();
+  });
+
+  test("clearTenantPolicyData(tenantId) removes that tenant's data", () => {
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev.setTenantPolicyData("tenant-A", { claimsThreshold: 0.5 });
+    ev.setTenantPolicyData("tenant-B", { claimsThreshold: 0.8 });
+    ev.clearTenantPolicyData("tenant-A");
+    expect(ev.getTenantPolicyData("tenant-A")).toBeUndefined();
+    expect(ev.getTenantPolicyData("tenant-B")).toBeDefined();
+  });
+
+  test("clearTenantPolicyData() with no args clears all tenants", () => {
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev.setTenantPolicyData("tenant-A", { claimsThreshold: 0.5 });
+    ev.setTenantPolicyData("tenant-B", { claimsThreshold: 0.8 });
+    ev.clearTenantPolicyData();
+    expect(ev.getTenantPolicyData("tenant-A")).toBeUndefined();
+    expect(ev.getTenantPolicyData("tenant-B")).toBeUndefined();
+  });
+
+  // ── evaluateModeratorCheck with tenant overrides ───────────────────
+
+  test("evaluateModeratorCheck with tenantId — tenant thresholds override input thresholds", () => {
+    const mockPolicy = {
+      evaluate: jest.fn().mockReturnValue([
+        { expressions: [{ value: { decision: "allow", severity: 0, reason_code: null } }] },
+      ]),
+    };
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev._injectPolicy(mockPolicy);
+    ev.setTenantPolicyData("tenant-strict", { moderationThresholds: { HATE: 0.1 } });
+
+    const input: OpaModeratorInput = {
+      moderator_check: {
+        categories: [{ name: "HATE", score: 0.5 }],
+        thresholds: { HATE: 0.8, default: 0.5 },
+      },
+    };
+    ev.evaluateModeratorCheck(input, "tenant-strict");
+
+    const calledWith = mockPolicy.evaluate.mock.calls[0][0] as OpaModeratorInput;
+    // Tenant threshold for HATE overrides 0.8 → 0.1
+    expect(calledWith.moderator_check.thresholds.HATE).toBe(0.1);
+    // Global default remains
+    expect(calledWith.moderator_check.thresholds.default).toBe(0.5);
+    // tenant_id is injected into input
+    expect(calledWith.moderator_check.tenant_id).toBe("tenant-strict");
+  });
+
+  test("evaluateModeratorCheck without tenantId — uses input thresholds unchanged", () => {
+    const mockPolicy = {
+      evaluate: jest.fn().mockReturnValue([
+        { expressions: [{ value: { decision: "allow", severity: 0, reason_code: null } }] },
+      ]),
+    };
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev._injectPolicy(mockPolicy);
+    ev.setTenantPolicyData("tenant-strict", { moderationThresholds: { HATE: 0.1 } });
+
+    const input: OpaModeratorInput = {
+      moderator_check: {
+        categories: [{ name: "HATE", score: 0.5 }],
+        thresholds: { HATE: 0.8, default: 0.5 },
+      },
+    };
+    ev.evaluateModeratorCheck(input); // no tenantId
+
+    const calledWith = mockPolicy.evaluate.mock.calls[0][0] as OpaModeratorInput;
+    expect(calledWith).toBe(input); // exact same reference — no mutation
+    expect(calledWith.moderator_check.thresholds.HATE).toBe(0.8);
+  });
+
+  test("evaluateModeratorCheck with tenantId but no stored data — uses input thresholds unchanged", () => {
+    const mockPolicy = {
+      evaluate: jest.fn().mockReturnValue([
+        { expressions: [{ value: { decision: "allow", severity: 0, reason_code: null } }] },
+      ]),
+    };
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev._injectPolicy(mockPolicy);
+
+    const input: OpaModeratorInput = {
+      moderator_check: {
+        categories: [{ name: "HATE", score: 0.5 }],
+        thresholds: { HATE: 0.8 },
+      },
+    };
+    ev.evaluateModeratorCheck(input, "unknown-tenant");
+
+    const calledWith = mockPolicy.evaluate.mock.calls[0][0] as OpaModeratorInput;
+    expect(calledWith).toBe(input);
+  });
+
+  // ── evaluateClaimsCheck with tenant overrides ─────────────────────
+
+  test("evaluateClaimsCheck with tenantId — tenant claimsThreshold overrides input threshold", () => {
+    const mockPolicy = {
+      evaluate: jest.fn().mockReturnValue([
+        { expressions: [{ value: { decision: "allow", severity: 0, reason_code: null } }] },
+      ]),
+    };
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev._injectPolicy(mockPolicy);
+    ev.setTenantPolicyData("tenant-A", { claimsThreshold: 0.9 });
+
+    const input: OpaClaimsInput = { claims_check: { similarity_score: 0.85, threshold: 0.6 } };
+    ev.evaluateClaimsCheck(input, "tenant-A");
+
+    const calledWith = mockPolicy.evaluate.mock.calls[0][0] as OpaClaimsInput;
+    expect(calledWith.claims_check.threshold).toBe(0.9);
+    expect(calledWith.claims_check.tenant_id).toBe("tenant-A");
+  });
+
+  test("evaluateClaimsCheck without tenantId — uses input threshold unchanged", () => {
+    const mockPolicy = {
+      evaluate: jest.fn().mockReturnValue([
+        { expressions: [{ value: { decision: "allow", severity: 0, reason_code: null } }] },
+      ]),
+    };
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev._injectPolicy(mockPolicy);
+    ev.setTenantPolicyData("tenant-A", { claimsThreshold: 0.9 });
+
+    const input: OpaClaimsInput = { claims_check: { similarity_score: 0.85, threshold: 0.6 } };
+    ev.evaluateClaimsCheck(input); // no tenantId
+
+    const calledWith = mockPolicy.evaluate.mock.calls[0][0] as OpaClaimsInput;
+    expect(calledWith).toBe(input);
+    expect(calledWith.claims_check.threshold).toBe(0.6);
+  });
+
+  test("evaluateClaimsCheck with tenantId but no stored claimsThreshold — uses input threshold", () => {
+    const mockPolicy = {
+      evaluate: jest.fn().mockReturnValue([
+        { expressions: [{ value: { decision: "allow", severity: 0, reason_code: null } }] },
+      ]),
+    };
+    const ev = new OpaEvaluator("/fake/bundle.wasm");
+    ev._injectPolicy(mockPolicy);
+    // Store only moderationThresholds, not claimsThreshold
+    ev.setTenantPolicyData("tenant-A", { moderationThresholds: { HATE: 0.2 } });
+
+    const input: OpaClaimsInput = { claims_check: { similarity_score: 0.85, threshold: 0.6 } };
+    ev.evaluateClaimsCheck(input, "tenant-A");
+
+    const calledWith = mockPolicy.evaluate.mock.calls[0][0] as OpaClaimsInput;
+    expect(calledWith).toBe(input); // unchanged — claimsThreshold not set
+  });
+
+  // ── Cross-tenant isolation ─────────────────────────────────────────
+
+  test("two tenants with different thresholds produce different effective inputs", () => {
+    const makePolicy = () => ({
+      evaluate: jest.fn().mockReturnValue([
+        { expressions: [{ value: { decision: "allow", severity: 0, reason_code: null } }] },
+      ]),
+    });
+    const policyA = makePolicy();
+    const policyB = makePolicy();
+
+    const evA = new OpaEvaluator("/fake/bundle.wasm");
+    evA._injectPolicy(policyA);
+    evA.setTenantPolicyData("tenant-strict", { claimsThreshold: 0.95 });
+
+    const evB = new OpaEvaluator("/fake/bundle.wasm");
+    evB._injectPolicy(policyB);
+    evB.setTenantPolicyData("tenant-lenient", { claimsThreshold: 0.3 });
+
+    const input: OpaClaimsInput = { claims_check: { similarity_score: 0.5, threshold: 0.6 } };
+
+    evA.evaluateClaimsCheck(input, "tenant-strict");
+    evB.evaluateClaimsCheck(input, "tenant-lenient");
+
+    const calledA = policyA.evaluate.mock.calls[0][0] as OpaClaimsInput;
+    const calledB = policyB.evaluate.mock.calls[0][0] as OpaClaimsInput;
+
+    expect(calledA.claims_check.threshold).toBe(0.95);
+    expect(calledB.claims_check.threshold).toBe(0.3);
+  });
+
+  // ── Type-level checks (compilation confirms field presence) ───────
+
+  test("OpaModeratorInput has optional tenant_id field in moderator_check", () => {
+    // If this compiles, the interface is correct
+    const input: OpaModeratorInput = {
+      moderator_check: {
+        categories: [],
+        thresholds: {},
+        tenant_id: "tenant-xyz",
+      },
+    };
+    expect(input.moderator_check.tenant_id).toBe("tenant-xyz");
+  });
+
+  test("OpaClaimsInput has optional tenant_id field in claims_check", () => {
+    // If this compiles, the interface is correct
+    const input: OpaClaimsInput = {
+      claims_check: {
+        similarity_score: 0.5,
+        threshold: 0.6,
+        tenant_id: "tenant-xyz",
+      },
+    };
+    expect(input.claims_check.tenant_id).toBe("tenant-xyz");
   });
 });

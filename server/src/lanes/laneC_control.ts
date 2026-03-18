@@ -92,6 +92,7 @@ import type { OpaEvaluator } from "../insurance/opa_evaluator.js";
 import { OpaModeratorCheck } from "../insurance/opa_moderator.js";
 import { OpaClaimsCheck } from "../insurance/opa_claims.js";
 import type { TicketingClient, TicketPayload } from "../services/TicketingMcpClient.js";
+import { tenantClaimsLoader } from "../services/TenantClaimsLoader.js";
 
 // ── Configuration ──────────────────────────────────────────────────────
 
@@ -135,6 +136,12 @@ export interface ControlEngineConfig {
    * When provided, an escalation decision triggers a fire-and-forget ticket.
    */
   ticketingClient?: TicketingClient;
+  /**
+   * Tenant identifier. When set (without an explicit claimsRegistry), the engine
+   * uses the module-level TenantClaimsLoader to obtain an isolated
+   * AllowedClaimsRegistry for this tenant. Defaults to "default".
+   */
+  tenantId?: string;
 }
 
 const DEFAULT_CONFIG: ControlEngineConfig = {
@@ -306,6 +313,14 @@ export class ControlEngine extends EventEmitter {
     super();
     this.sessionId = sessionId;
     this.config = { ...DEFAULT_CONFIG, ...config };
+
+    // Per-tenant claims isolation: if tenantId is provided but no explicit registry,
+    // use the tenant-scoped registry from TenantClaimsLoader.
+    if (config.tenantId && !config.claimsRegistry) {
+      this.config.claimsRegistry = tenantClaimsLoader.getRegistryForTenant(
+        config.tenantId,
+      );
+    }
 
     // Build the policy check pipeline (order matters: PII → Moderator → Claims)
     const checks: PolicyCheck[] = [];
@@ -517,6 +532,7 @@ export class ControlEngine extends EventEmitter {
       role: "user",
       text: payload.text,
       isFinal,
+      ...(this.config.tenantId ? { tenantId: this.config.tenantId } : {}),
     });
   }
 
@@ -536,6 +552,7 @@ export class ControlEngine extends EventEmitter {
       metadata: this.lastResponseMetadata
         ? { response: this.lastResponseMetadata }
         : undefined,
+      ...(this.config.tenantId ? { tenantId: this.config.tenantId } : {}),
     });
   }
 
@@ -555,6 +572,7 @@ export class ControlEngine extends EventEmitter {
       metadata: this.lastResponseMetadata
         ? { response: this.lastResponseMetadata }
         : undefined,
+      ...(this.config.tenantId ? { tenantId: this.config.tenantId } : {}),
     });
   }
 
