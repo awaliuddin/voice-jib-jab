@@ -240,29 +240,57 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
-### DIRECTIVE-NXTG-20260318-100 — P1: Session Recording + Replay
+### DIRECTIVE-NXTG-20260318-110 — P1: Admin API — Tenant Management + System Config
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-18 18:00 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-18 19:15 | **Estimate**: M | **Status**: PENDING
 
 **Action Items**:
-1. [ ] **Record voice sessions** — capture audio input/output + Lane decisions + policy events as structured log.
-2. [ ] **Replay endpoint** — `GET /sessions/:id/replay` returns session timeline with audio segments + decision points.
-3. [ ] **Session storage** — save to disk (JSON + audio chunks). Configurable retention.
+1. [ ] **`POST /admin/tenants`** — create tenant (name, claims config, policy level).
+2. [ ] **`GET /admin/tenants`** — list tenants with session count, policy version.
+3. [ ] **`PUT /admin/config`** — update system config (moderation sensitivity, SIP trunk, TTS engine) without restart.
 4. [ ] Tests.
 
-**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-101.
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-111.
 **Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260318-111 — P2: Final NEXUS Archive + Session Summary
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 19:15 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] Archive DONE directives. 2. [ ] Final test count. 3. [ ] All initiatives shipped today.
+
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260318-100 — P1: Session Recording + Replay
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-18 18:00 | **Estimate**: M | **Status**: DONE
+
+**Action Items**:
+1. [x] **Record voice sessions** — capture audio input/output + Lane decisions + policy events as structured log.
+2. [x] **Replay endpoint** — `GET /sessions/:id/replay` returns session timeline with audio segments + decision points.
+3. [x] **Session storage** — save to disk (JSON + audio chunks). Configurable retention.
+4. [x] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-101.
+**Response** (filled by team):
+> **DONE 2026-03-18**. SessionRecorder service + /sessions API + 30 new tests. Delivered as part of D-100 chain.
 
 ---
 
 ### DIRECTIVE-NXTG-20260318-101 — P2: Final Session Archive
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-18 18:00 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-18 18:00 | **Estimate**: S | **Status**: DONE
 
 **Action Items**:
-1. [ ] Archive DONE directives. 2. [ ] Final test count + session summary.
+1. [x] Archive DONE directives. 2. [x] Final test count + session summary.
 
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-18**. Archived 15 directives to NEXUS-archive.md Batch 4. Final server tests: 2533/2533, client: 79/79. All D-100 deliverables confirmed: SessionRecorder, /sessions API, 30 new tests.
 
 ---
 
