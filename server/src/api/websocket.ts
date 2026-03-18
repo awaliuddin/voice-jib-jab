@@ -27,6 +27,7 @@ import {
   SessionContext,
 } from "../storage/index.js";
 import type { OpaEvaluator } from "../insurance/opa_evaluator.js";
+import type { SessionRecorder } from "../services/SessionRecorder.js";
 
 interface ClientConnection {
   ws: WebSocket;
@@ -64,11 +65,13 @@ export class VoiceWebSocketServer {
   private wss: WebSocketServer;
   private connections: Map<WebSocket, ClientConnection>;
   private opaEvaluator: OpaEvaluator | undefined;
+  private sessionRecorder: SessionRecorder | undefined;
 
-  constructor(server: any, opaEvaluator?: OpaEvaluator) {
+  constructor(server: any, opaEvaluator?: OpaEvaluator, sessionRecorder?: SessionRecorder) {
     this.wss = new WebSocketServer({ server });
     this.connections = new Map();
     this.opaEvaluator = opaEvaluator;
+    this.sessionRecorder = sessionRecorder;
 
     // Initialize storage if persistent memory or audit trail is enabled
     if (
@@ -653,6 +656,9 @@ export class VoiceWebSocketServer {
 
       switch (message.type) {
         case "session.start":
+          // Start recording this session
+          this.sessionRecorder?.startRecording(sessionId, message.tenantId);
+
           // New session — ensure audio gate is open
           connection.audioStopped = false;
 
@@ -1069,6 +1075,11 @@ export class VoiceWebSocketServer {
         console.error("[WebSocket] Failed to save session summary:", error);
       }
     }
+
+    // Stop session recording and flush to disk
+    this.sessionRecorder?.stopRecording(sessionId).catch((error) => {
+      console.error("[WebSocket] Failed to stop session recording:", error);
+    });
 
     laneArbitrator.endSession();
     fallbackPlanner.stop();

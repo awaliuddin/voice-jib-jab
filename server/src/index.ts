@@ -5,10 +5,16 @@
 
 import express from "express";
 import { createServer } from "http";
+import { dirname, resolve } from "path";
 import { config } from "./config/index.js";
 import { VoiceWebSocketServer } from "./api/websocket.js";
 import { sessionManager } from "./orchestrator/SessionManager.js";
 import { OpaEvaluator } from "./insurance/opa_evaluator.js";
+import { SessionRecorder } from "./services/SessionRecorder.js";
+import { createSessionsRouter } from "./api/sessions.js";
+import { createAdminRouter } from "./api/admin.js";
+import { tenantRegistry, initTenantRegistry } from "./services/TenantRegistry.js";
+import { systemConfigStore } from "./services/SystemConfigStore.js";
 
 const app = express();
 const server = createServer(app);
@@ -174,13 +180,27 @@ async function initializeOpa(): Promise<OpaEvaluator | undefined> {
 
 // ── Startup ───────────────────────────────────────────────────────────────
 
+// ── Session Recorder singleton ────────────────────────────────────────
+export const sessionRecorder = new SessionRecorder({
+  recordingsDir: resolve(dirname(config.storage.databasePath), "recordings"),
+  storeRawAudio: config.safety.storeRawAudio,
+  retentionDays: 7,
+});
+
+// Mount sessions API
+app.use("/sessions", createSessionsRouter(sessionRecorder));
+
+// ── Tenant Registry + Admin API ──────────────────────────────────────
+initTenantRegistry(resolve(dirname(config.storage.databasePath), "tenants.json"));
+app.use("/admin", createAdminRouter(tenantRegistry, systemConfigStore));
+
 async function startServer(): Promise<void> {
   // Initialize OPA singleton before accepting any sessions
   const opaEvaluator = await initializeOpa();
 
   // Initialize WebSocket server — passes pre-initialized OPA singleton
   // so every per-session ControlEngine receives the same loaded bundle.
-  new VoiceWebSocketServer(server, opaEvaluator);
+  new VoiceWebSocketServer(server, opaEvaluator, sessionRecorder);
 
   server.listen(config.port, () => {
     console.log(
@@ -208,7 +228,9 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Health: http://localhost:${config.port}/health`);
     console.log(`[Server] Status: http://localhost:${config.port}/status`);
     console.log(`[Server] Metrics: http://localhost:${config.port}/metrics`);
-    console.log(`[Server] Dashboard: http://localhost:${config.port}/dashboard\n`);
+    console.log(`[Server] Dashboard: http://localhost:${config.port}/dashboard`);
+    console.log(`[Server] Sessions: http://localhost:${config.port}/sessions`);
+    console.log(`[Server] Admin API: http://localhost:${config.port}/admin\n`);
 
     console.log("Features:");
     console.log(

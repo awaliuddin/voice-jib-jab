@@ -2,7 +2,7 @@
 
 A production voice agent runtime focused on eliminating the two things that kill enterprise voice deployments: **bad latency** and **ungoverned output**. Browser-based speech-to-speech assistant with lane-based orchestration, async policy enforcement, and retrieval-augmented generation.
 
-**Status:** 17/17 initiatives SHIPPED + 1 BUILDING | 2,450+ tests | 91%+ coverage
+**Status:** 17/17 initiatives SHIPPED + 1 BUILDING | 2,533 server + 79 client tests | 91%+ coverage
 
 ## Architecture
 
@@ -62,7 +62,7 @@ Lane C runs in parallel with Lane B, never blocking audio. As of N-15 (2026-03-1
 | OPA policy eval | <1ms (WASM in-process) |
 | Tenant registry lookup | <0.1ms (O(1) Map) |
 | Fire-and-forget ticket overhead | 0ms |
-| Test suite | 2,450 tests, 0 failures |
+| Test suite | 2,612 tests (2,533 server + 79 client), 0 failures |
 | Server coverage | >91% lines |
 
 ## Getting Started
@@ -147,7 +147,7 @@ npm run format
 
 | Metric | Value |
 |--------|-------|
-| Test count | 2,450+ |
+| Test count | 2,612 (2,533 server + 79 client) |
 | Statement coverage | 91%+ |
 | Branch coverage | 81%+ |
 | Coverage floor (enforced) | stmt 88 / branch 78 / fn 87 / lines 88 |
