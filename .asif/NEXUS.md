@@ -233,21 +233,21 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260318-07 — P2: Documentation + Architecture Diagram + Changelog
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-18 09:00 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-18 09:00 | **Estimate**: S | **Status**: DONE
 
 **Context**: 15/15 SHIPPED. 2,251 tests. 94% coverage. CRUCIBLE clean. Next M-sized initiatives need Asif. Make the project showcase-ready.
 
 **Action Items**:
-1. [ ] **CHANGELOG.md** — create from git history. Group by initiative (N-01 through N-15). Include test counts at each milestone.
-2. [ ] **Architecture diagram** — Lane A/B/C architecture, PolicyGate flow, OPA integration, dense embedding pipeline. Mermaid format.
-3. [ ] **API documentation** — WebSocket protocol, control commands, voice pipeline config.
-4. [ ] **Contributing guide** — setup, test running, architecture overview for new contributors.
+1. [x] **CHANGELOG.md** — created from git history. 15 initiative sections (N-01 through N-15) + quality hardening. Test counts at each milestone (713 at N-07, 1,028 at N-09/N-10, 2,168 at N-15 Sprint 2, 2,251 post-hardening). 179 lines.
+2. [x] **Architecture diagram** — `docs/architecture/ARCHITECTURE.md`. 5 Mermaid diagrams: system overview, three-lane architecture, Lane C PolicyGate flow, LaneArbitrator state machine, N-15 dense embedding pipeline. 296 lines.
+3. [x] **API documentation** — `docs/API.md`. WebSocket protocol, all 9 client→server + 17 server→client message types with TypeScript interfaces, voice pipeline config (env vars, ControlEngineConfig, moderation categories, claims registry), policy decision semantics, error handling. 788 lines.
+4. [x] **Contributing guide** — `CONTRIBUTING.md`. Setup, test running, coverage floors, adding policy checks (with async PolicyCheck interface example), mock patterns, commit conventions, PR checklist. 262 lines. No internal governance details exposed.
 
 **Constraints**:
 - S-sized documentation — no code changes
 
-**Response** (filled by team):
->
+**Response** (2026-03-18):
+> **SHIPPED.** Four showcase-ready documentation files created in parallel (1,525 lines total). No source code changed. Project is now developer-onboarding ready: CHANGELOG traces the full N-01→N-15 journey with test counts, ARCHITECTURE.md gives visual clarity on all 5 system dimensions via Mermaid, API.md gives a complete WebSocket protocol reference for integrators, CONTRIBUTING.md gives a clean public-facing onboarding path with the async PolicyCheck interface and CRUCIBLE two-oracle minimum (without exposing internal governance branding).
 
 ---
 
