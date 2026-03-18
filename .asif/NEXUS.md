@@ -240,6 +240,32 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260318-100 — P1: Session Recording + Replay
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-18 18:00 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Record voice sessions** — capture audio input/output + Lane decisions + policy events as structured log.
+2. [ ] **Replay endpoint** — `GET /sessions/:id/replay` returns session timeline with audio segments + decision points.
+3. [ ] **Session storage** — save to disk (JSON + audio chunks). Configurable retention.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260318-101.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260318-101 — P2: Final Session Archive
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-18 18:00 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] Archive DONE directives. 2. [ ] Final test count + session summary.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260318-79 — P1: WebSocket Client SDK + Integration Guide
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-18 16:15 | **Estimate**: M | **Status**: DONE
