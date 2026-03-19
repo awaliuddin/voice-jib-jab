@@ -249,6 +249,47 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260319-122 — P1: Voice Analytics Dashboard — Call Center Metrics
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 07:00 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Dashboard page** — aggregate metrics: calls/day, avg duration, sentiment distribution, escalation rate, top policy violations.
+2. [ ] **Per-tenant view** — filter by tenant. Compare tenants.
+3. [ ] **Export** — CSV download of call logs with policy decisions.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260319-123.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260319-123 — P1: Multilingual Voice Support — Language Detection + Routing
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 07:00 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Language detection** — detect caller language from first 5 seconds of audio.
+2. [ ] **Route to language-specific agent template** — English/Spanish/French templates with appropriate TTS voice + claims registry.
+3. [ ] **Fallback** — default to English if detection fails.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260319-124.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260319-124 — P2: IVR Menu Builder — Configurable Phone Tree
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-19 07:00 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **IVR config** — JSON-based phone tree: "Press 1 for support, 2 for sales..." 2. [ ] **DTMF detection** — route based on keypad input. 3. [ ] Tests.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260319-113 — P0: OPERATION FIRST DOLLAR — Voice Claim Verification Demo
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P0
 **Injected**: 2026-03-19 06:00 | **Estimate**: M | **Status**: DONE
