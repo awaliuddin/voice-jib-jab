@@ -244,6 +244,33 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260319-20 — P1: Voice Agent Templates — Pre-Built Personas
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 02:00 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Template system** — pre-configured voice agent profiles: Customer Support, Sales, Tech Support, Receptionist.
+2. [ ] **Each template** includes: claims registry, moderation sensitivity, TTS voice, greeting, escalation rules.
+3. [ ] **`POST /templates`** CRUD + **`POST /sessions/from-template/:id`** — start session from template.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260319-21.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260319-21 — P2: Compliance Report — Per-Session Audit Export
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-19 02:00 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **`GET /sessions/:id/compliance`** — export: all policy decisions, claims checked, escalations, with timestamps. PDF or JSON.
+2. [ ] Ties into EU AI Act compliance (cross-project with FP).
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260319-10 — P1: Conversation Summarizer — Auto-Generated Session Summaries
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-19 01:30 | **Estimate**: M | **Status**: DONE
