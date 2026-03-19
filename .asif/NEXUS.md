@@ -249,6 +249,36 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260319-113 — P0: OPERATION FIRST DOLLAR — Voice Claim Verification Demo
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P0
+**Injected**: 2026-03-19 06:00 | **Estimate**: M | **Status**: PENDING
+
+**Context**: REVENUE SPRINT. Build the "Faultline for phone calls" demo that shows enterprise value.
+
+**Action Items**:
+1. [ ] **Voice verification flow** — caller reads text → VJJ extracts text via speech-to-text → sends to FP API (`POST /scan`) → reads back verification results via TTS.
+2. [ ] **Integration with FP** — HTTP call to FP's scan endpoint. Parse results. Format as spoken response: "I found 5 claims. 3 verified. 2 unverified. The highest risk claim is..."
+3. [ ] **Demo script** at `docs/demo-voice-verification.md` — 60-second walkthrough.
+4. [ ] Tests for the integration flow (mock FP response).
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260319-114.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260319-114 — P1: Enterprise Demo Package
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 06:00 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Demo fixtures** — 3 pre-configured scenarios: customer support (warranty claims), compliance hotline (regulatory questions), sales qualification (product claims).
+2. [ ] **Demo launcher** — `npm run demo:support`, `npm run demo:compliance`, `npm run demo:sales`. Each starts a session with appropriate template + claims registry + policies.
+3. [ ] **Enterprise pitch doc** at `docs/enterprise-pitch.md` — features, pricing ($99+/seat), deployment options.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260319-43 — P2: Final Session Archive + Test Count
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
 **Injected**: 2026-03-19 04:00 | **Estimate**: S | **Status**: DONE
