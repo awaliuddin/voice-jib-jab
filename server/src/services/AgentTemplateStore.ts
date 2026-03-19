@@ -30,6 +30,7 @@ export interface AgentTemplate {
   name: string;
   persona: PersonaType;
   builtIn: boolean;
+  published: boolean;      // true = visible in marketplace
   greeting: string;
   claims: string[];
   disallowedPatterns: string[];
@@ -48,6 +49,7 @@ export const BUILTIN_TEMPLATES: AgentTemplate[] = [
     name: "Customer Support",
     persona: "customer_support",
     builtIn: true,
+    published: true,
     greeting: "Thank you for calling, how can I help you today?",
     claims: ["account issues", "billing", "refunds", "order status", "product information"],
     disallowedPatterns: ["competitor pricing", "legal advice", "medical advice"],
@@ -66,6 +68,7 @@ export const BUILTIN_TEMPLATES: AgentTemplate[] = [
     name: "Sales",
     persona: "sales",
     builtIn: true,
+    published: true,
     greeting: "Hi there! I'd love to help you find the perfect solution for your needs.",
     claims: ["product features", "pricing", "trials", "demos", "integrations", "case studies"],
     disallowedPatterns: ["competitor bashing", "false claims", "pressure tactics"],
@@ -84,6 +87,7 @@ export const BUILTIN_TEMPLATES: AgentTemplate[] = [
     name: "Tech Support",
     persona: "tech_support",
     builtIn: true,
+    published: true,
     greeting: "Tech support here. What issue are you experiencing today?",
     claims: ["troubleshooting", "configuration", "installation", "error codes", "network issues", "security"],
     disallowedPatterns: ["data deletion", "root access", "password sharing"],
@@ -102,6 +106,7 @@ export const BUILTIN_TEMPLATES: AgentTemplate[] = [
     name: "Receptionist",
     persona: "receptionist",
     builtIn: true,
+    published: true,
     greeting: "Good day! How may I direct your call?",
     claims: ["office hours", "contact information", "appointments", "directions", "general inquiries"],
     disallowedPatterns: ["personnel details", "internal systems", "confidential information"],
@@ -197,12 +202,13 @@ export class AgentTemplateStore {
 
   /** Create a new custom template. Persists immediately. */
   createTemplate(
-    opts: Omit<AgentTemplate, "templateId" | "createdAt" | "builtIn">,
+    opts: Omit<AgentTemplate, "templateId" | "createdAt" | "builtIn" | "published"> & { published?: boolean },
   ): AgentTemplate {
     const template: AgentTemplate = {
       ...opts,
       templateId: randomUUID(),
       builtIn: false,
+      published: opts.published ?? false,
       createdAt: new Date().toISOString(),
     };
 
@@ -245,6 +251,63 @@ export class AgentTemplateStore {
     this.templates.delete(templateId);
     this.saveToDisk();
     return true;
+  }
+
+  /** Publish a custom template to the marketplace. Returns false if built-in or not found. */
+  publishTemplate(templateId: string): AgentTemplate | undefined {
+    const existing = this.templates.get(templateId);
+    if (!existing || existing.builtIn) {
+      return undefined;
+    }
+    const updated: AgentTemplate = { ...existing, published: true };
+    this.templates.set(templateId, updated);
+    this.saveToDisk();
+    return updated;
+  }
+
+  /** Unpublish a custom template from the marketplace. Returns false if built-in or not found. */
+  unpublishTemplate(templateId: string): AgentTemplate | undefined {
+    const existing = this.templates.get(templateId);
+    if (!existing || existing.builtIn) {
+      return undefined;
+    }
+    const updated: AgentTemplate = { ...existing, published: false };
+    this.templates.set(templateId, updated);
+    this.saveToDisk();
+    return updated;
+  }
+
+  /** List all published templates (built-in + custom) — the marketplace catalog. */
+  listMarketplace(opts?: { persona?: PersonaType }): AgentTemplate[] {
+    let results = Array.from(this.templates.values()).filter((tpl) => tpl.published);
+    if (opts?.persona) {
+      results = results.filter((tpl) => tpl.persona === opts.persona);
+    }
+    return results;
+  }
+
+  /**
+   * Install a marketplace template for a tenant — creates a private copy with
+   * the given tenantId. Published flag on the copy starts as false (tenant's
+   * private copy is not re-published by default).
+   */
+  installTemplate(templateId: string, tenantId: string): AgentTemplate | undefined {
+    const source = this.templates.get(templateId);
+    if (!source || !source.published) {
+      return undefined;
+    }
+    return this.createTemplate({
+      name: source.name,
+      persona: source.persona,
+      greeting: source.greeting,
+      claims: [...source.claims],
+      disallowedPatterns: [...source.disallowedPatterns],
+      moderationSensitivity: source.moderationSensitivity,
+      ttsVoice: source.ttsVoice,
+      escalationRules: { ...source.escalationRules, escalateOnKeywords: [...source.escalationRules.escalateOnKeywords] },
+      tenantId,
+      published: false,
+    });
   }
 
   /** Get session configuration derived from a template. */

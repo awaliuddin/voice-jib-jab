@@ -32,6 +32,9 @@ import { initAgentTemplateStore } from "./services/AgentTemplateStore.js";
 import { createTemplatesRouter } from "./api/templates.js";
 import { supervisorRegistry } from "./services/SupervisorRegistry.js";
 import { SupervisorWebSocketServer, createSupervisorRouter } from "./api/supervisor.js";
+import { initRoutingEngine } from "./services/RoutingEngine.js";
+import { CallQueueService } from "./services/CallQueueService.js";
+import { createRoutingRouter } from "./api/routing.js";
 
 const app = express();
 const server = createServer(app);
@@ -241,6 +244,11 @@ app.use("/tenants", createKnowledgeRouter(kbStore));
 const templateStore = initAgentTemplateStore(resolve(dirname(config.storage.databasePath), "templates.json"));
 app.use("/templates", createTemplatesRouter(templateStore));
 
+// ── Call Routing + Queue System ───────────────────────────────────────
+const routingEngine = initRoutingEngine(resolve(dirname(config.storage.databasePath), "routing-rules.json"));
+const callQueue = new CallQueueService();
+app.use("/routing", createRoutingRouter(routingEngine, callQueue));
+
 // ── Supervisor System ─────────────────────────────────────────────────
 app.use("/supervisor", createSupervisorRouter(supervisorRegistry, sessionManager));
 const supervisorWsServer = new SupervisorWebSocketServer(supervisorRegistry, sessionManager);
@@ -305,6 +313,7 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Voice Triggers: http://localhost:${config.port}/voice/trigger`);
     console.log(`[Server] Voices API: http://localhost:${config.port}/voices`);
     console.log(`[Server] Knowledge Base: http://localhost:${config.port}/tenants/{tenantId}/kb`);
+    console.log(`[Server] Routing API: http://localhost:${config.port}/routing/rules`);
     console.log(`[Server] Templates API: http://localhost:${config.port}/templates`);
     console.log(`[Server] Supervisor WS: ws://localhost:${config.port}/supervisor\n`);
 

@@ -326,6 +326,178 @@ describe("AgentTemplateStore", () => {
     expect(customs[0].tenantId).toBe("x");
   });
 
+  // ── Marketplace tests ─────────────────────────────────────────────
+
+  it("createTemplate() sets published=false by default", () => {
+    const created = store.createTemplate({
+      name: "Unpublished Agent",
+      persona: "custom",
+      greeting: "Hello!",
+      claims: [],
+      disallowedPatterns: [],
+      moderationSensitivity: "low",
+      ttsVoice: "nova",
+      escalationRules: { escalateOnFrustration: false, escalateOnKeywords: [], maxTurnsBeforeEscalate: null },
+      tenantId: null,
+    });
+    expect(created.published).toBe(false);
+  });
+
+  it("createTemplate() respects explicit published=true", () => {
+    const created = store.createTemplate({
+      name: "Published Agent",
+      persona: "custom",
+      greeting: "Hello!",
+      claims: [],
+      disallowedPatterns: [],
+      moderationSensitivity: "low",
+      ttsVoice: "nova",
+      escalationRules: { escalateOnFrustration: false, escalateOnKeywords: [], maxTurnsBeforeEscalate: null },
+      tenantId: null,
+      published: true,
+    });
+    expect(created.published).toBe(true);
+  });
+
+  it("built-in templates are published=true", () => {
+    const builtIns = store.listTemplates().filter((t) => t.builtIn);
+    expect(builtIns.length).toBeGreaterThan(0);
+    expect(builtIns.every((t) => t.published)).toBe(true);
+  });
+
+  it("publishTemplate() sets published=true on custom template", () => {
+    const created = store.createTemplate({
+      name: "Publish Me",
+      persona: "custom",
+      greeting: "Hello!",
+      claims: [],
+      disallowedPatterns: [],
+      moderationSensitivity: "low",
+      ttsVoice: "nova",
+      escalationRules: { escalateOnFrustration: false, escalateOnKeywords: [], maxTurnsBeforeEscalate: null },
+      tenantId: null,
+    });
+    expect(created.published).toBe(false);
+
+    const published = store.publishTemplate(created.templateId);
+    expect(published).toBeDefined();
+    expect(published!.published).toBe(true);
+    expect(store.getTemplate(created.templateId)!.published).toBe(true);
+  });
+
+  it("publishTemplate() returns undefined for built-in", () => {
+    const result = store.publishTemplate("builtin-customer-support");
+    expect(result).toBeUndefined();
+  });
+
+  it("publishTemplate() returns undefined for unknown id", () => {
+    const result = store.publishTemplate("nonexistent-id");
+    expect(result).toBeUndefined();
+  });
+
+  it("unpublishTemplate() sets published=false on custom template", () => {
+    const created = store.createTemplate({
+      name: "Unpublish Me",
+      persona: "custom",
+      greeting: "Hello!",
+      claims: [],
+      disallowedPatterns: [],
+      moderationSensitivity: "low",
+      ttsVoice: "nova",
+      escalationRules: { escalateOnFrustration: false, escalateOnKeywords: [], maxTurnsBeforeEscalate: null },
+      tenantId: null,
+      published: true,
+    });
+    expect(created.published).toBe(true);
+
+    const unpublished = store.unpublishTemplate(created.templateId);
+    expect(unpublished).toBeDefined();
+    expect(unpublished!.published).toBe(false);
+  });
+
+  it("unpublishTemplate() returns undefined for built-in", () => {
+    const result = store.unpublishTemplate("builtin-customer-support");
+    expect(result).toBeUndefined();
+  });
+
+  it("listMarketplace() returns all published templates (builtins + custom)", () => {
+    const customPublished = store.createTemplate({
+      name: "Marketplace Agent",
+      persona: "custom",
+      greeting: "Buy me!",
+      claims: [],
+      disallowedPatterns: [],
+      moderationSensitivity: "low",
+      ttsVoice: "nova",
+      escalationRules: { escalateOnFrustration: false, escalateOnKeywords: [], maxTurnsBeforeEscalate: null },
+      tenantId: null,
+      published: true,
+    });
+
+    const marketplace = store.listMarketplace();
+    // 4 built-ins + the custom published one
+    expect(marketplace.length).toBeGreaterThanOrEqual(5);
+    expect(marketplace.every((t) => t.published)).toBe(true);
+    expect(marketplace.some((t) => t.templateId === customPublished.templateId)).toBe(true);
+  });
+
+  it("listMarketplace() excludes unpublished custom templates", () => {
+    const unpublished = store.createTemplate({
+      name: "Hidden Agent",
+      persona: "custom",
+      greeting: "You cannot see me!",
+      claims: [],
+      disallowedPatterns: [],
+      moderationSensitivity: "low",
+      ttsVoice: "nova",
+      escalationRules: { escalateOnFrustration: false, escalateOnKeywords: [], maxTurnsBeforeEscalate: null },
+      tenantId: null,
+      published: false,
+    });
+
+    const marketplace = store.listMarketplace();
+    expect(marketplace.some((t) => t.templateId === unpublished.templateId)).toBe(false);
+  });
+
+  it("listMarketplace({ persona }) filters by persona", () => {
+    const salesOnly = store.listMarketplace({ persona: "sales" });
+    expect(salesOnly.every((t) => t.persona === "sales")).toBe(true);
+    expect(salesOnly.every((t) => t.published)).toBe(true);
+  });
+
+  it("installTemplate() creates tenant copy with published=false", () => {
+    const installed = store.installTemplate("builtin-customer-support", "tenant-install");
+    expect(installed).toBeDefined();
+    expect(installed!.builtIn).toBe(false);
+    expect(installed!.published).toBe(false);
+    expect(installed!.tenantId).toBe("tenant-install");
+    expect(installed!.name).toBe("Customer Support");
+    expect(installed!.persona).toBe("customer_support");
+  });
+
+  it("installTemplate() returns undefined for unpublished template", () => {
+    const unpublished = store.createTemplate({
+      name: "Private Agent",
+      persona: "custom",
+      greeting: "Private!",
+      claims: [],
+      disallowedPatterns: [],
+      moderationSensitivity: "low",
+      ttsVoice: "nova",
+      escalationRules: { escalateOnFrustration: false, escalateOnKeywords: [], maxTurnsBeforeEscalate: null },
+      tenantId: null,
+      published: false,
+    });
+
+    const result = store.installTemplate(unpublished.templateId, "tenant-try");
+    expect(result).toBeUndefined();
+  });
+
+  it("installTemplate() returns undefined for unknown id", () => {
+    const result = store.installTemplate("nonexistent-id", "tenant-try");
+    expect(result).toBeUndefined();
+  });
+
   it("custom template absent after delete (verified via listTemplates)", () => {
     const created = store.createTemplate({
       name: "Temporary Agent",
@@ -458,5 +630,98 @@ describe("Templates API Endpoints", () => {
     expect(res.status).toBe(403);
     const data = res.json() as { error: string };
     expect(data.error).toContain("Cannot delete built-in template");
+  });
+
+  // ── Marketplace API tests ──────────────────────────────────────────
+
+  it("GET /templates/marketplace returns only published templates", async () => {
+    const res = await httpRequest(server, "GET", "/templates/marketplace");
+    expect(res.status).toBe(200);
+
+    const data = res.json() as { templates: Array<{ published: boolean }>; count: number };
+    expect(data.count).toBeGreaterThanOrEqual(4); // 4 built-ins are published
+    expect(data.templates.every((t) => t.published)).toBe(true);
+  });
+
+  it("GET /templates/marketplace?persona=sales filters by persona", async () => {
+    const res = await httpRequest(server, "GET", "/templates/marketplace?persona=sales");
+    expect(res.status).toBe(200);
+
+    const data = res.json() as { templates: Array<{ persona: string; published: boolean }>; count: number };
+    expect(data.templates.every((t) => t.persona === "sales")).toBe(true);
+    expect(data.templates.every((t) => t.published)).toBe(true);
+  });
+
+  it("POST /templates/:id/publish publishes a custom template", async () => {
+    // Create custom template first
+    const createRes = await httpRequest(server, "POST", "/templates", {
+      name: "Publish via API",
+      persona: "custom",
+      greeting: "Hello marketplace!",
+    });
+    const created = createRes.json() as { templateId: string; published: boolean };
+    expect(created.published).toBe(false);
+
+    const res = await httpRequest(server, "POST", `/templates/${created.templateId}/publish`);
+    expect(res.status).toBe(200);
+
+    const data = res.json() as { published: boolean };
+    expect(data.published).toBe(true);
+  });
+
+  it("POST /templates/builtin-customer-support/publish returns 403", async () => {
+    const res = await httpRequest(server, "POST", "/templates/builtin-customer-support/publish");
+    expect(res.status).toBe(403);
+  });
+
+  it("POST /templates/:id/unpublish unpublishes a custom template", async () => {
+    // Create and publish
+    const createRes = await httpRequest(server, "POST", "/templates", {
+      name: "Unpublish via API",
+      persona: "custom",
+      greeting: "Bye marketplace!",
+    });
+    const created = createRes.json() as { templateId: string };
+    await httpRequest(server, "POST", `/templates/${created.templateId}/publish`);
+
+    const res = await httpRequest(server, "POST", `/templates/${created.templateId}/unpublish`);
+    expect(res.status).toBe(200);
+
+    const data = res.json() as { published: boolean };
+    expect(data.published).toBe(false);
+  });
+
+  it("POST /templates/marketplace/:id/install installs a template for a tenant", async () => {
+    const res = await httpRequest(server, "POST", "/templates/marketplace/builtin-sales/install", {
+      tenantId: "tenant-api-test",
+    });
+    expect(res.status).toBe(201);
+
+    const data = res.json() as { templateId: string; builtIn: boolean; tenantId: string; published: boolean; name: string };
+    expect(data.templateId).toBeDefined();
+    expect(data.builtIn).toBe(false);
+    expect(data.tenantId).toBe("tenant-api-test");
+    expect(data.published).toBe(false);
+    expect(data.name).toBe("Sales");
+  });
+
+  it("POST /templates/marketplace/:id/install returns 400 without tenantId", async () => {
+    const res = await httpRequest(server, "POST", "/templates/marketplace/builtin-sales/install", {});
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /templates/marketplace/:id/install returns 404 for unpublished template", async () => {
+    // Create an unpublished template
+    const createRes = await httpRequest(server, "POST", "/templates", {
+      name: "Private",
+      persona: "custom",
+      greeting: "Private!",
+    });
+    const created = createRes.json() as { templateId: string };
+
+    const res = await httpRequest(server, "POST", `/templates/marketplace/${created.templateId}/install`, {
+      tenantId: "tenant-api-test",
+    });
+    expect(res.status).toBe(404);
   });
 });

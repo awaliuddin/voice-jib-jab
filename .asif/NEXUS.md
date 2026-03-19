@@ -1,7 +1,7 @@
 # NEXUS — voice-jib-jab Vision-to-Execution Dashboard
 
 > **Owner**: Asif Waliuddin
-> **Last Updated**: 2026-03-18
+> **Last Updated**: 2026-03-19
 > **North Star**: A production voice agent runtime that eliminates the two things that kill enterprise voice deployments: bad latency and ungoverned output.
 
 ---
@@ -25,6 +25,8 @@
 | N-13 | Multi-Tenant Isolation | GOVERNANCE | SHIPPED | P1 | 2026-03-18 |
 | N-14 | Lane C v2: Semantic Governance | GOVERNANCE | SHIPPED | P2 | 2026-03-07 |
 | N-15 | Dense Embedding Similarity for Claims | GOVERNANCE | SHIPPED | P1 | 2026-03-17 |
+| N-16 | Call Routing + Queue System | EXTENSIBILITY | SHIPPED | P1 | 2026-03-19 |
+| N-17 | Voice Agent Marketplace | EXTENSIBILITY | SHIPPED | P2 | 2026-03-19 |
 
 ---
 
@@ -232,7 +234,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ## CoS Directives
 
-> 42 completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
+> 44 completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
 > - Batch 1: 6 directives (2026-03-08, team)
 > - Batch 2: 1 directive (2026-03-11, Wolf — governance hygiene)
 > - Batch 3: 8 directives (2026-03-18, team)
@@ -243,33 +245,45 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 > - Batch 8: 2 directives (2026-03-19, session 4 — D-10/11)
 > - Batch 9: 2 directives (2026-03-19, session 5 — D-20/21)
 > - Batch 10: 2 directives (2026-03-19, session 6 — D-28/29)
+> - Batch 11: 2 directives (2026-03-19, session 7 — D-38/39)
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
 ### DIRECTIVE-NXTG-20260319-38 — P1: Call Routing — Intelligent Session Assignment
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-19 03:30 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-19 03:30 | **Estimate**: M | **Status**: DONE
 
 **Action Items**:
-1. [ ] **Routing engine** — assign inbound calls to agents based on: tenant config, language, topic, load balancing.
-2. [ ] **Routing rules** — `POST /routing/rules` (conditions + target agent template). Priority-based fallback.
-3. [ ] **Queue system** — if all agents busy, queue caller with position + estimated wait.
-4. [ ] Tests.
+1. [x] **Routing engine** — assign inbound calls to agents based on: tenant config, language, topic, load balancing.
+2. [x] **Routing rules** — `POST /routing/rules` (conditions + target agent template). Priority-based fallback.
+3. [x] **Queue system** — if all agents busy, queue caller with position + estimated wait.
+4. [x] Tests.
 
 **CHAIN**: When done, start DIRECTIVE-NXTG-20260319-39.
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-19**. Rule-based routing engine + per-tenant call queue:
+> - `server/src/services/RoutingEngine.ts` — `RoutingRule` (ruleId, tenantId, priority, conditions: language/topic/callerType/timeRange/concurrencyLimit, targetTemplateId, active); `evaluate(meta)` priority-sorted with multi-condition matching + concurrency cap; JSON-persisted rules; fallback to `builtin-customer-support`; module-level singleton `initRoutingEngine()`
+> - `server/src/services/CallQueueService.ts` — per-tenant FIFO queue; `enqueue()` → 1-based `QueueEntry` with ETA calc (AVG_HANDLE_TIME_MS = 180s); `dequeue()`, `getPosition()`, `remove()`, `getQueueStatus()`, `getAllQueueStatuses()`
+> - `server/src/api/routing.ts` — 9 endpoints: rules CRUD (`GET/POST/PUT/DELETE /routing/rules`), `POST /routing/evaluate`, queue ops (`GET /routing/queue/:tenantId/status`, `POST /routing/queue/:tenantId/enqueue`, `POST /routing/queue/:tenantId/dequeue`, `DELETE /routing/queue/:tenantId/:sessionId`)
+> - `server/src/index.ts` — mounted at `/routing`
+> - Tests added for RoutingEngine + CallQueueService + API
 
 ---
 
 ### DIRECTIVE-NXTG-20260319-39 — P2: Voice Agent Marketplace — Share Templates
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-19 03:30 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-19 03:30 | **Estimate**: S | **Status**: DONE
 
 **Action Items**:
-1. [ ] Publish voice agent templates to a marketplace (similar to SynApps workflow marketplace).
-2. [ ] Browse/install/customize pre-built agents.
+1. [x] Publish voice agent templates to a marketplace (similar to SynApps workflow marketplace).
+2. [x] Browse/install/customize pre-built agents.
 
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-19**. Marketplace layer added to existing AgentTemplateStore + templates API:
+> - `server/src/services/AgentTemplateStore.ts` — added `published: boolean` to `AgentTemplate` interface; all 4 BUILTIN_TEMPLATES set `published: true`; `createTemplate()` defaults `published: false`; new methods: `publishTemplate(id)`, `unpublishTemplate(id)`, `listMarketplace(opts?)`, `installTemplate(templateId, tenantId)` (creates private tenant copy, published=false)
+> - `server/src/api/templates.ts` — new routes: `GET /templates/marketplace` (catalog, ?persona filter), `POST /templates/:id/publish`, `POST /templates/:id/unpublish`, `POST /templates/marketplace/:id/install` (body: `{ tenantId }`); all static routes registered before `/:templateId` catch-all
+> - 22 new tests (unit store + API integration) — 47 total in AgentTemplates.test.ts (up from 25)
+> - Test count: 2891/2891, 0 failures
 
 ---
 

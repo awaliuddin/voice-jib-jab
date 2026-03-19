@@ -56,6 +56,14 @@ export function createTemplatesRouter(store: AgentTemplateStore): Router {
     res.json({ templates, count: templates.length });
   });
 
+  /** GET /templates/marketplace — browse the published template catalog. */
+  router.get("/marketplace", (req, res) => {
+    const persona = typeof req.query.persona === "string" ? req.query.persona : undefined;
+    const validPersona = isValidPersona(persona) ? persona : undefined;
+    const templates = store.listMarketplace({ persona: validPersona });
+    res.json({ templates, count: templates.length });
+  });
+
   /** GET /templates/:templateId — get a single template. */
   router.get("/:templateId", (req, res) => {
     if (!isValidId(req.params.templateId)) {
@@ -192,6 +200,63 @@ export function createTemplatesRouter(store: AgentTemplateStore): Router {
 
     store.deleteTemplate(req.params.templateId);
     res.status(204).send();
+  });
+
+  /** POST /templates/:templateId/publish — publish a template to the marketplace. */
+  router.post("/:templateId/publish", (req, res) => {
+    if (!isValidId(req.params.templateId)) {
+      res.status(400).json({ error: "Invalid templateId format" });
+      return;
+    }
+    const existing = store.getTemplate(req.params.templateId);
+    if (!existing) {
+      res.status(404).json({ error: "Template not found" });
+      return;
+    }
+    if (existing.builtIn) {
+      res.status(403).json({ error: "Built-in templates are always published" });
+      return;
+    }
+    const updated = store.publishTemplate(req.params.templateId);
+    res.json(updated);
+  });
+
+  /** POST /templates/:templateId/unpublish — remove a template from the marketplace. */
+  router.post("/:templateId/unpublish", (req, res) => {
+    if (!isValidId(req.params.templateId)) {
+      res.status(400).json({ error: "Invalid templateId format" });
+      return;
+    }
+    const existing = store.getTemplate(req.params.templateId);
+    if (!existing) {
+      res.status(404).json({ error: "Template not found" });
+      return;
+    }
+    if (existing.builtIn) {
+      res.status(403).json({ error: "Cannot unpublish built-in templates" });
+      return;
+    }
+    const updated = store.unpublishTemplate(req.params.templateId);
+    res.json(updated);
+  });
+
+  /** POST /templates/marketplace/:templateId/install — install a published template for a tenant. */
+  router.post("/marketplace/:templateId/install", (req, res) => {
+    if (!isValidId(req.params.templateId)) {
+      res.status(400).json({ error: "Invalid templateId format" });
+      return;
+    }
+    const body = req.body ?? {};
+    if (!body.tenantId || typeof body.tenantId !== "string") {
+      res.status(400).json({ error: "tenantId is required" });
+      return;
+    }
+    const installed = store.installTemplate(req.params.templateId, body.tenantId);
+    if (!installed) {
+      res.status(404).json({ error: "Template not found or not published" });
+      return;
+    }
+    res.status(201).json(installed);
   });
 
   /** GET /templates/:templateId/config — session config derived from template. */
