@@ -81,6 +81,75 @@ export function createSessionsRouter(recorder: SessionRecorder): Router {
   });
 
   /**
+   * GET /sessions/:id/compliance — structured compliance audit export (JSON).
+   * Returns all policy decisions, claims checks, escalations with timestamps.
+   * Suitable for EU AI Act / enterprise audit requirements.
+   */
+  router.get("/:id/compliance", (req, res) => {
+    if (!/^[a-zA-Z0-9_-]+$/.test(req.params.id)) {
+      res.status(400).json({ error: "Invalid session ID" });
+      return;
+    }
+    const recording = recorder.loadRecording(req.params.id);
+    if (!recording) {
+      res.status(404).json({ error: "Recording not found" });
+      return;
+    }
+
+    // Extract compliance-relevant events from timeline
+    const policyDecisions: Array<{ t_ms: number; decision: string; reason?: string; claim?: string }> = [];
+    const escalations: Array<{ t_ms: number; reason?: string }> = [];
+    const claimsChecked: Array<{ t_ms: number; claim: string; result: string }> = [];
+
+    for (const entry of recording.timeline) {
+      const p = entry.payload as Record<string, unknown> | undefined;
+      if (entry.type === "policy.decision" && p) {
+        policyDecisions.push({
+          t_ms: entry.t_ms,
+          decision: (p.decision as string) ?? "unknown",
+          reason: p.reason as string | undefined,
+          claim: p.claim as string | undefined,
+        });
+        if (p.decision === "escalate") {
+          escalations.push({ t_ms: entry.t_ms, reason: p.reason as string | undefined });
+        }
+      }
+      if (entry.type === "claims.check" && p) {
+        claimsChecked.push({
+          t_ms: entry.t_ms,
+          claim: (p.claim as string) ?? "",
+          result: (p.result as string) ?? "unknown",
+        });
+      }
+    }
+
+    res.json({
+      sessionId: req.params.id,
+      exportedAt: new Date().toISOString(),
+      session: {
+        startedAt: recording.startedAt,
+        endedAt: recording.endedAt,
+        durationMs: recording.durationMs,
+        tenantId: recording.tenantId,
+        turnCount: recording.summary.turnCount,
+      },
+      compliance: {
+        policyDecisionCount: policyDecisions.length,
+        policyDecisions,
+        escalationCount: escalations.length,
+        escalations,
+        claimsCheckedCount: claimsChecked.length,
+        claimsChecked,
+        sentimentEscalation: recording.summary.sentiment?.escalationTriggered ?? false,
+      },
+      meta: {
+        standard: "EU AI Act Article 13 — Transparency obligations",
+        generatedBy: "voice-jib-jab compliance engine",
+      },
+    });
+  });
+
+  /**
    * GET /sessions/:id/replay — timeline loaded from audit JSONL (existing infrastructure).
    * Returns: { sessionId, timeline, summary: { eventCount, policyDecisions } }
    */

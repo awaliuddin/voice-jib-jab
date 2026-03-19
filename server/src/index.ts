@@ -28,6 +28,8 @@ import { KokoroVoiceEngine } from "./services/KokoroVoiceEngine.js";
 import { createVoicesRouter } from "./api/voices.js";
 import { initKnowledgeBaseStore } from "./services/KnowledgeBaseStore.js";
 import { createKnowledgeRouter } from "./api/knowledge.js";
+import { initAgentTemplateStore } from "./services/AgentTemplateStore.js";
+import { createTemplatesRouter } from "./api/templates.js";
 
 const app = express();
 const server = createServer(app);
@@ -233,6 +235,10 @@ app.use("/voices", createVoicesRouter(voiceProfileStore, kokoroEngine));
 const kbStore = initKnowledgeBaseStore(resolve(dirname(config.storage.databasePath), "kb"));
 app.use("/tenants", createKnowledgeRouter(kbStore));
 
+// ── Agent Template Store + Templates API ─────────────────────────────
+const templateStore = initAgentTemplateStore(resolve(dirname(config.storage.databasePath), "templates.json"));
+app.use("/templates", createTemplatesRouter(templateStore));
+
 // ── Voice Trigger Service + Voice API ────────────────────────────────
 export const voiceTriggerService = new VoiceTriggerService(
   `http://localhost:${config.port}`,
@@ -281,7 +287,8 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Memory API: http://localhost:${config.port}/tenants/{tenantId}/memory`);
     console.log(`[Server] Voice Triggers: http://localhost:${config.port}/voice/trigger`);
     console.log(`[Server] Voices API: http://localhost:${config.port}/voices`);
-    console.log(`[Server] Knowledge Base: http://localhost:${config.port}/tenants/{tenantId}/kb\n`);
+    console.log(`[Server] Knowledge Base: http://localhost:${config.port}/tenants/{tenantId}/kb`);
+    console.log(`[Server] Templates API: http://localhost:${config.port}/templates\n`);
 
     console.log("Features:");
     console.log(

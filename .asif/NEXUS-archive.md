@@ -879,3 +879,11 @@ All 5 UAT fixes verified intact. 1,119 tests pass. Bug #1 (echo cancellation 3-l
 ### DIRECTIVE-NXTG-20260319-11 — P2: Knowledge Base Builder — Extract FAQ from Sessions
 **Status**: DONE | **Archived**: 2026-03-19
 **Deliverables**: `KnowledgeBaseStore.ts` (JSON-backed per-tenant FAQ CRUD + hitCount + text search), `FaqExtractor.ts` (question/answer pair extraction from transcripts), `api/knowledge.ts` (7 endpoints), KB context injection at session.start for auto-suggest. 30 tests. Tests at archive: 2801/2801.
+
+### DIRECTIVE-NXTG-20260319-20 — P1: Voice Agent Templates — Pre-Built Personas
+**Status**: DONE | **Archived**: 2026-03-19
+**Deliverables**: `AgentTemplateStore.ts` (4 built-ins: customer_support/sales/tech_support/receptionist with claims/ttsVoice/escalationRules; custom CRUD; getSessionConfig()), `api/templates.ts` (7 endpoints, 403 on built-in mutation), index.ts mount at /templates. 25 tests. Tests at archive: 2826/2826.
+
+### DIRECTIVE-NXTG-20260319-21 — P2: Compliance Report — Per-Session Audit Export
+**Status**: DONE | **Archived**: 2026-03-19
+**Deliverables**: `GET /sessions/:id/compliance` in sessions.ts — extracts policyDecisions, escalations, claimsChecked from timeline with timestamps; EU AI Act Article 13 metadata; no new deps. Tests at archive: 2826/2826.

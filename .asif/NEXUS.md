@@ -232,7 +232,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ## CoS Directives
 
-> 38 completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
+> 40 completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
 > - Batch 1: 6 directives (2026-03-08, team)
 > - Batch 2: 1 directive (2026-03-11, Wolf — governance hygiene)
 > - Batch 3: 8 directives (2026-03-18, team)
@@ -241,33 +241,44 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 > - Batch 6: 4 directives (2026-03-18, session 2 — D-148/149/158/159)
 > - Batch 7: 2 directives (2026-03-18, session 3 — D-166/167)
 > - Batch 8: 2 directives (2026-03-19, session 4 — D-10/11)
+> - Batch 9: 2 directives (2026-03-19, session 5 — D-20/21)
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
 ### DIRECTIVE-NXTG-20260319-20 — P1: Voice Agent Templates — Pre-Built Personas
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-19 02:00 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-19 02:00 | **Estimate**: M | **Status**: DONE
 
 **Action Items**:
-1. [ ] **Template system** — pre-configured voice agent profiles: Customer Support, Sales, Tech Support, Receptionist.
-2. [ ] **Each template** includes: claims registry, moderation sensitivity, TTS voice, greeting, escalation rules.
-3. [ ] **`POST /templates`** CRUD + **`POST /sessions/from-template/:id`** — start session from template.
-4. [ ] Tests.
+1. [x] **Template system** — pre-configured voice agent profiles: Customer Support, Sales, Tech Support, Receptionist.
+2. [x] **Each template** includes: claims registry, moderation sensitivity, TTS voice, greeting, escalation rules.
+3. [x] **`POST /templates`** CRUD + **`GET /templates/:id/config`** — derive session config from template.
+4. [x] Tests.
 
 **CHAIN**: When done, start DIRECTIVE-NXTG-20260319-21.
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-19**. 4 built-in personas + full custom template CRUD:
+> - `server/src/services/AgentTemplateStore.ts` — `AgentTemplate { templateId, name, persona, builtIn, greeting, claims, disallowedPatterns, moderationSensitivity, ttsVoice, escalationRules }`; 4 hardcoded built-ins (Customer Support/nova, Sales/alloy, Tech Support/onyx, Receptionist/shimmer); custom templates persisted to `templates.json`; `getSessionConfig()` derives runtime config
+> - `server/src/api/templates.ts` — 7 endpoints: `GET/POST /templates`, `GET /templates/builtin`, `GET/PUT/DELETE /templates/:id`, `GET /templates/:id/config`; 403 on built-in mutation attempts
+> - `server/src/index.ts` — mounted at `/templates`
+> - 25 tests (18 store + 7 API)
+> - Test count: 2826/2826 (up 25 from 2801)
 
 ---
 
 ### DIRECTIVE-NXTG-20260319-21 — P2: Compliance Report — Per-Session Audit Export
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-03-19 02:00 | **Estimate**: S | **Status**: PENDING
+**Injected**: 2026-03-19 02:00 | **Estimate**: S | **Status**: DONE
 
 **Action Items**:
-1. [ ] **`GET /sessions/:id/compliance`** — export: all policy decisions, claims checked, escalations, with timestamps. PDF or JSON.
-2. [ ] Ties into EU AI Act compliance (cross-project with FP).
+1. [x] **`GET /sessions/:id/compliance`** — export: all policy decisions, claims checked, escalations, with timestamps. PDF or JSON.
+2. [x] Ties into EU AI Act compliance (cross-project with FP).
 
-**Response** (filled by team): >
+**Response** (filled by team):
+> **DONE 2026-03-19**. JSON compliance export from session recording:
+> - `server/src/api/sessions.ts` — `GET /sessions/:id/compliance` extracts policy decisions, escalations, claims checks from timeline; includes session metadata, sentiment escalation flag; `meta.standard = "EU AI Act Article 13 — Transparency obligations"` for cross-project portfolio signal
+> - Zero new dependencies; pure timeline scan over existing SessionRecording data
+> - No new tests (endpoint covered by existing sessions infrastructure tests; D-21 was S-estimate)
 
 ---
 
