@@ -8890,3 +8890,68 @@ Same as last check-in:
 ### 5. Blockers / Questions for CoS
 
 Same as last check-in. Q3 and Q4 are unresolved pending CoS enrichment cycle. No new blockers.
+
+---
+
+> Session: 2026-03-19 (check-in — end of day 1) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+**7 sessions today. 22 directives. +640 tests (2,251 → 2,891).**
+
+| Commit | Feature | Tests |
+|--------|---------|-------|
+| `5eaae61` | D-10: ConversationSummarizer (topics/decisions/actionItems/sentimentArc/keyQuotes) | +23 |
+| `5eaae61` | D-11: KnowledgeBaseStore + FaqExtractor + /kb CRUD API | +30 |
+| `545d897` | D-20: AgentTemplateStore + 4 built-in personas + /templates API | +25 |
+| `545d897` | D-21: GET /sessions/:id/compliance — EU AI Act Article 13 export | included |
+| `a25a5b5` | D-28: SupervisorRegistry + SupervisorWebSocketServer + whisper injection | +19 |
+| `e8a7aa9` | D-38: RoutingEngine + CallQueueService + /routing API (9 endpoints) | ~24 |
+| `e8a7aa9` | D-39: Marketplace layer — publish/install templates + /marketplace routes | +22 |
+
+**New API surface added today**: `/sessions/:id/summary`, `/sessions/:id/compliance`, `/tenants/:id/kb` (7 endpoints), `/templates` (11 endpoints incl. marketplace), `/supervisor` (WS + HTTP), `/routing` (9 endpoints). That's 30+ new HTTP endpoints in one day.
+
+---
+
+### 2. What surprised me?
+
+**The agent team pattern compounds velocity better than expected.** D-10+D-11 ran in parallel agents that built independent service layers — websocket.ts and index.ts wiring happened cleanly after both finished. The bottleneck was always integration wiring, never feature logic.
+
+**Two TS errors surfaced post-wiring on D-10 that tests didn't catch before integration**: `getSessionTranscripts` referenced a non-existent TranscriptStore method, and an unused `conversationSummarizer` field triggered TS6133. Both were fast fixes, but they signal that the integration surface between services and the WebSocket host isn't covered by unit tests — only by TypeScript compilation.
+
+**Marketplace route ordering is easy to get wrong.** Added `GET /marketplace` at the bottom of templates.ts after the `GET /:templateId` catch-all — Express would have silently served `/marketplace` as a template lookup returning 404. Caught it manually. Worth a lint rule or test pattern: static routes must always be registered before parameterised siblings.
+
+**The NEXUS file is now 8,892 lines.** Team Feedback history alone is hundreds of entries. Every session loads this full file into context. Not blocking yet but the CoS should consider a NEXUS-trim + NEXUS-feedback-archive split before the file hits token limits in a single read.
+
+---
+
+### 3. Cross-project signals
+
+**Reusable: `TicketingClient` interface pattern (D-N-12, prior session).** The `connect() / createTicket() / close()` MCP wrapper is provider-agnostic. Any ASIF project needing GitHub/Linear/Jira escalation ticketing can drop in `GitHubIssuesMcpClient` or implement the interface for a different provider. Zero friction to reuse — it's a pure interface + one concrete class.
+
+**Reusable: Fire-and-forget escalation pattern from ControlEngine.** The `void this.createEscalationTicket()` pattern with `ticket_created` / `ticket_error` events keeps evaluate() latency clean while still surfacing async outcomes to observers. Any ASIF project with a fast-path decision + slow-path side-effect can copy this pattern.
+
+**Reusable: `KnowledgeBaseStore` hit-count search.** Simple stopword-filtered frequency scoring ranked by hitCount is surprisingly effective for FAQ autocomplete. No vector DB required. FamilyMind or SynApps could use this for in-product help suggestions without spinning up ChromaDB.
+
+**SynApps parallel signal**: The marketplace install/publish flow here (D-39) is structurally identical to the SynApps workflow marketplace described in the NEXUS cross-project notes. If SynApps hasn't shipped that yet, this implementation could be ported almost verbatim — same `published` flag, same `installTemplate(id, tenantId)` tenant-copy pattern.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **N-11: SIP Telephony** — marked BUILDING for multiple sessions with no progress. This is the only initiative in active-building state. Either ship it or demote to IDEA.
+2. **Integration test for RoutingEngine concurrency cap** — the concurrency condition in RoutingEngine calls `this.getActiveSessionCount()` which returns 0 in all tests because there's no production wiring. The concurrency feature is untested end-to-end.
+3. **Supervisor WS auth** — currently zero authentication on the `/supervisor` upgrade path. Any WebSocket client can connect and observe sessions or inject whispers. Production blocker before customer deployment.
+4. **NEXUS file split** — extract Team Feedback history to `NEXUS-feedback-archive.md`. The current 8,892-line file will hit context limits soon.
+5. **Dependabot vulns** — GitHub flagged 1 high + 1 moderate on push. Worth a 15-minute triage before shipping to a customer environment.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+**Q19 — Supervisor auth**: The `/supervisor` WebSocket path has no authentication. Should we add a shared secret header check, JWT validation, or is this intentional (internal-only network assumed)? Blocking production readiness for D-28.
+
+**Q20 — SIP status**: N-11 has been BUILDING since 2026-03-18 with no directive. Is there a dependency or decision holding this back? If it's deprioritised, should the status be changed to PAUSED so it doesn't create false urgency in future sessions?
+
+**Q21 — NEXUS file size**: At 8,892 lines, the file is becoming expensive to load. Recommend a new directive: archive Team Feedback entries older than the current month to `NEXUS-feedback-archive.md`, similar to how CoS Directives are archived. Ready to execute immediately on authorization.
+
