@@ -621,3 +621,366 @@ describe("IvrMenuStore — Persistence", () => {
     }
   });
 });
+
+// ── Coverage gaps: IvrMenuStore ────────────────────────────────────────
+
+describe("IvrMenuStore — coverage gaps", () => {
+  it("loadFromDisk() throws when file read fails with non-ENOENT error", () => {
+    // Arrange: write a valid file first, then mock readFileSync to throw EACCES
+    const storageFile = tempFile("eacces");
+    // Pre-create the file so existsSync returns true
+    const { writeFileSync: wfs } = require("fs");
+    wfs(storageFile, "[]", "utf-8");
+
+    const fs = require("fs");
+    const original = fs.readFileSync;
+    const eaccesErr = Object.assign(new Error("Permission denied"), { code: "EACCES" });
+    fs.readFileSync = () => { throw eaccesErr; };
+
+    try {
+      expect(() => new IvrMenuStore(storageFile)).toThrow("Permission denied");
+    } finally {
+      fs.readFileSync = original;
+      const { dirname: pdir } = require("path");
+      const dir = pdir(storageFile);
+      const { rmSync: rms, existsSync: exs } = require("fs");
+      if (exs(dir)) rms(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("saveToDisk() persists data that survives a reload", () => {
+    const storageFile = tempFile("savedisk");
+    const store1 = new IvrMenuStore(storageFile);
+    const created = store1.createMenu({
+      name: "Disk Save Test",
+      tenantId: null,
+      rootNodeId: "root",
+      nodes: { root: { nodeId: "root", type: "message", prompt: "Saved", tenantId: null } },
+    });
+
+    // A second instance must read what saveToDisk wrote
+    const store2 = new IvrMenuStore(storageFile);
+    expect(store2.getMenu(created.menuId)).toBeDefined();
+    expect(store2.getMenu(created.menuId)!.name).toBe("Disk Save Test");
+
+    const dir = join(storageFile, "..");
+    if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("processInput() returns null when node has no options", () => {
+    const storageFile = tempFile("proc-noopts");
+    const store = new IvrMenuStore(storageFile);
+    const menu = store.createMenu({
+      name: "No Options Menu",
+      tenantId: null,
+      rootNodeId: "root",
+      nodes: {
+        root: { nodeId: "root", type: "message", prompt: "No options here", tenantId: null },
+      },
+    });
+
+    // "root" node has no options field at all
+    const result = store.processInput(menu.menuId, "root", "1");
+    expect(result).toBeNull();
+
+    const dir = join(storageFile, "..");
+    if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("processInput() returns null when digit not in node.options", () => {
+    const storageFile = tempFile("proc-nodigit");
+    const store = new IvrMenuStore(storageFile);
+    const menu = store.createMenu({
+      name: "Missing Digit Menu",
+      tenantId: null,
+      rootNodeId: "root",
+      nodes: {
+        root: {
+          nodeId: "root",
+          type: "menu",
+          prompt: "Press 1 only",
+          tenantId: null,
+          options: { "1": { nodeId: "leaf", label: "Only option" } },
+        },
+        leaf: { nodeId: "leaf", type: "message", prompt: "Leaf", tenantId: null },
+      },
+    });
+
+    // Digit "9" is not in options
+    const result = store.processInput(menu.menuId, "root", "9");
+    expect(result).toBeNull();
+
+    const dir = join(storageFile, "..");
+    if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("processInput() returns null when referenced nextNode not found in nodes map", () => {
+    const storageFile = tempFile("proc-nonode");
+    const store = new IvrMenuStore(storageFile);
+    // Manually construct a menu where the option's nodeId points to a non-existent node
+    const menu = store.createMenu({
+      name: "Dangling Ref Menu",
+      tenantId: null,
+      rootNodeId: "root",
+      nodes: {
+        root: {
+          nodeId: "root",
+          type: "menu",
+          prompt: "Press 1",
+          tenantId: null,
+          options: { "1": { nodeId: "ghost-node", label: "Ghost" } },
+        },
+        // "ghost-node" is intentionally absent from the nodes map
+      },
+    });
+
+    const result = store.processInput(menu.menuId, "root", "1");
+    expect(result).toBeNull();
+
+    const dir = join(storageFile, "..");
+    if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+// ── Coverage gaps: IvrMenuStore singleton ─────────────────────────────
+
+describe("IvrMenuStore — singleton", () => {
+  it("ivrMenuStore proxy throws when accessed before initIvrMenuStore()", async () => {
+    // Import a fresh module instance that has never had initIvrMenuStore called.
+    // Jest module registry is shared, so we use jest.resetModules to get a clean slate.
+    jest.resetModules();
+    const { ivrMenuStore } = await import("../../services/IvrMenuStore.js");
+    expect(() => (ivrMenuStore as unknown as { listMenus: () => unknown }).listMenus()).toThrow(
+      "IvrMenuStore not initialized",
+    );
+  });
+
+  it("initIvrMenuStore() initializes and returns a working store", async () => {
+    jest.resetModules();
+    const storageFile = tempFile("singleton");
+    const { initIvrMenuStore } = await import("../../services/IvrMenuStore.js");
+    const store = initIvrMenuStore(storageFile);
+
+    expect(store).toBeDefined();
+    expect(typeof store.createMenu).toBe("function");
+    expect(store.listMenus()).toHaveLength(0);
+
+    const dir = join(storageFile, "..");
+    if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+// ── Coverage gaps: IVR API endpoints ──────────────────────────────────
+
+describe("IVR API — coverage gaps", () => {
+  let app: ReturnType<typeof buildTestApp>;
+  let server: Server;
+  let store: IvrMenuStore;
+  let storageFile: string;
+
+  beforeAll((done) => {
+    storageFile = tempFile("api-gaps");
+    store = new IvrMenuStore(storageFile);
+    app = buildTestApp(store);
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(() => {
+      const dir = join(storageFile, "..");
+      if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+      done();
+    });
+  });
+
+  // POST /menus — validation gaps
+
+  it("POST /ivr/menus returns 400 when rootNodeId is missing", async () => {
+    const res = await httpRequest(server, "POST", "/ivr/menus", {
+      name: "No Root",
+      nodes: { root: { nodeId: "root", type: "message", prompt: "Hi", tenantId: null } },
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/rootNodeId/);
+  });
+
+  it("POST /ivr/menus returns 400 when nodes is missing", async () => {
+    const res = await httpRequest(server, "POST", "/ivr/menus", {
+      name: "No Nodes",
+      rootNodeId: "root",
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/nodes/);
+  });
+
+  it("POST /ivr/menus returns 400 when nodes is not a valid node map (array instead of object)", async () => {
+    const res = await httpRequest(server, "POST", "/ivr/menus", {
+      name: "Bad Nodes",
+      rootNodeId: "root",
+      nodes: ["not", "an", "object"],
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/nodes/);
+  });
+
+  it("POST /ivr/menus returns 400 when a node in nodes has an invalid type", async () => {
+    const res = await httpRequest(server, "POST", "/ivr/menus", {
+      name: "Bad Node Type",
+      rootNodeId: "root",
+      nodes: {
+        root: { nodeId: "root", type: "invalid-type", prompt: "Hi", tenantId: null },
+      },
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/nodes/);
+  });
+
+  // PUT /menus/:menuId — gaps
+
+  it("PUT /ivr/menus/:menuId returns 404 when menu not found", async () => {
+    const res = await httpRequest(server, "PUT", "/ivr/menus/does-not-exist", {
+      name: "Ghost Update",
+    });
+    expect(res.status).toBe(404);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/not found/i);
+  });
+
+  it("PUT /ivr/menus/:menuId returns 400 when nodes is provided but invalid", async () => {
+    const menu = store.createMenu({
+      name: "Update Nodes Test",
+      tenantId: null,
+      rootNodeId: "root",
+      nodes: { root: { nodeId: "root", type: "message", prompt: "Hello", tenantId: null } },
+    });
+
+    const res = await httpRequest(server, "PUT", `/ivr/menus/${menu.menuId}`, {
+      nodes: { root: { nodeId: "root", type: "bad-type", prompt: "Hi", tenantId: null } },
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/nodes/);
+  });
+
+  it("PUT /ivr/menus/:menuId returns 200 and updated menu on valid patch", async () => {
+    const menu = store.createMenu({
+      name: "Patch Target",
+      tenantId: null,
+      rootNodeId: "root",
+      nodes: { root: { nodeId: "root", type: "message", prompt: "Before", tenantId: null } },
+    });
+
+    const res = await httpRequest(server, "PUT", `/ivr/menus/${menu.menuId}`, {
+      name: "Patched Name",
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { name: string };
+    expect(data.name).toBe("Patched Name");
+  });
+
+  // DELETE /menus/:menuId — gap (404)
+
+  it("DELETE /ivr/menus/:menuId returns 404 when menu not found", async () => {
+    const res = await httpRequest(server, "DELETE", "/ivr/menus/no-such-menu");
+    expect(res.status).toBe(404);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/not found/i);
+  });
+
+  // POST /menus/:menuId/process — validation gaps
+
+  it("POST /ivr/menus/:menuId/process returns 400 when nodeId is missing", async () => {
+    const menu = store.createMenu({
+      name: "Process Validation Menu",
+      tenantId: null,
+      rootNodeId: "root",
+      nodes: { root: { nodeId: "root", type: "menu", prompt: "Hi", tenantId: null } },
+    });
+
+    const res = await httpRequest(server, "POST", `/ivr/menus/${menu.menuId}/process`, {
+      input: "press 1",
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/nodeId/);
+  });
+
+  it("POST /ivr/menus/:menuId/process returns 400 when input is missing", async () => {
+    const menu = store.createMenu({
+      name: "Process Input Validation Menu",
+      tenantId: null,
+      rootNodeId: "root",
+      nodes: { root: { nodeId: "root", type: "menu", prompt: "Hi", tenantId: null } },
+    });
+
+    const res = await httpRequest(server, "POST", `/ivr/menus/${menu.menuId}/process`, {
+      nodeId: "root",
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/input/);
+  });
+
+  it("POST /ivr/menus/:menuId/process returns 404 when processInput returns null (digit not in options)", async () => {
+    const menu = store.createMenu({
+      name: "No Matching Option",
+      tenantId: null,
+      rootNodeId: "root",
+      nodes: {
+        root: {
+          nodeId: "root",
+          type: "menu",
+          prompt: "Press 1 only",
+          tenantId: null,
+          options: { "1": { nodeId: "leaf", label: "Leaf" } },
+        },
+        leaf: { nodeId: "leaf", type: "message", prompt: "Leaf", tenantId: null },
+      },
+    });
+
+    // Digit "2" is a valid DTMF but maps to no option in this menu
+    const res = await httpRequest(server, "POST", `/ivr/menus/${menu.menuId}/process`, {
+      nodeId: "root",
+      input: "2",
+    });
+    expect(res.status).toBe(404);
+    const data = res.json() as { error: string };
+    expect(data.error).toMatch(/not found/i);
+  });
+});
+
+// ── DtmfDetector — step 4 (token scan fallback) ───────────────────────────
+
+describe("DtmfDetector — token scan fallback (step 4)", () => {
+  let detector: DtmfDetector;
+
+  beforeEach(() => {
+    detector = new DtmfDetector();
+  });
+
+  it("detects bare digit embedded in multi-word sentence (no phrase prefix)", () => {
+    const result = detector.detect("the code is 3 please");
+    expect(result.detected).toBe(true);
+    expect(result.digit).toBe("3");
+    expect(result.confidence).toBe(1.0);
+  });
+
+  it("detects bare word-digit embedded in sentence (no phrase prefix)", () => {
+    const result = detector.detect("I think one would work");
+    expect(result.detected).toBe(true);
+    expect(result.digit).toBe("1");
+    expect(result.confidence).toBe(1.0);
+  });
+
+  it("returns confidence 0.7 when multiple digits appear in sentence", () => {
+    const result = detector.detect("either 3 or 5 works");
+    expect(result.detected).toBe(true);
+    expect(result.confidence).toBe(0.7);
+    expect(result.digit).toBe("3"); // first found
+  });
+});

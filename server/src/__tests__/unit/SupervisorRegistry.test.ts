@@ -209,6 +209,29 @@ describe("SupervisorRegistry", () => {
     expect(list).toContain(info3);
   });
 
+  // -- Early-return branch coverage -----------------------------------------
+
+  it("removeSupervisor() with unknown ws is a no-op", () => {
+    const unknown = makeMockWs();
+    expect(() => registry.removeSupervisor(unknown)).not.toThrow();
+  });
+
+  it("watch() with unknown ws is a no-op", () => {
+    const unknown = makeMockWs();
+    expect(() => registry.watch(unknown, "session-x")).not.toThrow();
+  });
+
+  it("unwatch() when supervisor is not watching any session is a no-op", () => {
+    const ws = makeMockWs();
+    registry.addSupervisor(ws); // watchingSessionId starts as null
+    expect(() => registry.unwatch(ws)).not.toThrow();
+  });
+
+  it("unwatch() with unknown ws is a no-op", () => {
+    const unknown = makeMockWs();
+    expect(() => registry.unwatch(unknown)).not.toThrow();
+  });
+
   // -- Module singleton -----------------------------------------------------
 
   it("module-level supervisorRegistry export is a SupervisorRegistry instance", () => {

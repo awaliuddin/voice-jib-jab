@@ -728,3 +728,429 @@ describe("Templates API Endpoints", () => {
     expect(res.status).toBe(404);
   });
 });
+
+// ── Coverage gap: GET /:id validation and 404 ─────────────────────────
+
+describe("Templates API — GET /:id coverage gaps", () => {
+  let server: Server;
+  let store: AgentTemplateStore;
+  let storageFile: string;
+
+  beforeAll((done) => {
+    storageFile = tempFile("get-id-gaps");
+    store = new AgentTemplateStore(storageFile);
+    const app = buildTestApp(store);
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(() => {
+      const dir = join(storageFile, "..");
+      if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+      done();
+    });
+  });
+
+  it("GET /templates/:id with invalid id format returns 400", async () => {
+    const res = await httpRequest(server, "GET", "/templates/bad.id");
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("Invalid templateId format");
+  });
+
+  it("GET /templates/:id for unknown id returns 404", async () => {
+    const res = await httpRequest(server, "GET", "/templates/nonexistent-id-xyz");
+    expect(res.status).toBe(404);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("Template not found");
+  });
+});
+
+// ── Coverage gap: POST /templates validation branches ─────────────────
+
+describe("Templates API — POST validation coverage gaps", () => {
+  let server: Server;
+  let storageFile: string;
+
+  beforeAll((done) => {
+    storageFile = tempFile("post-gaps");
+    const store = new AgentTemplateStore(storageFile);
+    const app = buildTestApp(store);
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(() => {
+      const dir = join(storageFile, "..");
+      if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+      done();
+    });
+  });
+
+  it("POST /templates without name returns 400", async () => {
+    const res = await httpRequest(server, "POST", "/templates", {
+      persona: "custom",
+      greeting: "Hello!",
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("name is required");
+  });
+
+  it("POST /templates with invalid persona returns 400", async () => {
+    const res = await httpRequest(server, "POST", "/templates", {
+      name: "Bad Persona Agent",
+      persona: "invalid_persona",
+      greeting: "Hello!",
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("persona is required");
+  });
+
+  it("POST /templates without greeting returns 400", async () => {
+    const res = await httpRequest(server, "POST", "/templates", {
+      name: "No Greeting Agent",
+      persona: "custom",
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("greeting is required");
+  });
+});
+
+// ── Coverage gap: PUT /:id validation and patch branches ──────────────
+
+describe("Templates API — PUT coverage gaps", () => {
+  let server: Server;
+  let store: AgentTemplateStore;
+  let storageFile: string;
+
+  beforeAll((done) => {
+    storageFile = tempFile("put-gaps");
+    store = new AgentTemplateStore(storageFile);
+    const app = buildTestApp(store);
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(() => {
+      const dir = join(storageFile, "..");
+      if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+      done();
+    });
+  });
+
+  it("PUT /templates/:id with invalid id format returns 400", async () => {
+    const res = await httpRequest(server, "PUT", "/templates/bad.id", { name: "x" });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("Invalid templateId format");
+  });
+
+  it("PUT /templates/:id for unknown id returns 404", async () => {
+    const res = await httpRequest(server, "PUT", "/templates/nonexistent-id-xyz", { name: "x" });
+    expect(res.status).toBe(404);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("Template not found");
+  });
+
+  it("PUT /templates/:id patches moderationSensitivity field", async () => {
+    const createRes = await httpRequest(server, "POST", "/templates", {
+      name: "Sensitivity Agent",
+      persona: "custom",
+      greeting: "Hello!",
+    });
+    const created = createRes.json() as { templateId: string };
+
+    const res = await httpRequest(server, "PUT", `/templates/${created.templateId}`, {
+      moderationSensitivity: "high",
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { moderationSensitivity: string };
+    expect(data.moderationSensitivity).toBe("high");
+  });
+
+  it("PUT /templates/:id patches escalationRules field", async () => {
+    const createRes = await httpRequest(server, "POST", "/templates", {
+      name: "Escalation Agent",
+      persona: "custom",
+      greeting: "Hello!",
+    });
+    const created = createRes.json() as { templateId: string };
+
+    const res = await httpRequest(server, "PUT", `/templates/${created.templateId}`, {
+      escalationRules: {
+        escalateOnFrustration: true,
+        escalateOnKeywords: ["help", "manager"],
+        maxTurnsBeforeEscalate: 5,
+      },
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { escalationRules: { escalateOnFrustration: boolean; escalateOnKeywords: string[]; maxTurnsBeforeEscalate: number } };
+    expect(data.escalationRules.escalateOnFrustration).toBe(true);
+    expect(data.escalationRules.escalateOnKeywords).toEqual(["help", "manager"]);
+    expect(data.escalationRules.maxTurnsBeforeEscalate).toBe(5);
+  });
+
+  it("PUT /templates/:id patches tenantId field", async () => {
+    const createRes = await httpRequest(server, "POST", "/templates", {
+      name: "Tenant Patch Agent",
+      persona: "custom",
+      greeting: "Hello!",
+    });
+    const created = createRes.json() as { templateId: string };
+
+    const res = await httpRequest(server, "PUT", `/templates/${created.templateId}`, {
+      tenantId: "new-tenant-99",
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { tenantId: string };
+    expect(data.tenantId).toBe("new-tenant-99");
+  });
+});
+
+// ── Coverage gap: DELETE /:id validation and success ──────────────────
+
+describe("Templates API — DELETE coverage gaps", () => {
+  let server: Server;
+  let store: AgentTemplateStore;
+  let storageFile: string;
+
+  beforeAll((done) => {
+    storageFile = tempFile("delete-gaps");
+    store = new AgentTemplateStore(storageFile);
+    const app = buildTestApp(store);
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(() => {
+      const dir = join(storageFile, "..");
+      if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+      done();
+    });
+  });
+
+  it("DELETE /templates/:id with invalid id format returns 400", async () => {
+    const res = await httpRequest(server, "DELETE", "/templates/bad.id");
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("Invalid templateId format");
+  });
+
+  it("DELETE /templates/:id for unknown id returns 404", async () => {
+    const res = await httpRequest(server, "DELETE", "/templates/nonexistent-id-xyz");
+    expect(res.status).toBe(404);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("Template not found");
+  });
+
+  it("DELETE /templates/:id for custom template returns 204", async () => {
+    const createRes = await httpRequest(server, "POST", "/templates", {
+      name: "Delete Me Via API",
+      persona: "custom",
+      greeting: "Goodbye!",
+    });
+    const created = createRes.json() as { templateId: string };
+
+    const res = await httpRequest(server, "DELETE", `/templates/${created.templateId}`);
+    expect(res.status).toBe(204);
+
+    // Verify gone
+    const getRes = await httpRequest(server, "GET", `/templates/${created.templateId}`);
+    expect(getRes.status).toBe(404);
+  });
+});
+
+// ── Coverage gap: publish/unpublish validation branches ───────────────
+
+describe("Templates API — publish/unpublish coverage gaps", () => {
+  let server: Server;
+  let store: AgentTemplateStore;
+  let storageFile: string;
+
+  beforeAll((done) => {
+    storageFile = tempFile("pubunpub-gaps");
+    store = new AgentTemplateStore(storageFile);
+    const app = buildTestApp(store);
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(() => {
+      const dir = join(storageFile, "..");
+      if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+      done();
+    });
+  });
+
+  it("POST /templates/:id/publish with invalid id format returns 400", async () => {
+    const res = await httpRequest(server, "POST", "/templates/bad.id/publish");
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("Invalid templateId format");
+  });
+
+  it("POST /templates/:id/publish for unknown id returns 404", async () => {
+    const res = await httpRequest(server, "POST", "/templates/nonexistent-id-xyz/publish");
+    expect(res.status).toBe(404);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("Template not found");
+  });
+
+  it("POST /templates/:id/unpublish with invalid id format returns 400", async () => {
+    const res = await httpRequest(server, "POST", "/templates/bad.id/unpublish");
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("Invalid templateId format");
+  });
+
+  it("POST /templates/:id/unpublish for unknown id returns 404", async () => {
+    const res = await httpRequest(server, "POST", "/templates/nonexistent-id-xyz/unpublish");
+    expect(res.status).toBe(404);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("Template not found");
+  });
+
+  it("POST /templates/:id/unpublish for built-in returns 403", async () => {
+    const res = await httpRequest(server, "POST", "/templates/builtin-customer-support/unpublish");
+    expect(res.status).toBe(403);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("Cannot unpublish built-in templates");
+  });
+
+  it("POST /templates/:id/unpublish on a custom published template returns unpublished template", async () => {
+    const createRes = await httpRequest(server, "POST", "/templates", {
+      name: "Unpublish Target",
+      persona: "custom",
+      greeting: "Hello marketplace!",
+    });
+    const created = createRes.json() as { templateId: string };
+
+    // Publish first
+    await httpRequest(server, "POST", `/templates/${created.templateId}/publish`);
+
+    // Now unpublish
+    const res = await httpRequest(server, "POST", `/templates/${created.templateId}/unpublish`);
+    expect(res.status).toBe(200);
+    const data = res.json() as { published: boolean; templateId: string };
+    expect(data.published).toBe(false);
+    expect(data.templateId).toBe(created.templateId);
+  });
+});
+
+// ── Coverage gap: /marketplace/:id/install validation ─────────────────
+
+describe("Templates API — marketplace install coverage gaps", () => {
+  let server: Server;
+  let storageFile: string;
+
+  beforeAll((done) => {
+    storageFile = tempFile("install-gaps");
+    const store = new AgentTemplateStore(storageFile);
+    const app = buildTestApp(store);
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(() => {
+      const dir = join(storageFile, "..");
+      if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+      done();
+    });
+  });
+
+  it("POST /templates/marketplace/:id/install with invalid id format returns 400", async () => {
+    const res = await httpRequest(server, "POST", "/templates/marketplace/bad.id/install", {
+      tenantId: "t1",
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("Invalid templateId format");
+  });
+});
+
+// ── Coverage gap: GET /:id/config handler ─────────────────────────────
+
+describe("Templates API — GET /:id/config coverage gaps", () => {
+  let server: Server;
+  let store: AgentTemplateStore;
+  let storageFile: string;
+
+  beforeAll((done) => {
+    storageFile = tempFile("config-gaps");
+    store = new AgentTemplateStore(storageFile);
+    const app = buildTestApp(store);
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(() => {
+      const dir = join(storageFile, "..");
+      if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+      done();
+    });
+  });
+
+  it("GET /templates/:id/config with invalid id format returns 400", async () => {
+    const res = await httpRequest(server, "GET", "/templates/bad.id/config");
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("Invalid templateId format");
+  });
+
+  it("GET /templates/:id/config for unknown id returns 404", async () => {
+    const res = await httpRequest(server, "GET", "/templates/nonexistent-id-xyz/config");
+    expect(res.status).toBe(404);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("Template not found");
+  });
+
+  it("GET /templates/:id/config returns session config for valid template", async () => {
+    const res = await httpRequest(server, "GET", "/templates/builtin-customer-support/config");
+    expect(res.status).toBe(200);
+
+    const data = res.json() as {
+      greeting: string;
+      ttsVoice: string;
+      moderationSensitivity: string;
+      claims: string[];
+      disallowedPatterns: string[];
+      escalationRules: { escalateOnFrustration: boolean };
+    };
+    expect(data.greeting).toBeDefined();
+    expect(data.ttsVoice).toBeDefined();
+    expect(data.moderationSensitivity).toBeDefined();
+    expect(Array.isArray(data.claims)).toBe(true);
+    expect(Array.isArray(data.disallowedPatterns)).toBe(true);
+    expect(typeof data.escalationRules.escalateOnFrustration).toBe("boolean");
+  });
+
+  it("GET /templates/:id/config for custom template returns config", async () => {
+    const createRes = await httpRequest(server, "POST", "/templates", {
+      name: "Config Test Agent",
+      persona: "custom",
+      greeting: "Config greeting",
+      claims: ["config-test"],
+      ttsVoice: "alloy",
+      moderationSensitivity: "low",
+    });
+    const created = createRes.json() as { templateId: string };
+
+    const res = await httpRequest(server, "GET", `/templates/${created.templateId}/config`);
+    expect(res.status).toBe(200);
+
+    const data = res.json() as { greeting: string; ttsVoice: string; claims: string[] };
+    expect(data.greeting).toBe("Config greeting");
+    expect(data.ttsVoice).toBe("alloy");
+    expect(data.claims).toEqual(["config-test"]);
+  });
+});

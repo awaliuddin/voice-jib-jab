@@ -741,5 +741,98 @@ describe("Analytics Dashboard API Endpoints", () => {
       expect(lines.length).toBe(2);
       expect(lines[1]).toContain("sess-002");
     });
+
+    it("returns 400 when from is an invalid date", async () => {
+      const res = await httpRequest(server, "GET", "/analytics/export.csv?from=not-a-date");
+      expect(res.status).toBe(400);
+      const data = res.json() as Record<string, string>;
+      expect(data.error).toMatch(/valid ISO date/i);
+    });
+
+    it("returns 400 when to is an invalid date", async () => {
+      const res = await httpRequest(server, "GET", "/analytics/export.csv?to=not-a-date");
+      expect(res.status).toBe(400);
+      const data = res.json() as Record<string, string>;
+      expect(data.error).toMatch(/valid ISO date/i);
+    });
+
+    it("returns 400 when limit is not a valid number", async () => {
+      const res = await httpRequest(server, "GET", "/analytics/export.csv?limit=abc");
+      expect(res.status).toBe(400);
+      const data = res.json() as Record<string, string>;
+      expect(data.error).toMatch(/limit must be between/i);
+    });
+
+    it("returns 400 when limit is zero", async () => {
+      const res = await httpRequest(server, "GET", "/analytics/export.csv?limit=0");
+      expect(res.status).toBe(400);
+      const data = res.json() as Record<string, string>;
+      expect(data.error).toMatch(/limit must be between/i);
+    });
+  });
+});
+
+// ── Additional coverage: /sessions invalid date params ────────────────
+
+describe("Analytics API — /sessions invalid query param branches", () => {
+  let server: Server;
+
+  beforeAll((done) => {
+    const recordings: RecordingMetadata[] = [
+      makeRecording({ sessionId: "s1", tenantId: "t1", startedAt: "2026-03-18T10:00:00.000Z" }),
+    ];
+    const service = new AnalyticsService(makeRecorder(recordings));
+    const app = express();
+    app.use(express.json());
+    app.use("/analytics", createAnalyticsRouter(service));
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(done);
+  });
+
+  it("returns 400 when /sessions to param is an invalid date", async () => {
+    const res = await httpRequest(server, "GET", "/analytics/sessions?to=not-a-date");
+    expect(res.status).toBe(400);
+    const data = res.json() as Record<string, string>;
+    expect(data.error).toMatch(/valid ISO date/i);
+  });
+});
+
+// ── Additional coverage: /calls-per-day invalid date params ──────────
+
+describe("Analytics API — /calls-per-day invalid query param branches", () => {
+  let server: Server;
+
+  beforeAll((done) => {
+    const recordings: RecordingMetadata[] = [
+      makeRecording({ sessionId: "s1", tenantId: "t1", startedAt: "2026-03-18T10:00:00.000Z" }),
+    ];
+    const service = new AnalyticsService(makeRecorder(recordings));
+    const app = express();
+    app.use(express.json());
+    app.use("/analytics", createAnalyticsRouter(service));
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(done);
+  });
+
+  it("returns 400 when from is an invalid date", async () => {
+    const res = await httpRequest(server, "GET", "/analytics/calls-per-day?from=not-a-date");
+    expect(res.status).toBe(400);
+    const data = res.json() as Record<string, string>;
+    expect(data.error).toMatch(/valid ISO date/i);
+  });
+
+  it("returns 400 when to is an invalid date", async () => {
+    const res = await httpRequest(server, "GET", "/analytics/calls-per-day?to=not-a-date");
+    expect(res.status).toBe(400);
+    const data = res.json() as Record<string, string>;
+    expect(data.error).toMatch(/valid ISO date/i);
   });
 });

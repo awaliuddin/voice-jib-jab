@@ -395,6 +395,77 @@ describe("PlaybookStore (mocked fs)", () => {
     const results = store.suggestEntries("the weather is nice today");
     expect(results).toHaveLength(0);
   });
+
+  // ── loadFromDisk non-ENOENT error ──────────────────────────────────
+
+  it("constructor: re-throws non-ENOENT errors from readFileSync", () => {
+    mockExistsSync.mockReturnValue(true);
+    const accessError = Object.assign(new Error("Permission denied"), { code: "EACCES" });
+    mockReadFileSync.mockImplementation(() => { throw accessError; });
+
+    expect(() => new PlaybookStore(STORAGE_PATH)).toThrow("Permission denied");
+  });
+
+  // ── suggestEntries: tenantId filter with no keyword matches ───────
+
+  it("suggestEntries: returns [] when tenantId scoped entries have no keyword matches", () => {
+    mockExistsSync.mockReturnValue(false);
+    const store = new PlaybookStore(STORAGE_PATH);
+
+    // Entry belongs to tenant-b only — should be excluded for tenant-a
+    store.createEntry({ name: "Tenant B Entry", scenario: "faq", script: "S", keywords: ["refund"], tenantId: "tenant-b", enabled: true });
+
+    const results = store.suggestEntries("I want a refund", { tenantId: "tenant-a" });
+    expect(results).toHaveLength(0);
+  });
+
+  it("suggestEntries: returns [] when keyword-matched candidates are all disabled and tenantId is scoped", () => {
+    mockExistsSync.mockReturnValue(false);
+    const store = new PlaybookStore(STORAGE_PATH);
+
+    store.createEntry({ name: "Disabled Tenant A", scenario: "faq", script: "S", keywords: ["cancel"], tenantId: "tenant-a", enabled: false });
+
+    const results = store.suggestEntries("I need to cancel", { tenantId: "tenant-a" });
+    expect(results).toHaveLength(0);
+  });
+
+  // ── playbookStore proxy + initPlaybookStore ────────────────────────
+
+  it("playbookStore proxy: throws 'not initialized' when accessed before initPlaybookStore()", async () => {
+    // Use a fresh module so _store is null
+    jest.resetModules();
+    jest.doMock("fs", () => ({
+      readFileSync: jest.fn(),
+      writeFileSync: jest.fn(),
+      existsSync: jest.fn().mockReturnValue(false),
+      mkdirSync: jest.fn(),
+    }));
+
+    const { playbookStore } = await import("../../services/PlaybookStore.js");
+
+    expect(() => (playbookStore as unknown as { listEntries: () => unknown }).listEntries()).toThrow(
+      "PlaybookStore not initialized",
+    );
+  });
+
+  it("initPlaybookStore: initializes singleton and allows method calls through proxy", async () => {
+    jest.resetModules();
+    jest.doMock("fs", () => ({
+      readFileSync: jest.fn(),
+      writeFileSync: jest.fn(),
+      existsSync: jest.fn().mockReturnValue(false),
+      mkdirSync: jest.fn(),
+    }));
+
+    const { initPlaybookStore, playbookStore } = await import("../../services/PlaybookStore.js");
+
+    initPlaybookStore("/fake/init-test.json");
+
+    // Proxy should now delegate to the real store instance
+    const entries = (playbookStore as unknown as { listEntries: () => unknown[] }).listEntries();
+    expect(Array.isArray(entries)).toBe(true);
+    expect(entries).toHaveLength(0);
+  });
 });
 
 // ── HTTP helpers ───────────────────────────────────────────────────────
@@ -645,5 +716,166 @@ describe("Playbooks API Endpoints", () => {
 
     const checkRes = await httpRequest(server, "GET", `/playbooks/${created.entryId}`);
     expect(checkRes.status).toBe(404);
+  });
+
+  // ── GET /playbooks: enabled filter branches ────────────────────────
+
+  it("GET /playbooks: enabled=true filters to only enabled entries", async () => {
+    store.createEntry({ name: "Enabled Filter Test", scenario: "faq", script: "S", keywords: [], tenantId: null, enabled: true });
+    store.createEntry({ name: "Disabled Filter Test", scenario: "faq", script: "S", keywords: [], tenantId: null, enabled: false });
+
+    const res = await httpRequest(server, "GET", "/playbooks?enabled=true");
+    expect(res.status).toBe(200);
+    const data = res.json() as { entries: Array<{ enabled: boolean }>; count: number };
+    expect(data.entries.every((e) => e.enabled === true)).toBe(true);
+  });
+
+  it("GET /playbooks: enabled=false filters to only disabled entries", async () => {
+    store.createEntry({ name: "Enabled B", scenario: "faq", script: "S", keywords: [], tenantId: null, enabled: true });
+    store.createEntry({ name: "Disabled B", scenario: "faq", script: "S", keywords: [], tenantId: null, enabled: false });
+
+    const res = await httpRequest(server, "GET", "/playbooks?enabled=false");
+    expect(res.status).toBe(200);
+    const data = res.json() as { entries: Array<{ enabled: boolean }>; count: number };
+    expect(data.entries.every((e) => e.enabled === false)).toBe(true);
+    expect(data.count).toBeGreaterThanOrEqual(1);
+  });
+
+  // ── POST /playbooks: keywords and enabled validation ───────────────
+
+  it("POST /playbooks: returns 400 when keywords is not an array of strings", async () => {
+    const res = await httpRequest(server, "POST", "/playbooks", {
+      name: "Bad Keywords",
+      scenario: "faq",
+      script: "Some script.",
+      keywords: "not-an-array",
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("keywords");
+  });
+
+  it("POST /playbooks: returns 400 when keywords contains non-string elements", async () => {
+    const res = await httpRequest(server, "POST", "/playbooks", {
+      name: "Mixed Keywords",
+      scenario: "faq",
+      script: "Some script.",
+      keywords: ["valid", 42],
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("keywords");
+  });
+
+  it("POST /playbooks: returns 400 when enabled is not a boolean", async () => {
+    const res = await httpRequest(server, "POST", "/playbooks", {
+      name: "Bad Enabled",
+      scenario: "faq",
+      script: "Some script.",
+      enabled: "yes",
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("enabled");
+  });
+
+  // ── PUT /playbooks/:entryId: validation branches ───────────────────
+
+  it("PUT /playbooks/:entryId: returns 400 on invalid entryId format", async () => {
+    const res = await httpRequest(server, "PUT", "/playbooks/bad..id!!!", { name: "X" });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("entryId");
+  });
+
+  it("PUT /playbooks/:entryId: returns 400 when name is not a string", async () => {
+    const created = store.createEntry({ name: "For Name Check", scenario: "faq", script: "S", keywords: [], tenantId: null, enabled: true });
+
+    const res = await httpRequest(server, "PUT", `/playbooks/${created.entryId}`, {
+      name: 999,
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("name");
+  });
+
+  it("PUT /playbooks/:entryId: returns 400 when scenario is invalid", async () => {
+    const created = store.createEntry({ name: "For Scenario Check", scenario: "faq", script: "S", keywords: [], tenantId: null, enabled: true });
+
+    const res = await httpRequest(server, "PUT", `/playbooks/${created.entryId}`, {
+      scenario: "not-valid-scenario",
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("scenario");
+  });
+
+  it("PUT /playbooks/:entryId: returns 400 when script is not a string", async () => {
+    const created = store.createEntry({ name: "For Script Check", scenario: "faq", script: "S", keywords: [], tenantId: null, enabled: true });
+
+    const res = await httpRequest(server, "PUT", `/playbooks/${created.entryId}`, {
+      script: true,
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("script");
+  });
+
+  it("PUT /playbooks/:entryId: returns 400 when keywords is not string[]", async () => {
+    const created = store.createEntry({ name: "For Keywords Check", scenario: "faq", script: "S", keywords: [], tenantId: null, enabled: true });
+
+    const res = await httpRequest(server, "PUT", `/playbooks/${created.entryId}`, {
+      keywords: { wrong: true },
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("keywords");
+  });
+
+  it("PUT /playbooks/:entryId: returns 400 when enabled is not a boolean", async () => {
+    const created = store.createEntry({ name: "For Enabled Check", scenario: "faq", script: "S", keywords: [], tenantId: null, enabled: true });
+
+    const res = await httpRequest(server, "PUT", `/playbooks/${created.entryId}`, {
+      enabled: "true",
+    });
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("enabled");
+  });
+
+  it("PUT /playbooks/:entryId: sets tenantId to null when tenantId is non-string", async () => {
+    const created = store.createEntry({ name: "Tenant Null Test", scenario: "faq", script: "S", keywords: [], tenantId: "original-tenant", enabled: true });
+
+    const res = await httpRequest(server, "PUT", `/playbooks/${created.entryId}`, {
+      tenantId: 0,
+    });
+    expect(res.status).toBe(200);
+    const data = res.json() as { tenantId: string | null };
+    expect(data.tenantId).toBeNull();
+  });
+
+  it("PUT /playbooks/:entryId: returns 404 when updateEntry returns undefined (race condition fallback)", async () => {
+    const created = store.createEntry({ name: "Race Condition Entry", scenario: "faq", script: "S", keywords: [], tenantId: null, enabled: true });
+
+    // Temporarily make updateEntry return undefined to simulate race condition
+    const originalUpdate = store.updateEntry.bind(store);
+    jest.spyOn(store, "updateEntry").mockImplementationOnce(() => undefined);
+
+    const res = await httpRequest(server, "PUT", `/playbooks/${created.entryId}`, {
+      name: "Updated",
+    });
+    expect(res.status).toBe(404);
+
+    // Restore original
+    jest.spyOn(store, "updateEntry").mockImplementation(originalUpdate);
+  });
+
+  // ── DELETE /playbooks/:entryId: invalid id format ──────────────────
+
+  it("DELETE /playbooks/:entryId: returns 400 on invalid entryId format", async () => {
+    const res = await httpRequest(server, "DELETE", "/playbooks/bad..id!!!");
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("entryId");
   });
 });

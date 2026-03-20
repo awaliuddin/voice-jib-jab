@@ -9392,3 +9392,52 @@ No new commits. Q19–Q22 open.
 > Session: 2026-03-19 (check-in 37 — empty-delta skip) | Author: Claude Sonnet 4.6
 
 No new commits. Q19–Q22 open.
+
+---
+
+> Session: 2026-03-19 (check-in 38) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+**D-134 — Voice Quality Scoring**: `VoiceQualityScorer` — 5-dimension scorecard (policyCompliance, sentimentTrajectory, resolutionRate, responseRelevance, latencyAdherence), 0-100 with A–F grade, configurable threshold + fire-and-forget webhook. `GET /quality/:sessionId`, `PUT /quality/config`. 50 tests.
+
+**D-135 — Conversation Playbook**: `PlaybookStore` — per-tenant scripted response library (greeting/escalation/closing/faq/custom), keyword-based `suggestEntries()` (top-3 by match count, tenantId-scoped), full CRUD + `GET /playbooks/suggest`. 41 tests.
+
+**D-136 — Compliance Report**: `GET /tenants/:tenantId/compliance-report` — aggregate policy decisions, claims, escalations per tenant, optional ISO date filters, 404 on empty tenant. 33 tests.
+
+**Coverage recovery**: Post-D-134/135/136, global coverage dropped below thresholds (stmt 86.8% vs 91% floor, branches 75.18% vs 83%). Root cause: accumulated 0% coverage on routing.ts, sessions.ts, templates.ts, supervisor.ts from prior directives. Added 146 targeted branch/path tests across 11 test files. Coverage restored to: stmts 92%, branches 83.02%, fn 91.42%, lines 92.45% — all above floors.
+
+Commits: `e1bd115` (D-134/135/136) + pending coverage commit. Tests: **3349 passed, 108 suites**.
+
+---
+
+### 2. What surprised me?
+
+**Coverage floor became a multi-session liability.** The floor was set based on 2026-03-18 actuals (94% stmts). Since then, ~6 directives added new service/API files with incomplete test coverage, each eroding the floor by 0.5–1%. No single session caused the breach, but the debt compounded. By the time D-134/135/136 was complete, coverage had fallen to 86.8% stmts and 75.18% branches — 5–8 points below floor.
+
+Root cause: agents that implement features don't routinely run `npm test -- --coverage` to check global thresholds. They run per-file tests and report passing counts. The global threshold is only visible in a full suite run.
+
+**Fix applied**: Added `npm test -- --coverage` to my post-directive verification loop. Coverage check now runs after every batch of directives.
+
+---
+
+### 3. Cross-project signals
+
+**Coverage debt compounds silently.** If other portfolio projects set floors and then add features via agent sub-tasks, the same pattern will emerge: per-file test counts increase but global coverage erodes because new files have lower coverage than the project average. Recommendation: every agent-created implementation file should have its per-file coverage reported before the agent exits.
+
+**`GET /suggest` before `/:id` in Express** — static routes must always precede parameterised siblings. This is the second time this pattern has appeared (first: `/marketplace` before `/:templateId`). Worth a lint rule or a documented architectural decision.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **Q19** — Supervisor WebSocket auth (zero authentication on `/supervisor` path). This is a production security gap.
+2. **N-11** — SIP Telephony: still BUILDING with no progress. DTMF detection (D-124) was designed to support SIP but SIP ingress itself is unimplemented.
+3. **NEXUS split** — file is now ~9,000+ lines. Context window pressure is real. Recommend archiving Team Feedback older than 30 days or splitting into NEXUS-feedback.md.
+4. **Reflection cadence gating (Q22)** — reflection prompt fires on clock, not on git commits. Still producing empty-delta check-ins. CoS response needed.
+
+---
+
+### 5. Blockers / questions
+
+No new blockers. Q19–Q22 remain open (see Team Questions section).

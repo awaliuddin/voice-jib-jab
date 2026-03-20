@@ -538,3 +538,27 @@ describe("Sessions Router", () => {
     expect(mockRes.json).toHaveBeenCalledWith({ error: "No audit trail found for session" });
   });
 });
+
+// ── SessionRecorder — uncovered branch gaps ───────────────────────────
+
+describe("SessionRecorder — branch coverage gaps", () => {
+  it("pruneOldRecordings() returns 0 when recordings directory does not exist", () => {
+    const recorderNoDir = new SessionRecorder({
+      recordingsDir: join(tmpdir(), `no-such-dir-${Date.now()}`),
+      retentionDays: 7,
+    });
+    expect(recorderNoDir.pruneOldRecordings()).toBe(0);
+  });
+
+  it("recordSentiment() is a no-op for unknown sessionId (does not throw)", () => {
+    const r = new SessionRecorder({ recordingsDir: join(tmpdir(), `sent-test-${Date.now()}`), retentionDays: 7 });
+    expect(() => r.recordSentiment("no-such-session", {
+      sessionId: "no-such-session",
+      readingCount: 0,
+      dominantSentiment: "neutral",
+      averageScore: 0,
+      escalationTriggered: false,
+      trajectory: [],
+    })).not.toThrow();
+  });
+});

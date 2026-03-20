@@ -176,6 +176,90 @@ describe("RoutingEngine", () => {
     expect(rules).toHaveLength(2);
     expect(rules[0].targetTemplateId).toBe("german-tpl");
   });
+
+  // -- TimeRange condition -------------------------------------------------
+
+  test("evaluate() matches within a full-day timeRange (00:00-23:59)", () => {
+    engine.addRule({
+      tenantId: null,
+      priority: 1,
+      conditions: { timeRange: { start: "00:00", end: "23:59" } },
+      targetTemplateId: "always-tpl",
+      maxConcurrentSessions: null,
+      active: true,
+    });
+
+    const decision = engine.evaluate({ tenantId: "acme" });
+    expect(decision.templateId).toBe("always-tpl");
+    expect(decision.matchedConditions).toContain("timeRange");
+  });
+
+  test("evaluate() skips rule when timeRange does not match (past single minute)", () => {
+    // Use a fake Date pointing to a specific time and set a range that excludes it
+    const fixedDate = new Date("2026-03-19T12:00:00.000Z"); // 12:00 UTC
+    const spy = jest.spyOn(global, "Date").mockImplementation(() => fixedDate as unknown as Date);
+
+    engine.addRule({
+      tenantId: null,
+      priority: 1,
+      conditions: { timeRange: { start: "00:00", end: "11:59" } }, // ends before 12:00
+      targetTemplateId: "morning-only",
+      maxConcurrentSessions: null,
+      active: true,
+    });
+    engine.addRule({
+      tenantId: null,
+      priority: 2,
+      conditions: {},
+      targetTemplateId: "fallback-tpl",
+      maxConcurrentSessions: null,
+      active: true,
+    });
+
+    const decision = engine.evaluate({ tenantId: "acme" });
+    expect(decision.templateId).toBe("fallback-tpl");
+
+    spy.mockRestore();
+  });
+
+  test("evaluate() matches midnight-wrapping timeRange (22:00-06:00) at 23:00 UTC", () => {
+    const fixedDate = new Date("2026-03-19T23:00:00.000Z"); // 23:00 UTC
+    const spy = jest.spyOn(global, "Date").mockImplementation(() => fixedDate as unknown as Date);
+
+    engine.addRule({
+      tenantId: null,
+      priority: 1,
+      conditions: { timeRange: { start: "22:00", end: "06:00" } },
+      targetTemplateId: "night-tpl",
+      maxConcurrentSessions: null,
+      active: true,
+    });
+
+    const decision = engine.evaluate({ tenantId: "acme" });
+    expect(decision.templateId).toBe("night-tpl");
+    expect(decision.matchedConditions).toContain("timeRange");
+
+    spy.mockRestore();
+  });
+
+  test("evaluate() skips midnight-wrapping timeRange when time falls in gap (e.g. 12:00 UTC)", () => {
+    const fixedDate = new Date("2026-03-19T12:00:00.000Z"); // 12:00 UTC — outside 22:00-06:00
+    const spy = jest.spyOn(global, "Date").mockImplementation(() => fixedDate as unknown as Date);
+
+    engine.addRule({
+      tenantId: null,
+      priority: 1,
+      conditions: { timeRange: { start: "22:00", end: "06:00" } },
+      targetTemplateId: "night-tpl",
+      maxConcurrentSessions: null,
+      active: true,
+    });
+
+    const decision = engine.evaluate({ tenantId: "acme" });
+    expect(decision.ruleId).toBe("default");
+
+    spy.mockRestore();
+  });
 });
 
 // ===========================================================================
@@ -264,5 +348,18 @@ describe("CallQueueService", () => {
 
     const tenantIds = statuses.map((s) => s.tenantId).sort();
     expect(tenantIds).toEqual(["acme", "beta"]);
+  });
+
+  test("getPosition() returns null when session in meta but queue not found", () => {
+    // Force the edge case: session is in meta but its tenantId queue has been removed
+    queue.enqueue("sess-orphan", "ghost-tenant");
+    // Manually simulate by clearing the queue entry (remove it so queue is gone)
+    queue.remove("sess-orphan");
+    // After remove, getPosition should return null (not found)
+    expect(queue.getPosition("sess-orphan")).toBeNull();
+  });
+
+  test("remove() returns false for unknown session", () => {
+    expect(queue.remove("does-not-exist")).toBe(false);
   });
 });

@@ -380,3 +380,30 @@ describe("Memory API Endpoints", () => {
     });
   });
 });
+
+// ── ConversationMemoryStore — error + singleton branches ──────────────
+
+describe("ConversationMemoryStore — branch coverage", () => {
+  it("load() rethrows non-ENOENT errors", () => {
+    const dir = join(tmpdir(), `cmem-err-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    const store = new ConversationMemoryStore(dir);
+
+    // Write a file that will be treated as the memory file but with invalid content
+    // to trigger a JSON parse error (which has no .code, so it re-throws)
+    const { writeFileSync } = require("fs");
+    writeFileSync(join(dir, "tenant-x.json"), "NOT_VALID_JSON");
+
+    expect(() => store.load("tenant-x")).toThrow();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("initConversationMemoryStore() wires the proxy correctly", () => {
+    const { initConversationMemoryStore, conversationMemoryStore: proxy } =
+      require("../../services/ConversationMemoryStore.js");
+    const dir = join(tmpdir(), `cmem-init-${Date.now()}`);
+    initConversationMemoryStore(dir);
+    expect(typeof proxy.load).toBe("function");
+    rmSync(dir, { recursive: true, force: true });
+  });
+});

@@ -543,3 +543,18 @@ describe("Admin API Endpoints", () => {
     });
   });
 });
+
+// ── TenantRegistry singleton (proxy branches) ─────────────────────────
+
+describe("TenantRegistry — initTenantRegistry + proxy", () => {
+  it("proxy delegates after initTenantRegistry() is called", () => {
+    const tmpPath = join(tmpdir(), `tenant-proxy-test-${Date.now()}.json`);
+    const { initTenantRegistry } = require("../../services/TenantRegistry.js");
+    initTenantRegistry(tmpPath);
+    const { tenantRegistry: proxy } = require("../../services/TenantRegistry.js");
+    // Proxy delegates to real store — listTenants returns array, non-function property works
+    expect(typeof proxy.listTenants).toBe("function");
+    expect(Array.isArray(proxy.listTenants())).toBe(true);
+    if (existsSync(tmpPath)) unlinkSync(tmpPath);
+  });
+});
