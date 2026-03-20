@@ -87,6 +87,20 @@ import { createCompareAgentsRouter } from "./api/compareAgents.js";
 import { compareAgentsDashboardHtml } from "./api/compareAgentsDashboard.js";
 import { AuditReportService } from "./services/AuditReportService.js";
 import { createAuditReportRouter } from "./api/auditReport.js";
+import { ComplianceDashboardService } from "./services/ComplianceDashboardService.js";
+import { createComplianceDashboardRouter } from "./api/complianceDashboard.js";
+import { initOnboardingWizardService } from "./services/OnboardingWizardService.js";
+import { createOnboardingRouter } from "./api/onboarding.js";
+import { initWebhookService } from "./services/WebhookService.js";
+import { createWebhooksRouter } from "./api/webhooks.js";
+import { CapacityPlannerService } from "./services/CapacityPlannerService.js";
+import { createCapacityPlannerRouter } from "./api/capacityPlanner.js";
+import { initSkillStore } from "./services/SkillStore.js";
+import { createSkillsRouter } from "./api/skills.js";
+import { initAgentVersionStore } from "./services/AgentVersionStore.js";
+import { createAgentVersionsRouter } from "./api/agentVersions.js";
+import { ConversationAnalyticsService } from "./services/ConversationAnalyticsService.js";
+import { createConversationAnalyticsRouter } from "./api/conversationAnalytics.js";
 import { createHealthRouter } from "./api/health.js";
 import { healthMonitorDashboardHtml } from "./api/healthMonitorDashboard.js";
 
@@ -362,6 +376,38 @@ app.get("/compare-agents/dashboard", (_req, res) => {
 const auditReportService = new AuditReportService(sessionRecorder, voiceQualityScorer);
 app.use("/audit", createAuditReportRouter(auditReportService));
 
+// ── Compliance Dashboard ──────────────────────────────────────────────
+const complianceDashboardService = new ComplianceDashboardService(
+  tenantRegistry,
+  sessionRecorder,
+  recordingRetentionDays,
+);
+app.use("/compliance-dashboard", createComplianceDashboardRouter(complianceDashboardService));
+
+// ── Tenant Onboarding Wizard ──────────────────────────────────────────
+const onboardingWizardService = initOnboardingWizardService(resolve(dirname(config.storage.databasePath), "onboarding.json"));
+app.use("/onboarding", createOnboardingRouter(onboardingWizardService));
+
+// ── Webhook Management ────────────────────────────────────────────────
+const webhookService = initWebhookService(resolve(dirname(config.storage.databasePath), "webhooks.json"));
+app.use("/webhooks", createWebhooksRouter(webhookService));
+
+// ── Capacity Planner ──────────────────────────────────────────────────
+const capacityPlannerService = new CapacityPlannerService();
+app.use("/capacity", createCapacityPlannerRouter(capacityPlannerService));
+
+// ── Skill System ──────────────────────────────────────────────────────
+const skillStore = initSkillStore(resolve(dirname(config.storage.databasePath), "skills.json"));
+app.use("/skills", createSkillsRouter(skillStore));
+
+// ── Agent Version Management ──────────────────────────────────────────
+const agentVersionStore = initAgentVersionStore(resolve(dirname(config.storage.databasePath), "agent-versions.json"));
+app.use("/agent-versions", createAgentVersionsRouter(agentVersionStore));
+
+// ── Conversation Analytics ────────────────────────────────────────────
+const conversationAnalytics = new ConversationAnalyticsService(sessionRecorder);
+app.use("/analytics/conversations", createConversationAnalyticsRouter(conversationAnalytics));
+
 // ── Call Routing + Queue System ───────────────────────────────────────
 const routingEngine = initRoutingEngine(resolve(dirname(config.storage.databasePath), "routing-rules.json"));
 const callQueue = new CallQueueService();
@@ -471,7 +517,14 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Live KB Search:  http://localhost:${config.port}/kb-search`);
     console.log(`[Server] Training Mode:   http://localhost:${config.port}/training/annotations`);
     console.log(`[Server] Agent Compare:   http://localhost:${config.port}/compare-agents/dashboard`);
-    console.log(`[Server] Audit Reports:   http://localhost:${config.port}/audit/report\n`);
+    console.log(`[Server] Audit Reports:   http://localhost:${config.port}/audit/report`);
+    console.log(`[Server] Compliance:      http://localhost:${config.port}/compliance-dashboard/dashboard`);
+    console.log(`[Server] Onboarding:      http://localhost:${config.port}/onboarding/wizard`);
+    console.log(`[Server] Webhooks:        http://localhost:${config.port}/webhooks`);
+    console.log(`[Server] Capacity:        http://localhost:${config.port}/capacity/calculator`);
+    console.log(`[Server] Skills:          http://localhost:${config.port}/skills`);
+    console.log(`[Server] Agent Versions:  http://localhost:${config.port}/agent-versions`);
+    console.log(`[Server] Conv Analytics:  http://localhost:${config.port}/analytics/conversations/dashboard\n`);
 
     console.log("Features:");
     console.log(
