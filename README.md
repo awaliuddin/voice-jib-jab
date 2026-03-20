@@ -2,7 +2,7 @@
 
 A production voice agent runtime focused on eliminating the two things that kill enterprise voice deployments: **bad latency** and **ungoverned output**. Browser-based speech-to-speech assistant with lane-based orchestration, async policy enforcement, and retrieval-augmented generation.
 
-**Status:** 22/23 initiatives SHIPPED + 1 BUILDING | 3,651 server tests | 92%+ coverage
+**Status:** 24/25 initiatives SHIPPED + 1 BUILDING | 3,746 server tests | 92%+ coverage
 
 ## Architecture
 
@@ -245,6 +245,16 @@ npm run format
 | N-13 | Multi-Tenant Isolation | SHIPPED |
 | N-14 | Lane C v2: Semantic Governance | SHIPPED |
 | N-15 | Dense Embedding Similarity | SHIPPED |
+| N-16 | Call Routing + Queue System | SHIPPED |
+| N-17 | Voice Agent Marketplace | SHIPPED |
+| N-18 | Voice Biometrics — Caller ID | SHIPPED |
+| N-19 | Custom TTS Voices + A/B Testing | SHIPPED |
+| N-20 | Agent Personas — Per-Tenant Personality | SHIPPED |
+| N-21 | Voice Agent React SDK | SHIPPED |
+| N-22 | Conversation Flow Builder | SHIPPED |
+| N-23 | Real-Time Translation Pipeline | SHIPPED |
+| N-24 | Intent Detection — Smart Caller Routing | SHIPPED |
+| N-25 | Voice Pipeline Profiler | SHIPPED |
 
 ## Documentation
 

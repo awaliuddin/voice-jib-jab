@@ -54,6 +54,11 @@ import { FlowEngine } from "./services/FlowEngine.js";
 import { createFlowsRouter } from "./api/flows.js";
 import { translationService } from "./services/TranslationService.js";
 import { createTranslationRouter } from "./api/translation.js";
+import { IntentClassifier } from "./services/IntentClassifier.js";
+import { initIntentStore } from "./services/IntentStore.js";
+import { createIntentsRouter } from "./api/intents.js";
+import { pipelineProfiler } from "./services/PipelineProfiler.js";
+import { createProfilerRouter } from "./api/profiler.js";
 
 const app = express();
 const server = createServer(app);
@@ -298,6 +303,14 @@ app.use("/flows", createFlowsRouter(flowStore, flowEngine));
 
 // ── Real-Time Translation (D-202) ────────────────────────────────────
 app.use("/translation", createTranslationRouter(translationService));
+
+// ── Intent Detection (D-212) ─────────────────────────────────────────
+const intentClassifier = new IntentClassifier();
+const intentStore = initIntentStore(resolve(dirname(config.storage.databasePath), "intents.json"));
+app.use("/intents", createIntentsRouter(intentClassifier, intentStore));
+
+// ── Pipeline Profiler (D-213) ─────────────────────────────────────────
+app.use("/sessions", createProfilerRouter(pipelineProfiler));
 
 // ── Call Routing + Queue System ───────────────────────────────────────
 const routingEngine = initRoutingEngine(resolve(dirname(config.storage.databasePath), "routing-rules.json"));

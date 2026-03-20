@@ -33,6 +33,8 @@
 | N-21 | Voice Agent React SDK | EXTENSIBILITY | SHIPPED | P1 | 2026-03-19 |
 | N-22 | Conversation Flow Builder | INTERACTION | SHIPPED | P1 | 2026-03-19 |
 | N-23 | Real-Time Translation Pipeline | INTERACTION | SHIPPED | P1 | 2026-03-19 |
+| N-24 | Intent Detection — Smart Caller Routing | INTERACTION | SHIPPED | P1 | 2026-03-19 |
+| N-25 | Voice Pipeline Profiler | OBSERVABILITY | SHIPPED | P1 | 2026-03-19 |
 
 ---
 
@@ -259,30 +261,30 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260319-212 — P1: Intent Detection — Smart Caller Routing
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-19 18:40 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-19 18:40 | **Estimate**: M | **Status**: DONE
 
 **Action Items**:
-1. [ ] **Intent classifier** — detect caller intent from first utterance: support, billing, sales, complaint, general.
-2. [ ] **Route by intent** — auto-assign to the right agent template based on detected intent.
-3. [ ] **`GET /intents`** — list detected intents with frequency. Configurable intent→template mapping.
-4. [ ] Tests.
+1. [x] **Intent classifier** — `IntentClassifier` detects: support, billing, sales, complaint, general (fallback). Keyword scoring with confidence (highScore/totalWords, clamped 0-1; fallback to "general" if confidence <0.03).
+2. [x] **Route by intent** — `IntentStore.setMapping()` / `getMapping()` allows configurable intent→templateId mapping. `POST /intents/config` to set, `GET /intents/config` to list, `DELETE /intents/config/:intent` to remove.
+3. [x] **`GET /intents`** — lists detection logs with frequency counts via `getFrequencies()`. `POST /intents/detect` runs live classification. Static routes (`/detect`, `/config`) registered before parameterised peers.
+4. [x] Tests — 52 tests in `IntentDetection.test.ts`.
 
 **CHAIN**: When done, start DIRECTIVE-NXTG-20260319-213.
-**Response** (filled by team): >
+**Response** (filled by team): > **DONE 2026-03-19.** `IntentClassifier` (stateless, keyword scoring) + `IntentStore` (JSON-persisted, singleton proxy) + `intents.ts` router + `intents-constants.ts` (no circular imports). Wired in `index.ts`. 52 tests. Total: 3,746 all green. Coverage 83.5% branches.
 
 ---
 
 ### DIRECTIVE-NXTG-20260319-213 — P1: Voice Pipeline Profiler — Latency Breakdown
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
-**Injected**: 2026-03-19 18:40 | **Estimate**: M | **Status**: PENDING
+**Injected**: 2026-03-19 18:40 | **Estimate**: M | **Status**: DONE
 
 **Action Items**:
-1. [ ] **Per-stage timing** — measure: STT, Lane A/B/C, PolicyGate, TTS, total roundtrip.
-2. [ ] **`GET /sessions/:id/profile`** — flamechart-style timing breakdown.
-3. [ ] **Bottleneck alerts** — flag if any stage >200ms consistently.
-4. [ ] Tests.
+1. [x] **Per-stage timing** — `PipelineProfiler` tracks: stt, lane_a, lane_b, lane_c, policy_gate, tts, total. In-memory (not persisted), Map<sessionId, StageTimingRecord[]>. `BOTTLENECK_THRESHOLD_MS = 200`.
+2. [x] **`GET /sessions/:id/profile`** — returns `PipelineProfile` with per-stage avg/min/max/count. `GET /sessions/:id/profile/bottlenecks` returns only stages exceeding threshold. Route ordering: bottlenecks before plain profile.
+3. [x] **Bottleneck alerts** — `getBottlenecks()` filters stages where avg > 200ms. `POST /sessions/:id/profile` records a timing entry.
+4. [x] Tests — 43 tests in `PipelineProfiler.test.ts`.
 
-**Response** (filled by team): >
+**Response** (filled by team): > **DONE 2026-03-19.** `PipelineProfiler` (in-memory, exported singleton) + `profiler.ts` router mounted at `/sessions`. Bottleneck route registered before plain profile route to prevent shadowing. Wired in `index.ts`. 43 tests. Total: 3,746 all green. Coverage 83.5% branches.
 
 ---
 
