@@ -60,6 +60,8 @@ import { initIntentStore } from "./services/IntentStore.js";
 import { createIntentsRouter } from "./api/intents.js";
 import { pipelineProfiler } from "./services/PipelineProfiler.js";
 import { createProfilerRouter } from "./api/profiler.js";
+import { RecordingStore } from "./services/RecordingStore.js";
+import { createRecordingsRouter } from "./api/recordings.js";
 
 const app = express();
 const server = createServer(app);
@@ -171,6 +173,13 @@ export const sessionRecorder = new SessionRecorder({
   retentionDays: 7,
 });
 
+// ── Recording Store (audio export) ────────────────────────────────────
+const recordingRetentionDays = parseInt(process.env.RECORDING_RETENTION_DAYS ?? "30", 10);
+export const recordingStore = new RecordingStore({
+  audioDir: resolve(dirname(config.storage.databasePath), "audio"),
+  retentionDays: Number.isFinite(recordingRetentionDays) ? recordingRetentionDays : 30,
+});
+
 // ── Rate limiters ────────────────────────────────────────────────────
 const adminLimiter = createRateLimiter({ windowMs: 60_000, max: 30, message: "Admin API rate limit exceeded" });
 const voiceLimiter = createRateLimiter({ windowMs: 60_000, max: 10, message: "Voice API rate limit exceeded" });
@@ -249,6 +258,9 @@ app.use("/intents", createIntentsRouter(intentClassifier, intentStore));
 // ── Pipeline Profiler (D-213) ─────────────────────────────────────────
 app.use("/sessions", createProfilerRouter(pipelineProfiler));
 
+// ── Call Recording Export API ─────────────────────────────────────────
+app.use("/recordings", createRecordingsRouter(recordingStore));
+
 // ── Call Routing + Queue System ───────────────────────────────────────
 const routingEngine = initRoutingEngine(resolve(dirname(config.storage.databasePath), "routing-rules.json"));
 const callQueue = new CallQueueService();
@@ -276,7 +288,7 @@ async function startServer(): Promise<void> {
   const verificationService = fpApiKey
     ? new ClaimVerificationService(fpBaseUrl, fpApiKey)
     : undefined;
-  const voiceWss = new VoiceWebSocketServer(server, opaEvaluator, sessionRecorder, voiceTriggerService, memoryStore, voiceProfileStore, kbStore, verificationService);
+  const voiceWss = new VoiceWebSocketServer(server, opaEvaluator, sessionRecorder, voiceTriggerService, memoryStore, voiceProfileStore, kbStore, verificationService, recordingStore);
 
   // Register whisper handler so supervisors can inject hints into live sessions
   supervisorRegistry.setWhisperHandler((sessionId, message) => voiceWss.injectWhisper(sessionId, message));
@@ -364,6 +376,14 @@ async function startServer(): Promise<void> {
     console.log(`  Barge-in p95: <${config.latency.bargeInTargetP95}ms\n`);
 
     console.log("Ready for connections! 🚀\n");
+
+    // Schedule daily recording retention pruning (runs 24h after server start)
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    setInterval(() => {
+      recordingStore.pruneExpired().then((count) => {
+        if (count > 0) console.log(`[RecordingStore] Pruned ${count} expired recording(s)`);
+      }).catch((err) => console.error("[RecordingStore] Prune failed:", err));
+    }, ONE_DAY_MS).unref();
   });
 }
 

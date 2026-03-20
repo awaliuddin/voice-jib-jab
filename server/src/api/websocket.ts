@@ -36,6 +36,7 @@ import { SentimentTracker } from "../services/SentimentTracker.js";
 import { ConversationSummarizer } from "../services/ConversationSummarizer.js";
 import type { KnowledgeBaseStore } from "../services/KnowledgeBaseStore.js";
 import type { ClaimVerificationService } from "../services/ClaimVerificationService.js";
+import type { RecordingStore } from "../services/RecordingStore.js";
 import { supervisorRegistry } from "../services/SupervisorRegistry.js";
 
 interface ClientConnection {
@@ -83,8 +84,9 @@ export class VoiceWebSocketServer {
   private conversationSummarizer: ConversationSummarizer;
   private kbStore: KnowledgeBaseStore | undefined;
   private verificationService?: ClaimVerificationService;
+  private recordingStore?: RecordingStore;
 
-  constructor(server: any, opaEvaluator?: OpaEvaluator, sessionRecorder?: SessionRecorder, voiceTriggerService?: VoiceTriggerService, memoryStore?: ConversationMemoryStore, voiceProfileStore?: VoiceProfileStore, kbStore?: KnowledgeBaseStore, verificationService?: ClaimVerificationService) {
+  constructor(server: any, opaEvaluator?: OpaEvaluator, sessionRecorder?: SessionRecorder, voiceTriggerService?: VoiceTriggerService, memoryStore?: ConversationMemoryStore, voiceProfileStore?: VoiceProfileStore, kbStore?: KnowledgeBaseStore, verificationService?: ClaimVerificationService, recordingStore?: RecordingStore) {
     this.wss = new WebSocketServer({ server });
     this.connections = new Map();
     this.opaEvaluator = opaEvaluator;
@@ -97,6 +99,7 @@ export class VoiceWebSocketServer {
     this.conversationSummarizer = new ConversationSummarizer();
     this.kbStore = kbStore;
     this.verificationService = verificationService;
+    this.recordingStore = recordingStore;
 
     // Initialize storage if persistent memory or audit trail is enabled
     if (
@@ -350,6 +353,7 @@ export class VoiceWebSocketServer {
           lane: "A",
           timestamp: Date.now(),
         });
+        this.recordingStore?.appendChunk(sessionId, chunk.data);
       },
     );
 
@@ -400,6 +404,7 @@ export class VoiceWebSocketServer {
           lane: "B",
           timestamp: Date.now(),
         });
+        this.recordingStore?.appendChunk(sessionId, chunk.data);
       },
     );
 
@@ -632,6 +637,7 @@ export class VoiceWebSocketServer {
           lane: "fallback",
           timestamp: Date.now(),
         });
+        this.recordingStore?.appendChunk(sessionId, chunk.data);
       },
     );
 
@@ -708,6 +714,7 @@ export class VoiceWebSocketServer {
         case "session.start":
           // Start recording this session
           this.sessionRecorder?.startRecording(sessionId, message.tenantId);
+          this.recordingStore?.startCapture(sessionId, message.tenantId ?? null);
 
           // New session — ensure audio gate is open
           connection.audioStopped = false;
@@ -1180,6 +1187,11 @@ export class VoiceWebSocketServer {
     // Stop session recording and flush to disk
     this.sessionRecorder?.stopRecording(sessionId).catch((error) => {
       console.error("[WebSocket] Failed to stop session recording:", error);
+    });
+
+    // Finalise audio recording (writes WAV file)
+    this.recordingStore?.stopCapture(sessionId).catch((error) => {
+      console.error("[WebSocket] Failed to stop audio capture:", error);
     });
 
     // Fire webhook callback if this session was trigger-initiated
