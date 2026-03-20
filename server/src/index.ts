@@ -63,6 +63,9 @@ import { pipelineProfiler } from "./services/PipelineProfiler.js";
 import { createProfilerRouter } from "./api/profiler.js";
 import { RecordingStore } from "./services/RecordingStore.js";
 import { createRecordingsRouter } from "./api/recordings.js";
+import { initAgentAbTestService } from "./services/AgentAbTestService.js";
+import { createAbTestsRouter } from "./api/abtests.js";
+import { abTestDashboardHtml } from "./api/abTestDashboard.js";
 
 const app = express();
 const server = createServer(app);
@@ -271,6 +274,13 @@ app.use("/sessions", createProfilerRouter(pipelineProfiler));
 // ── Call Recording Export API ─────────────────────────────────────────
 app.use("/recordings", createRecordingsRouter(recordingStore));
 
+// ── Agent A/B Testing Framework ───────────────────────────────────────
+const agentAbTestService = initAgentAbTestService(resolve(dirname(config.storage.databasePath), "agent-abtests.json"));
+app.use("/abtests", createAbTestsRouter(agentAbTestService));
+app.get("/abtests/dashboard", (_req, res) => {
+  res.type("html").send(abTestDashboardHtml());
+});
+
 // ── Call Routing + Queue System ───────────────────────────────────────
 const routingEngine = initRoutingEngine(resolve(dirname(config.storage.databasePath), "routing-rules.json"));
 const callQueue = new CallQueueService();
@@ -365,7 +375,9 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Templates API: http://localhost:${config.port}/templates`);
     console.log(`[Server] Supervisor WS: ws://localhost:${config.port}/supervisor`);
     console.log(`[Server] Voiceprints API: http://localhost:${config.port}/voiceprints`);
-    console.log(`[Server] Voice A/B Tests: http://localhost:${config.port}/voices/abtests\n`);
+    console.log(`[Server] Voice A/B Tests: http://localhost:${config.port}/voices/abtests`);
+    console.log(`[Server] Agent A/B Tests: http://localhost:${config.port}/abtests`);
+    console.log(`[Server] A/B Dashboard:   http://localhost:${config.port}/abtests/dashboard\n`);
 
     console.log("Features:");
     console.log(
