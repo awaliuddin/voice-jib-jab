@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voice Jib-Jab — Offline</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0f;
+      color: #fff;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100dvh;
+      padding: 2rem;
+    }
+
+    .card {
+      text-align: center;
+      max-width: 420px;
+      width: 100%;
+    }
+
+    .icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 2rem;
+      background: #111118;
+      border: 1px solid #1e1e2e;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .icon svg {
+      width: 36px;
+      height: 36px;
+      color: #3b82f6;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      color: #fff;
+    }
+
+    p {
+      color: #888;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #111118;
+      border: 1px solid #1e1e2e;
+      border-radius: 9999px;
+      padding: 0.3rem 0.9rem;
+      font-size: 0.75rem;
+      color: #3b82f6;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 2rem;
+    }
+
+    button {
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem 2rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    button:hover { background: #2563eb; }
+
+    .status {
+      margin-top: 1.5rem;
+      font-size: 0.8rem;
+      color: #555;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #ef4444;
+      margin-right: 0.4rem;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="1" y1="1" x2="23" y2="23"/>
+        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+        <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
+        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+        <circle cx="12" cy="20" r="1" fill="currentColor"/>
+      </svg>
+    </div>
+
+    <div class="badge">Offline</div>
+
+    <h1>No connection</h1>
+    <p>Voice Jib-Jab needs an internet connection to reach the voice server. Check your network and try again.</p>
+
+    <button onclick="window.location.reload()">Try again</button>
+
+    <div class="status">
+      <span class="dot"></span>
+      <span id="msg">Waiting for connection…</span>
+    </div>
+  </div>
+
+  <script>
+    // Auto-retry when connectivity returns
+    window.addEventListener('online', () => {
+      document.getElementById('msg').textContent = 'Connection restored — reloading…';
+      setTimeout(() => window.location.reload(), 800);
+    });
+
+    // Check periodically in case the online event fires unreliably (iOS Safari)
+    const interval = setInterval(async () => {
+      try {
+        const r = await fetch('/health', { cache: 'no-store' });
+        if (r.ok) {
+          clearInterval(interval);
+          document.getElementById('msg').textContent = 'Server reachable — reloading…';
+          setTimeout(() => window.location.reload(), 500);
+        }
+      } catch {
+        // still offline
+      }
+    }, 5000);
+  </script>
+</body>
+</html>

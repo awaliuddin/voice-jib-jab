@@ -1,0 +1,35 @@
+{
+  "name": "Voice Jib-Jab",
+  "short_name": "VJJ",
+  "description": "NextGen AI Voice Orchestrator — enterprise speech-to-speech with three-lane governance",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0a0f",
+  "theme_color": "#3b82f6",
+  "lang": "en",
+  "scope": "/",
+  "categories": ["productivity", "utilities", "business"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Open Dashboard",
+      "url": "/",
+      "description": "Go to the voice agent dashboard"
+    }
+  ]
+}

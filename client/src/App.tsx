@@ -15,6 +15,7 @@ import { Navigation } from "./components/Navigation";
 import { VoiceInterface } from "./components/VoiceInterface";
 import { PerformanceShowcase } from "./components/PerformanceShowcase";
 import { TrustSignals } from "./components/TrustSignals";
+import { InstallBanner } from "./pwa/InstallBanner";
 
 const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:3000";
 
@@ -218,6 +219,9 @@ function App() {
 
       {/* Trust Signals */}
       <TrustSignals />
+
+      {/* PWA install prompt */}
+      <InstallBanner />
     </div>
   );
 }
