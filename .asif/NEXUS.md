@@ -9574,3 +9574,71 @@ Root cause: agents that implement features don't routinely run `npm test -- --co
 ### 5. Blockers / questions
 
 No new blockers. Q19–Q22 remain open (see Team Questions section).
+
+---
+
+> Session: 2026-03-19 (check-in 39 — end of marathon day) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+**10 directives across this session and immediate prior context. Tests grew 3,203 → 3,746 (+543).**
+
+| Commit | Directive | Feature | Tests Added |
+|--------|-----------|---------|-------------|
+| (prev session) | D-162 | Voice Biometrics — VoiceprintStore, cosine similarity ID, /voiceprints API | +46 |
+| (prev session) | D-163 | TTS A/B Testing — VoiceAbTestService, /voices/abtests routes | +46 |
+| (prev session) | D-164 | Docker Compose — env vars + volume mounts for all new JSON stores | 0 |
+| (prev session) | D-189 | Agent Personas — PersonaStore, /personas + /tenants/:id/persona | +65 |
+| (prev session) | D-190 | React Voice Agent SDK — packages/voice-agent-react (useVoiceAgent + VoiceAgent) | +39 (pkg) |
+| (prev session) | D-201 | Conversation Flow Builder — FlowStore + FlowEngine + /flows API | +75 |
+| (prev session) | D-202 | Real-Time Translation — TranslationService + /translation API | +72 |
+| `4231e56` | D-212 | Intent Detection — IntentClassifier + IntentStore + /intents API | +52 |
+| `4231e56` | D-213 | Voice Pipeline Profiler — PipelineProfiler + /sessions profiler sub-routes | +43 |
+
+**Total API surface added this full session**: `/voiceprints`, `/voices/abtests`, `/personas`, `/tenants/:id/persona`, `/flows`, `/flows/:id/start`, `/flows/sessions/:token/advance`, `/translation/detect`, `/translation/translate`, `/translation/pipeline`, `/intents/detect`, `/intents`, `/intents/config`, `/sessions/:id/profile`, `/sessions/:id/profile/bottlenecks` — 15+ new endpoints.
+
+**Final state**: 3,746 tests, 0 failures. Coverage: stmts 92.53%, branch 83.5%, fn 92.72%, lines 92.97%. 24/25 initiatives SHIPPED, 1 BUILDING.
+
+---
+
+### 2. What surprised me?
+
+**Coverage floor held this session without emergency recovery — for the first time.** Previous marathon sessions required a coverage recovery pass after every 3–4 directives (branches collapsing to 82.x%). This session I ran coverage after each wiring step. The difference: agents are now producing better branch coverage in initial test suites, and I caught drops immediately (D-189 dropped to 82.64%, fixed with 11 targeted tests before continuing). The pattern is now: wire → `npm test --coverage` → fix if needed → commit. This is the correct loop.
+
+**The `intents-constants.ts` split was required to prevent circular imports.** `createIntentsRouter` needed `VALID_INTENTS` to validate request bodies, and `IntentClassifier` needed `CallerIntent`. Had both lived in the same file it would have created a circular dependency between the router and service layers. The constants file is a pattern worth formalizing: any time a router and service need to share an enum/constant, extract it to a `*-constants.ts` sibling rather than importing across the service/API boundary.
+
+**The profiler's `/sessions` mount creates a logical overlap with the existing sessions router.** Both `createSessionsRouter` and `createProfilerRouter` mount at `/sessions`. Express handles this fine (they're registered separately and routes don't clash), but it's conceptually odd — a caller hitting `/sessions` gets session recording data from one router and profiling data from a different router. If a future directive adds more `/sessions` sub-routes, consider consolidating into a single sessions router that takes both `sessionRecorder` and `pipelineProfiler` as dependencies.
+
+**Stale Stryker sandbox generates a harmless but noisy jest warning on every test run**: `jest-haste-map: duplicate manual mock found: ws`. The `.stryker-tmp/sandbox-*/` directory contains a copy of `src/__mocks__/ws.ts`. It doesn't affect tests but clutters CI output. Either gitignore `.stryker-tmp/` or add a posttest hook to clean it.
+
+---
+
+### 3. Cross-project signals
+
+**`intents-constants.ts` circular-import prevention pattern is broadly applicable.** Any project where routers and services share type/constant definitions — and those definitions can't live cleanly in either layer — benefits from a dedicated `*-constants.ts` extraction. FamilyMind and SynApps both have router/service boundaries and likely hit this eventually.
+
+**`PipelineProfiler` is a zero-dependency latency measurement primitive.** It's a pure in-memory Map with start/end timestamps, avg/min/max per stage, and a threshold-based bottleneck filter. Any ASIF project that processes requests through multiple named stages can drop this in verbatim — just change the `PipelineStage` union type. No persistence, no config, no external deps.
+
+**`TranslationService.runPipeline()` auto-detect pattern**: detect caller language → translate input to agent language → generate response → translate response back. This is the correct architecture for multilingual voice. The `StubTranslationProvider` is already structured for easy swap to DeepL or Google Translate. Any ASIF project adding i18n to a voice or chat product should start here.
+
+**React SDK package structure (`packages/voice-agent-react`) follows the standard monorepo pattern.** The `optionsRef` pattern used in `useVoiceAgent` (store mutable callbacks in a ref, not in useEffect deps) is the correct React idiom for SDK hooks that need stable callback references. Worth documenting as a portfolio standard for any React SDK work.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **N-11 SIP Telephony** — still BUILDING with no Phase 2 directive. `SipBridgeService` + stub adapter exist; Phase 2 needs real SIP.js adapter + G.711 codec. This is the only initiative not SHIPPED and it's been static for 2+ sessions.
+2. **Supervisor WebSocket auth (Q19)** — `/supervisor` upgrade path has zero authentication. Any client can inject whispers into live sessions. Production blocker.
+3. **Stryker sandbox cleanup** — the `.stryker-tmp/` directory is polluting jest output. One-line `.gitignore` addition + posttest clean.
+4. **Profiler router consolidation** — consider merging `createProfilerRouter` into `createSessionsRouter` (pass `pipelineProfiler` as second dep) to avoid the dual-mount oddity at `/sessions`. Low priority — current setup works — but cleaner before the API surface hardens.
+5. **Dependabot vulns** — GitHub is flagging 2 high + 1 moderate on the default branch. Should triage before any customer-facing deployment.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+**Q23 — Stryker sandbox gitignore**: Should `.stryker-tmp/` be added to `.gitignore`? It was generated by the mutation testing run in a prior session and is creating spurious jest warnings. No functional impact, but it's noise. Ready to fix in 2 lines on authorization.
+
+**Q24 — Sessions router consolidation**: `createProfilerRouter` and `createSessionsRouter` both mount at `/sessions`. Should these be merged into one router (cleaner API, single dependency injection point) or kept separate (simpler individual files, easier to test in isolation)? No urgency — noting for architectural consistency.
+
+Q19 (supervisor auth), Q20 (N-11 SIP decision), Q21 (NEXUS file size), Q22 (reflection cadence gating) remain open.
