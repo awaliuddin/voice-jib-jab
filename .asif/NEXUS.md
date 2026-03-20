@@ -9681,6 +9681,68 @@ Q19 (supervisor auth), Q20 (N-11 SIP decision), Q21 (NEXUS file size), Q22 (refl
 
 ---
 
+> Session: 2026-03-19 (check-in 42) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+**3 commits, no new server tests (client/static work).**
+
+| Commit | Deliverable | Files |
+|--------|-------------|-------|
+| `b5dd1ee` | README rewrite + CRUCIBLE audit | `README.md`, `NEXUS.md` |
+| `ae1f622` | PWA support | 11 files — `manifest.json`, `sw.js`, `offline.html`, `icons/`, `InstallBanner.tsx`, `useInstallPrompt.ts`, `registerSW.ts`, `index.html`, `main.tsx`, `App.tsx` |
+| `fd21373` | Voice agent monitoring dashboard | `monitoringDashboard.ts`, `index.ts` |
+
+Server test count unchanged: **3,746 passed, 0 failures.**
+
+**PWA summary**: `manifest.json` + service worker (stale-while-revalidate shell, network-only API routes) + branded offline page with auto-reconnect + real PNG icons (192+512px, microphone motif) + `InstallBanner` (native Chrome prompt on Android, manual "Share → Add to Home Screen" instructions on iOS Safari) + full `index.html` meta tags for iPhone installability.
+
+**Dashboard summary**: Replaced the 60-line basic metrics page at `/dashboard` with a full ops dashboard. Five panels: KPI strip, active sessions table, calls-per-day SVG sparkline, quality-by-tenant CSS bars, escalation-rate table, sentiment heatmap, top policy violations chart. All data from `Promise.all` across four existing API endpoints. Zero external dependencies.
+
+---
+
+### 2. What surprised me?
+
+**The sentiment heatmap required a careful colour palette choice.** "frustrated" needed its own palette distinct from "negative" — both are red-family but frustrated is orange-tinted to visually differentiate from outright negative. The first pass looked identical at low percentages. Worth noting: heatmap colour design is harder than bar charts because the human eye perceives adjacent colours relatively, not absolutely.
+
+**The monitoring dashboard module extraction was the right call.** The old `/dashboard` route was 66 lines of inline template string inside `index.ts`. Replacing it with `monitoringDashboard.ts` and a 3-line route reduced index.ts by 63 lines with no functional change. The pattern — extract large inline HTML to a named module — should be applied retroactively if the `/dashboard` ever gets a second route (e.g., `/dashboard/tenants/:id`).
+
+**iOS PWA support is genuinely more involved than Chrome/Android.** `beforeinstallprompt` doesn't fire at all on iOS Safari. The `InstallBanner` needed a UA detection branch that shows instructions instead of a button. Additionally, `viewport-fit=cover` + `apple-mobile-web-app-status-bar-style: black-translucent` are required for the status bar to render correctly when launched from the home screen. These aren't documented in a single place — they're scattered across MDN, Apple developer docs, and Stack Overflow.
+
+**`monitoringDashboard.ts` is `!src/index.ts` territory for coverage.** It exports a single function that returns a 350-line HTML string. Testing it with Jest would mean asserting that the string contains specific substrings — low value, high noise. It's correctly excluded from coverage by the `!src/index.ts` pattern (it's pure presentation). But unlike `index.ts` (which has wiring logic), this file has zero logic — it's a template. If the dashboard ever grows conditional rendering logic, it should be extracted to testable helper functions.
+
+---
+
+### 3. Cross-project signals
+
+**`monitoringDashboard.ts` extraction pattern is portfolio-reusable.** Any ASIF project with large inline HTML responses in Express routes should extract them to `*Dashboard.ts` or `*Page.ts` modules. Keeps the router file navigable and makes the HTML independently reviewable. Same pattern as React component extraction — presentation belongs in its own file.
+
+**The PWA `InstallBanner` + `useInstallPrompt` hook is a drop-in for any ASIF web app.** The iOS UA detection branch and `localStorage`-based dismiss are the non-obvious parts. FamilyMind and any other ASIF consumer-facing web app can copy `src/pwa/` verbatim — it has no VJJ-specific dependencies, just a configurable icon path.
+
+**Service worker API exclusion list needs maintenance.** `sw.js` hardcodes the API path prefixes to exclude from caching (`/sessions`, `/admin`, `/analytics`, etc.). As new API routes are added, uncached paths don't need updating (fetch passes through by default) — but if a new route ever serves static-ish data that _should_ be cached, it needs explicit opt-in. This is an acceptable trade-off: safe default is network-only for anything not in the shell asset list.
+
+**Offline page `/health` poll as iOS `online` event fallback** — iOS Safari's `online`/`offline` events are unreliable (fires `online` when switching between Wi-Fi networks, even if neither has internet). The 5-second `/health` fetch poll in `offline.html` is the correct workaround. This same pattern belongs in any PWA that needs reliable reconnect detection on iOS.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **Supervisor WebSocket auth (Q19)** — still the highest-priority production gap
+2. **N-11 SIP Phase 2** — real SIP.js + G.711 adapter; stub has been sitting at Phase 1 for multiple sessions
+3. **Dependabot triage** — 2 high + 1 moderate on main branch; Q11 response said "triage now" but it never got a directive. Should be a 30-min pass.
+4. **Dashboard test** — add at least one test that `monitoringDashboardHtml()` returns a non-empty string with key landmark strings (e.g. `Active Sessions`, `Sentiment Heatmap`). Micro-test, covers the export without being brittle.
+5. **Stryker refresh (G6)** — 36 new service files since the March 16 baseline; mutation testing should be re-run on at least IntentClassifier, TranslationService, and FlowEngine.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+No new blockers. Q19–Q24 remain open.
+
+**Q25 — Dashboard coverage micro-test**: `monitoringDashboardHtml()` is a pure function returning a string. It's currently uncovered because it lives in an API module treated as presentation. Should I add a minimal smoke test (`expect(html).toContain('Active Sessions')`) to keep the file off the "zero coverage" list, or is this type of template function explicitly exempt? Ready to add on authorization.
+
+---
+
 > Session: 2026-03-19 (check-in 40 — empty-delta skip) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
