@@ -257,6 +257,35 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260319-212 — P1: Intent Detection — Smart Caller Routing
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 18:40 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Intent classifier** — detect caller intent from first utterance: support, billing, sales, complaint, general.
+2. [ ] **Route by intent** — auto-assign to the right agent template based on detected intent.
+3. [ ] **`GET /intents`** — list detected intents with frequency. Configurable intent→template mapping.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260319-213.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260319-213 — P1: Voice Pipeline Profiler — Latency Breakdown
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 18:40 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Per-stage timing** — measure: STT, Lane A/B/C, PolicyGate, TTS, total roundtrip.
+2. [ ] **`GET /sessions/:id/profile`** — flamechart-style timing breakdown.
+3. [ ] **Bottleneck alerts** — flag if any stage >200ms consistently.
+4. [ ] Tests.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260319-201 — P1: Conversation Flow Builder — Visual Dialog Designer
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-19 11:15 | **Estimate**: M | **Status**: DONE
