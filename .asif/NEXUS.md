@@ -251,6 +251,47 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260319-189 — P1: Agent Personas — Configurable Personality Profiles
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 10:45 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **Persona config** — name, tone (formal/casual/empathetic), vocabulary level, response length preference.
+2. [ ] **Persona library** — 5 pre-built: Professional Support, Friendly Helper, Technical Expert, Warm Receptionist, Compliance Officer.
+3. [ ] **Per-tenant persona assignment** — different tenants get different agent personalities.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260319-190.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260319-190 — P1: Voice Agent SDK — React Component Library
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-19 10:45 | **Estimate**: M | **Status**: PENDING
+
+**Action Items**:
+1. [ ] **`<VoiceAgent />`** React component — embed voice agent in any React app. Props: wsUrl, tenantId, persona, onTranscript, onPolicyEvent.
+2. [ ] **`useVoiceAgent()` hook** — programmatic control.
+3. [ ] **npm package** — `@nxtg/voice-agent-react`. Types included.
+4. [ ] Tests.
+
+**CHAIN**: When done, start DIRECTIVE-NXTG-20260319-191.
+**Response** (filled by team): >
+
+---
+
+### DIRECTIVE-NXTG-20260319-191 — P2: Final MAXOUT Session Summary
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P2
+**Injected**: 2026-03-19 10:45 | **Estimate**: S | **Status**: PENDING
+
+**Action Items**:
+1. [ ] Final test count. 2. [ ] All features shipped. 3. [ ] README + NEXUS archive.
+
+**Response** (filled by team): >
+
+---
+
 ### DIRECTIVE-NXTG-20260319-162 — P1: Voice Biometrics — Caller Identification
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-19 09:30 | **Estimate**: M | **Status**: DONE
