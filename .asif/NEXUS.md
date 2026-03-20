@@ -9885,3 +9885,58 @@ The TTFB p50 is remarkably stable at 52ms across all concurrency levels — the 
 Q19–Q25 remain open.
 
 **Q26** — Load test breaking point is connection-establishment at N=100. Should I add a mitigation (staggered connection ramp, connection pool warm-up) as a separate N-initiative, or is this information-only and the current N=50 safe operating ceiling is acceptable for portfolio purposes?
+
+---
+
+> Session: 2026-03-20 (check-in 44 — recording export + transcript viewer) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Three production features in one session.
+
+| Deliverable | Commit | Tests |
+|-------------|--------|-------|
+| `RecordingStore` — WAV capture, per-session audio export, retention policy | c231cb0 | +42 |
+| `/recordings` API — list/stream/delete WAV files, tenant+date filters | c231cb0 | +42 |
+| `websocket.ts` wiring — startCapture/appendChunk/stopCapture per session | c231cb0 | — |
+| `/transcripts/:sessionId` — self-contained HTML transcript viewer | f19fca0 | +24 |
+
+**Total: 3,812 tests (+66 from session start at 3,746).**
+
+Key capabilities now live:
+- `GET /recordings?tenant=X&from=ISO&to=ISO` — paginated listing with metadata
+- `GET /recordings/:sessionId` — streams WAV (PCM16, 24kHz mono, RIFF header)
+- `GET /transcripts/:sessionId` — HTML viewer with chat bubbles, policy banners, sentiment, timestamps
+- Retention: `RECORDING_RETENTION_DAYS` env var, daily prune via `setInterval().unref()`
+
+---
+
+### 2. What surprised me?
+
+**Building a WAV header from scratch is simpler than expected** — it's a fixed 44-byte structure with only 8 typed fields. No library needed. The `buildWavHeader` method is 12 lines. Worth knowing for any project that needs audio output without a media library dependency.
+
+**The transcript viewer reveals a data gap**: the `SessionRecorder` stores final transcript events (`isFinal=true`) but intermediate partial transcripts are filtered out. For a transcript viewer this is correct, but it means you can't see the "thinking time" between turns. The relative timestamp approach makes this visible as silence gaps between turns — which is actually useful for quality analysis.
+
+**Policy decision rendering needed 5 CSS variants** (allow, refuse, escalate, rewrite, cancel_output) — all with distinct colour semantics. The dashboard pattern of using CSS class names that match event payload values (`.policy-row.allow`, `.policy-row.escalate`) makes the JS renderer trivially simple: no `if/else` chains, just `className = 'policy-row ' + decision`.
+
+---
+
+### 3. Cross-project signals
+
+**WAV writer pattern is zero-dependency and portable.** Any project needing audio export (voice memos, call recording, TTS output archiving) can use the 44-byte RIFF header + PCM16 pattern. The RecordingStore architecture (in-memory accumulation → flush on session end) works well for any streaming-to-file use case.
+
+**Self-contained HTML viewer pattern** (monitoringDashboard.ts → transcriptViewer.ts) is a clean way to ship operational tooling with zero frontend build pipeline. The viewer fetches its own data from the existing API — no new endpoints needed, and it works immediately after `git push`.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **N-12 (ticketing MCP)** — plan is approved and ready, `BUILDING` status
+2. **Q19 (supervisor auth)** — `/supervisor` WS upgrade path has no auth
+3. **Dependabot triage** — 2 high + 1 moderate vulnerabilities on main
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q19–Q26 remain open. No new blockers.
