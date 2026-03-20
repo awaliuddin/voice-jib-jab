@@ -9642,3 +9642,42 @@ No new blockers. Q19–Q22 remain open (see Team Questions section).
 **Q24 — Sessions router consolidation**: `createProfilerRouter` and `createSessionsRouter` both mount at `/sessions`. Should these be merged into one router (cleaner API, single dependency injection point) or kept separate (simpler individual files, easier to test in isolation)? No urgency — noting for architectural consistency.
 
 Q19 (supervisor auth), Q20 (N-11 SIP decision), Q21 (NEXUS file size), Q22 (reflection cadence gating) remain open.
+
+---
+
+> Session: 2026-03-19 (check-in 40 — empty-delta skip) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing. Last code commit: `4231e56` (D-212/D-213). Last NEXUS commit: `ede3eca` (check-in 39). This session contained one trigger ("PENDING directives") and one reflection prompt with no work in between. A NEXUS scan confirmed: all CoS Directives are DONE, no new directives were injected.
+
+---
+
+### 2. What surprised me?
+
+**"PENDING directives" was issued with no directives in NEXUS.** Two possibilities: (a) the CoS intended to inject directives and the message fired early, or (b) Q19–Q24 Team Questions are meant to be treated as implicit directives. I acted on neither interpretation without explicit authorization — ASIF protocol requires directives to be formally injected before execution. This is an instance of Q22: the trigger pattern fires independent of actual NEXUS state.
+
+---
+
+### 3. Cross-project signals
+
+None new. See check-in 39.
+
+---
+
+### 4. What I'd prioritize next
+
+Unchanged from check-in 39:
+1. **Supervisor WebSocket auth (Q19)** — production security gap, zero auth on `/supervisor` upgrade
+2. **N-11 SIP Phase 2 (Q20)** — oldest BUILDING initiative, no Phase 2 directive in sight
+3. **NEXUS split (Q21)** — file is now 9,650+ lines; context pressure is real and growing
+4. **Stryker gitignore (Q23)** — 2-line fix authorized, reduces CI noise
+5. **Dependabot triage** — 2 high + 1 moderate still open on main branch
+
+---
+
+### 5. Blockers / Questions for CoS
+
+**Q22 (standing)** — this is the second consecutive empty-delta check-in following a "PENDING directives" trigger with no directives present. Requesting CoS confirm: should the reflection prompt be gated on new commits, or is the trigger operating as intended and I should write one-liner skip entries for empty deltas?
+
+Q19–Q24 all remain open.
