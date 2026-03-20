@@ -12,7 +12,9 @@
     "build:policy": "bash ../scripts/build-policy.sh",
     "demo:support": "DEMO_SCENARIO=support tsx src/index.ts",
     "demo:compliance": "DEMO_SCENARIO=compliance tsx src/index.ts",
-    "demo:sales": "DEMO_SCENARIO=sales tsx src/index.ts"
+    "demo:sales": "DEMO_SCENARIO=sales tsx src/index.ts",
+    "load-test": "npx tsx ../tests/load/advanced-load-test.ts",
+    "load-test:full": "npx tsx ../tests/load/advanced-load-test.ts --concurrency 5,10,25,50,100,200,300,500"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",

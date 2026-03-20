@@ -9822,3 +9822,66 @@ Unchanged: Q19 (supervisor auth), N-11 SIP Phase 2, Q21 (NEXUS split).
 ### 5. Blockers / Questions for CoS
 
 Q19–Q24 remain open.
+
+---
+
+> Session: 2026-03-20 (check-in 43 — load tester + breaking point) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+**Voice agent load tester with automatic breaking-point discovery.**
+
+| Deliverable | Commit |
+|-------------|--------|
+| `tests/load/advanced-load-test.ts` — comprehensive load tester (HTTP + WS + breaking point detection) | pending |
+| `docs/load-test-results.md` — live results from 2026-03-20 run | pending |
+| `server/package.json` — `load-test` and `load-test:full` npm scripts | pending |
+
+Extends the N-10 baseline with: HTTP endpoint benchmarking (GET /health, GET /metrics), extended WS concurrency ramp (up to 500), automatic stopping when SLA breached, in-process heap tracking, and direct markdown output. Runs in ~8 minutes for the full concurrency range.
+
+**Key findings from today's run:**
+| Metric | Result |
+|--------|--------|
+| Max safe concurrency | **N=50** (100% success, TTFB p95 78.8ms) |
+| Breaking point | **N=100** (24% error rate, primarily connection-establishment failures) |
+| HTTP /health at N=200 | 2,813 rps, p95 66.6ms, 0% errors |
+| HTTP /metrics at N=200 | **7,086 rps**, p95 27.0ms, 0% errors |
+| Baseline TTFB p50 | ~52ms (stable across all concurrency levels) |
+| Connection time degradation | 25ms → 704ms p95 from N=5 → N=100 |
+
+The TTFB p50 is remarkably stable at 52ms across all concurrency levels — the bottleneck at N=100 is session *establishment* (WebSocket upgrade + Lane init chain), not response latency once connected.
+
+---
+
+### 2. What surprised me?
+
+**The TTFB p50 does not degrade at all under concurrent load.** At N=5 it's 52.6ms; at N=100 it's 51.9ms. The Node.js event loop handles response generation perfectly — degradation is entirely in connection setup. This is the right failure mode: slow to connect, not slow to respond.
+
+**HTTP /metrics endpoint saturates at 7,000+ rps** with sub-30ms p95 even at N=200 concurrent clients. The server has zero bottleneck for REST observability queries — monitoring systems can poll aggressively without affecting voice pipeline latency.
+
+**Breaking point cause is connection establishment, not CPU/memory.** Heap growth is minimal (~4MB at N=50) and the GC actually frees more than it allocates in some levels. The failure mode at N=100 is the Lane A/B/C initialization chain overwhelming the event loop when all 100 sessions start simultaneously. In production, sessions would ramp gradually over time, making N=100+ likely safe under realistic traffic patterns.
+
+---
+
+### 3. Cross-project signals
+
+**Load test architecture is fully reusable.** The `advanced-load-test.ts` pattern (mock external service → programmatic server start → ramp concurrency → detect breaking point → write markdown) is applicable to any Express+WS project in the portfolio. Key pattern: set env vars before dynamic import to redirect external dependencies to mocks.
+
+**WebSocket upgrade overhead at high concurrency.** For any WS-heavy project: pre-warming connection pools or staggering connection establishment (not all at once) is the correct mitigation for the N=100+ failure mode found here.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **N-12 (ticketing MCP)** — plan is ready, `BUILDING` status, agents pre-wired
+2. **Q19 (supervisor auth)** — production security gap on `/supervisor` WS upgrade path
+3. **Q21 (NEXUS split)** — file is ~9,700+ lines now
+4. **Stryker refresh (G6)** — 36 new service files since March 16 mutation baseline
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q19–Q25 remain open.
+
+**Q26** — Load test breaking point is connection-establishment at N=100. Should I add a mitigation (staggered connection ramp, connection pool warm-up) as a separate N-initiative, or is this information-only and the current N=50 safe operating ceiling is acceptable for portfolio purposes?

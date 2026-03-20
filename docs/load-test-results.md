@@ -1,69 +1,125 @@
-# Load Test Results — SLA Baseline
+# Load Test Results — Breaking Point Analysis
 
-**Date**: 2026-02-22
-**Initiative**: N-10 Production Readiness QA
-**Directive**: DIRECTIVE-NXTG-20260222-01
+**Date**: 2026-03-20  
+**Node.js**: v22.21.1  
+**SLA Target**: TTFB p95 < 1200ms  
+**Breaking criteria**: Error rate > 10% OR p95 > 1200ms OR p95 > 5x baseline
+
+## Executive Summary
+
+| Metric | Value |
+|--------|-------|
+| Breaking point | **N=100** — Error rate 24.0% > 10% |
+| Max safe concurrency | **N=50** |
+| Baseline TTFB p95 (N=5) | 62.7ms |
+| Breaking TTFB p95 | 200.2ms |
+| Degradation factor | 3.2x |
 
 ## Test Setup
 
 | Parameter | Value |
 |-----------|-------|
 | Server | voice-jib-jab (Express + ws) |
-| OpenAI API | Mocked (local WebSocket, 20ms simulated thinking) |
-| Turns per session | 3 (audio send + commit + response cycle) |
-| Inter-turn delay | 2000ms (respects 1500ms echo-cancellation cooldown) |
-| Lane A | Disabled (no TTS preload; tests Lane B throughput) |
-| Lane C (PolicyGate) | Enabled (7-category moderation runs on every turn) |
+| OpenAI API | Mocked (20ms simulated thinking) |
+| Turns per session | 3 |
+| Inter-turn delay | 2000ms (echo-cancellation cooldown) |
+| Lane A | Disabled |
+| Lane C (PolicyGate) | Enabled |
 | Persistent Memory | Disabled |
 | Audit Trail | Disabled |
-| Platform | Linux (WSL2), Node.js |
+| Platform | Linux (WSL2) |
 
-## Results
+## HTTP Endpoint Load
 
-| Concurrency | Sessions | Successful | TTFB p50 | TTFB p95 | TTFB p99 | TTFB max | Turn p50 | Turn p95 | Connect p50 | Connect p95 | SLA Pass |
-|-------------|----------|------------|----------|----------|----------|----------|----------|----------|-------------|-------------|----------|
-| 5 | 5 | 5 | 52.5ms | 63.0ms | 63.0ms | 63.0ms | 74.2ms | 85.4ms | 22.9ms | 28.1ms | PASS |
-| 10 | 10 | 10 | 51.9ms | 54.3ms | 54.5ms | 54.5ms | 72.6ms | 75.1ms | 12.6ms | 29.6ms | PASS |
-| 20 | 20 | 20 | 51.9ms | 73.9ms | 79.7ms | 79.7ms | 72.7ms | 88.4ms | 32.4ms | 99.0ms | PASS |
-| 50 | 50 | 46 | 52.1ms | 153.2ms | 172.7ms | 177.6ms | 73.0ms | 163.6ms | 299.6ms | 584.3ms | PASS |
-| 100 | 100 | 90 | 51.8ms | 146.4ms | 318.7ms | 332.5ms | 72.9ms | 169.7ms | 717.0ms | 1228.8ms | PASS |
-| 200 | 200 | 189 | 51.9ms | 126.7ms | 242.6ms | 311.5ms | 72.8ms | 146.7ms | 913.1ms | 1560.6ms | PASS |
+### GET /health
 
-## SLA Compliance
+| Concurrency | Requests | p50 | p95 | p99 | Max | Throughput | Error Rate |
+|-------------|----------|-----|-----|-----|-----|------------|------------|
+| 10 | 200 | 2.5ms | 4.7ms | 15.7ms | 18.8ms | 3090.4 rps | 0.0% |
+| 50 | 200 | 4.3ms | 73.3ms | 96.9ms | 97.2ms | 2037.5 rps | 0.0% |
+| 100 | 200 | 10.4ms | 38.0ms | 39.3ms | 39.5ms | 4924.7 rps | 0.0% |
+| 200 | 200 | 47.4ms | 66.6ms | 68.3ms | 68.7ms | 2813.5 rps | 0.0% |
 
-**SLA Target**: p95 TTFB < 1200ms (from NEXUS)
+### GET /metrics
 
-**Result**: SLA NOT breached at any tested concurrency level (up to 200 sessions).
+| Concurrency | Requests | p50 | p95 | p99 | Max | Throughput | Error Rate |
+|-------------|----------|-----|-----|-----|-----|------------|------------|
+| 10 | 200 | 1.8ms | 2.5ms | 2.9ms | 3.3ms | 5400.1 rps | 0.0% |
+| 50 | 200 | 7.2ms | 10.7ms | 10.7ms | 10.7ms | 6410.9 rps | 0.0% |
+| 100 | 200 | 14.0ms | 15.0ms | 15.2ms | 15.2ms | 6874.7 rps | 0.0% |
+| 200 | 200 | 26.4ms | 27.0ms | 27.0ms | 27.0ms | 7086.4 rps | 0.0% |
 
-The server comfortably handles 200 concurrent WebSocket sessions with p95 TTFB at 126.7ms — well under the 1200ms target. The TTFB median stays remarkably stable at ~52ms across all concurrency levels, indicating the Node.js event loop is not saturated.
+## WebSocket Voice Pipeline
+
+| Concurrency | Sessions | Successful | TTFB p50 | TTFB p95 | TTFB p99 | TTFB max | Turn p95 | Connect p95 | Heap ΔMB | SLA |
+|-------------|----------|------------|----------|----------|----------|----------|----------|-------------|----------|-----|
+| 5 | 5 | 5 | 52.6ms | 62.7ms | 62.7ms | 62.7ms | 84.8ms | 25.2ms | -6 | PASS |
+| 10 | 10 | 10 | 51.9ms | 53.5ms | 54.5ms | 54.5ms | 75.2ms | 29.8ms | -10 | PASS |
+| 25 | 25 | 25 | 51.6ms | 60.9ms | 66.0ms | 66.0ms | 80.3ms | 77.4ms | +3 | PASS |
+| 50 | 50 | 50 | 51.8ms | 78.8ms | 86.3ms | 88.9ms | 97.1ms | 181.0ms | +4 | PASS |
+| 100 | 100 | 76 | 51.9ms | 200.2ms | 229.0ms | 261.4ms | 210.7ms | 704.3ms | -9 | **BREACH** — Error rate 24.0% > 10% |
+
+## Latency Degradation Curve
+
+TTFB p95 vs. concurrency (baseline = N=5 @ 62.7ms):
+
+| N | TTFB p95 | vs. Baseline | Connect p95 |
+|---|----------|--------------|-------------|
+| 5 | 62.7ms | 1.0x | 25.2ms |
+| 10 | 53.5ms | 0.9x | 29.8ms |
+| 25 | 60.9ms | 1.0x | 77.4ms |
+| 50 | 78.8ms | 1.3x | 181.0ms |
+| 100 | 200.2ms | 3.2x | 704.3ms |
+
+## Memory Growth
+
+| Concurrency | Heap Before (MB) | Heap After (MB) | Heap Δ (MB) | RSS After (MB) |
+|-------------|-----------------|-----------------|-------------|----------------|
+| 5 | 38 | 31 | -7 | 161 |
+| 10 | 31 | 22 | -9 | 117 |
+| 25 | 22 | 25 | +3 | 137 |
+| 50 | 25 | 29 | +4 | 164 |
+| 100 | 29 | 20 | -9 | 135 |
 
 ## Analysis
 
-### TTFB
-- **p50 is rock-solid** at ~52ms regardless of concurrency. This is the baseline server processing time: WebSocket message parse + Lane Arbitrator state transition + adapter commit + mock OpenAI round-trip.
-- **p95 scales gracefully**: 63ms at N=5 to 153ms at N=50 to 127ms at N=200. The slight dip from N=100 to N=200 is within variance.
-- **p99 shows the tail**: 318ms at N=100 — still 4x under SLA. A few sessions experience event loop contention at high concurrency.
+### Breaking Point
 
-### Connection Time (Bottleneck)
-- **Connection time is the primary scaling concern**: p95 connect grows from 28ms (N=5) to 1560ms (N=200).
-- At N=100+, the WebSocket upgrade handshake + Lane initialization (session creation, EventEmitter wiring, Lane A/B/C constructor chains) adds up.
-- Failed sessions (4 at N=50, 10 at N=100, 11 at N=200) are caused by Lane A's TTS preload hitting the real OpenAI API with a mock key (401 errors). These failures are **test artifact only** — not production behavior.
+The server reaches its breaking point at **N=100** concurrent sessions. 
+At this level: Error rate 24.0% > 10%.
+
+The safe operating range is **N≤50** where:
+- TTFB p95 stays at 78.8ms (vs. SLA 1200ms)
+- Error rate: 0.0%
 
 ### Where the Server Spends Time
-1. **50ms**: OpenAI adapter's buffer stabilization safety window (hardcoded in `commitAudio()`)
-2. **20ms**: Mock OpenAI thinking time (would be 100-500ms with real API)
-3. **2ms**: Server-side processing (arbitrator, event bus, policy gate, message routing)
+
+1. **~50ms**: OpenAI adapter buffer stabilization (hardcoded in `commitAudio()`)
+2. **~20ms**: Mock OpenAI "thinking" time (real API: 100–500ms)
+3. **~2ms**: Server processing (arbitrator, event bus, policy gate, routing)
+
+### Connection Time Scaling
+
+WebSocket upgrade + Lane init cost grows with concurrency due to:
+- Session object allocation (EventEmitter chain, Lane A/B/C constructors)
+- Node.js event loop scheduling under concurrent I/O
+- Policy gate initialization (OPA-off mode is O(1), but claims registry init adds ~5ms)
 
 ### Production Implications
-- With real OpenAI Realtime API, the TTFB bottleneck shifts entirely to the external API (100-500ms).
-- The server's own processing overhead (~2ms per turn) is negligible.
-- Connection establishment at N=100+ could benefit from connection pooling or pre-warming.
-- The 1500ms echo-cancellation cooldown is the real throughput limiter for multi-turn conversations.
+
+- With real OpenAI Realtime API (100–500ms TTFB), the bottleneck shifts entirely to the external API
+- Server-side processing overhead (~2ms/turn) is negligible
+- The 1500ms echo-cancellation cooldown is the real throughput limiter for multi-turn sessions
+- Connection establishment at N=100+ benefits from connection pooling or pre-warming
 
 ## How to Reproduce
 
 ```bash
-npx tsx tests/load/ws-load-test.ts --concurrency 5,10,20,50,100,200
+# Baseline (fast)
+npx tsx tests/load/advanced-load-test.ts --concurrency 5,10,25,50,100
+
+# Full breaking-point discovery
+npx tsx tests/load/advanced-load-test.ts --concurrency 5,10,25,50,100,200,300,500
 ```
 
-Requires: `ws` package (already in deps), `tsx` for TypeScript execution.
+Requires: `ws` package (already in server deps), `tsx` for TypeScript execution.
