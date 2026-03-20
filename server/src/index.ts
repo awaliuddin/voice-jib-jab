@@ -75,6 +75,13 @@ import { ConversationSearchService } from "./services/ConversationSearchService.
 import { createSearchRouter } from "./api/search.js";
 import { SessionExportService } from "./services/SessionExportService.js";
 import { createExportRouter } from "./api/export.js";
+import { SlaMonitor } from "./services/SlaMonitor.js";
+import { createSlaRouter } from "./api/sla.js";
+import { slaDashboardHtml } from "./api/slaDashboard.js";
+import { LiveKbSearchService } from "./services/LiveKbSearchService.js";
+import { createKbSearchRouter } from "./api/kbSearch.js";
+import { initTrainingDataService } from "./services/TrainingDataService.js";
+import { createTrainingRouter } from "./api/training.js";
 import { createHealthRouter } from "./api/health.js";
 import { healthMonitorDashboardHtml } from "./api/healthMonitorDashboard.js";
 
@@ -324,6 +331,21 @@ app.use("/search", createSearchRouter(conversationSearch));
 const sessionExportService = new SessionExportService(sessionRecorder, recordingStore, voiceQualityScorer);
 app.use("/export", createExportRouter(sessionExportService));
 
+// ── SLA Monitor ───────────────────────────────────────────────────────
+export const slaMonitor = new SlaMonitor({
+  windowMinutes: 60,
+  webhookUrl: process.env.SLA_WEBHOOK_URL,
+});
+app.use("/sla", createSlaRouter(slaMonitor));
+
+// ── Live KB Search ────────────────────────────────────────────────────
+const liveKbSearch = new LiveKbSearchService(kbStore);
+app.use("/kb-search", createKbSearchRouter(liveKbSearch));
+
+// ── Training Mode ─────────────────────────────────────────────────────
+const trainingDataService = initTrainingDataService(resolve(dirname(config.storage.databasePath), "training-data.json"));
+app.use("/training", createTrainingRouter(trainingDataService));
+
 // ── Call Routing + Queue System ───────────────────────────────────────
 const routingEngine = initRoutingEngine(resolve(dirname(config.storage.databasePath), "routing-rules.json"));
 const callQueue = new CallQueueService();
@@ -428,7 +450,10 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Health API:      http://localhost:${config.port}/health/subsystems`);
     console.log(`[Server] Config Validate: http://localhost:${config.port}/validate`);
     console.log(`[Server] Conversation Search: http://localhost:${config.port}/search/conversations`);
-    console.log(`[Server] Session Export: http://localhost:${config.port}/export/sessions\n`);
+    console.log(`[Server] Session Export:   http://localhost:${config.port}/export/sessions`);
+    console.log(`[Server] SLA Monitor:     http://localhost:${config.port}/sla/dashboard`);
+    console.log(`[Server] Live KB Search:  http://localhost:${config.port}/kb-search`);
+    console.log(`[Server] Training Mode:   http://localhost:${config.port}/training/annotations\n`);
 
     console.log("Features:");
     console.log(
