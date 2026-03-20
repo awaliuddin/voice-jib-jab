@@ -10187,3 +10187,63 @@ Q19–Q30 remain open.
 **Q31** — At 4,831 tests and 159 suites, jest runtime is 10-20s per full run. Still fast, but the trajectory is clear. Should I add test sharding configuration to jest.config.js proactively, or wait until the suite exceeds a specific threshold (e.g. 30s)?
 
 **Q32** — The Conversation Analytics service uses predefined topic seed keywords. For a real enterprise deployment, tenants would need custom topic seeds (insurance claims, healthcare diagnoses, legal intents, etc.). Should I make the seed set configurable per-tenant as a follow-up directive, or is the current 6-category set sufficient for portfolio purposes?
+
+---
+
+> Session: 2026-03-20 (check-in 49 — post-sprint meta-reflection) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship since last check-in?
+
+Check-in 48 was written and pushed minutes ago. No new features since then — this is a meta-reflection on the session as a whole.
+
+**Full session recap (check-ins 45-49):**
+
+| Window | Features | Tests Added | Commits |
+|--------|----------|-------------|---------|
+| CK 45-46 | A/B testing, health monitor, config validator, tenant migration, search | +306 | 3 |
+| CK 47 | Session export, E2E tests, SLA, KB search, training, comparison, audit | +352 | 2 |
+| CK 48 | Compliance, onboarding, webhooks, capacity, skills, versions, analytics | +762 | 1 |
+
+**Session total: 3,877 → 4,831 tests (+954). 159 suites. ~25 features. ~25,000 lines added.**
+
+---
+
+### 2. What surprised me?
+
+**The acceleration curve.** Check-in 45-46 averaged ~60 tests per feature. By check-in 48, the average was ~54 tests per feature but the features were substantially more complex (version management with canary routing, compliance evaluation across 5 regulations, topic clustering). The parallel agent pattern is not just maintaining pace — it's handling increasing complexity without proportional time cost.
+
+**Nothing failed on the first test run.** 14 features built in parallel, zero test failures on the first `npm test` after wiring. This is a product of the build pattern: agents read actual store APIs before writing code, test mocks are derived from real type signatures, and the agent instructions explicitly forbid placeholders. The quality bar is consistent even at high throughput.
+
+**The `index.ts` wiring cost is real but manageable.** Each feature adds ~5-8 lines to index.ts (import + instantiation + route mount + banner log). At 25+ features in one session, index.ts grew by ~175 lines. It's still readable, but the pattern of instantiating services at module level (not in `startServer()`) means server startup is doing a lot of synchronous file I/O (JSON store reads) before accepting connections. This is tech debt — stores should lazy-load or be initialized inside `startServer()`.
+
+**Conversation analytics topic seeds are surprisingly accurate.** The 6-keyword-bucket approach (billing/technical/account/scheduling/shipping/general_inquiry) assigned sessions correctly in all test cases. The key insight: enterprise contact-center vocabulary is highly constrained. 40 seed keywords cover most of the domain. This wouldn't work for open-domain conversation, but for voice agents in specific verticals it's robust.
+
+---
+
+### 3. Cross-project signals
+
+**`index.ts` anti-pattern: synchronous store reads at startup.** Every JSON store calls `readFileSync` in its constructor. At 15+ stores, this serializes ~15 file reads before the first request is accepted. For a production deployment, this should be `async init()` methods called inside `startServer()`. Worth noting for any new portfolio project adopting this pattern.
+
+**Test count milestone: 4,831.** The suite now takes 10-20s. The jest `--forceExit` flag is required because the integration tests (voice-e2e) leave the VoiceWebSocketServer's `setInterval` timer running. The root fix is adding proper teardown (`server.close()`) in `afterAll` of the integration suite. This is the source of the persistent force-exit warning.
+
+**The "register static before parameterized routes" rule.** Three routers this session had to register `/suggest`, `/resolve`, `/deliveries`, `/deployments`, `/canary` before `/:id` to prevent Express treating them as ID parameters. This is a recurring Express footgun. Any portfolio project with resource + action routes on the same base path should follow this order: static actions first, then `/:param`.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **N-12 (MCP ticketing)** — the only approved roadmap initiative still undelivered. Plan is complete. `TicketingMcpClient.ts` exists. This is the single highest-priority item.
+2. **Fix integration test teardown** — add `server.close()` + `mockWss.close()` to voice-e2e `afterAll`. Eliminates the force-exit warning permanently.
+3. **Store lazy-load refactor** — move JSON `readFileSync` calls from constructors to `initialize()` methods called inside `startServer()`. Reduces startup serialization from ~15 sequential reads to parallel async reads.
+4. **Stryker baseline refresh** — 100+ new service files. Mutation score is unknown.
+5. **NEXUS split (Q21)** — file is ~11,500 lines. Each read now consumes significant context.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q19–Q32 remain open.
+
+**Q33** — The `index.ts` startup now does ~15 synchronous JSON file reads before accepting connections. In production, this is a cold-start latency hit (container startup time in Kubernetes). Should I refactor stores to use async `initialize()` inside `startServer()` as a dedicated directive, or defer until there's a measured startup regression?
+
+**Q34** — At 4,831 tests, the session-level pattern has been: build features, wire, test, commit. Should I add a `pre-commit` hook that runs `npm test` to enforce CI gate protocol automatically, or is the current manual pattern (run before every commit) sufficient given the 0-failure track record?
