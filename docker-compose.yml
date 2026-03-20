@@ -38,6 +38,14 @@ services:
     environment:
       CHROMA_URL: http://chromadb:8000
       DATABASE_URL: postgresql://vjj:${POSTGRES_PASSWORD:-vjj_dev}@postgres:5432/vjj
+      # Voice Quality Scoring — optional webhook for threshold breaches
+      QUALITY_WEBHOOK_URL: ${QUALITY_WEBHOOK_URL:-}
+      # Voice Biometrics — cosine similarity threshold (default: 0.82)
+      VOICEPRINT_IDENTIFY_THRESHOLD: ${VOICEPRINT_IDENTIFY_THRESHOLD:-0.82}
+      # GitHub ticketing integration (D-165+)
+      GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PERSONAL_ACCESS_TOKEN:-}
+      GITHUB_OWNER: ${GITHUB_OWNER:-}
+      GITHUB_REPO: ${GITHUB_REPO:-}
     depends_on:
       chromadb:
         condition: service_healthy
@@ -46,6 +54,12 @@ services:
     volumes:
       - ./data:/app/data
       - ./server/policies:/app/server/policies
+      # JSON stores — persisted outside the container
+      - ./data/playbooks.json:/app/data/playbooks.json
+      - ./data/voiceprints.json:/app/data/voiceprints.json
+      - ./data/voice-abtests.json:/app/data/voice-abtests.json
+      - ./data/routing-rules.json:/app/data/routing-rules.json
+      - ./data/ivr-menus.json:/app/data/ivr-menus.json
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 30s

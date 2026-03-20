@@ -44,6 +44,9 @@ import { createQualityRouter } from "./api/quality.js";
 import { initPlaybookStore } from "./services/PlaybookStore.js";
 import { createPlaybooksRouter } from "./api/playbooks.js";
 import { createTenantComplianceRouter } from "./api/tenantCompliance.js";
+import { initVoiceprintStore } from "./services/VoiceprintStore.js";
+import { createVoiceprintsRouter } from "./api/voiceprints.js";
+import { initVoiceAbTestService } from "./services/VoiceAbTestService.js";
 
 const app = express();
 const server = createServer(app);
@@ -243,7 +246,8 @@ app.use("/tenants", createMemoryRouter(memoryStore));
 // ── Voice Profile Store + Voices API ─────────────────────────────────
 const voiceProfileStore = initVoiceProfileStore(resolve(dirname(config.storage.databasePath), "voices"));
 const kokoroEngine = new KokoroVoiceEngine();
-app.use("/voices", createVoicesRouter(voiceProfileStore, kokoroEngine));
+const voiceAbTestService = initVoiceAbTestService(resolve(dirname(config.storage.databasePath), "voice-abtests.json"));
+app.use("/voices", createVoicesRouter(voiceProfileStore, kokoroEngine, voiceAbTestService));
 
 // ── Knowledge Base Store + KB API ────────────────────────────────────
 const kbStore = initKnowledgeBaseStore(resolve(dirname(config.storage.databasePath), "kb"));
@@ -270,6 +274,10 @@ app.use("/playbooks", createPlaybooksRouter(playbookStore));
 
 // ── Tenant Compliance Report ──────────────────────────────────────────
 app.use("/tenants", createTenantComplianceRouter(sessionRecorder, analyticsService));
+
+// ── Voice Biometrics (D-162) ──────────────────────────────────────────
+const voiceprintStore = initVoiceprintStore(resolve(dirname(config.storage.databasePath), "voiceprints.json"));
+app.use("/voiceprints", createVoiceprintsRouter(voiceprintStore, memoryStore));
 
 // ── Call Routing + Queue System ───────────────────────────────────────
 const routingEngine = initRoutingEngine(resolve(dirname(config.storage.databasePath), "routing-rules.json"));
@@ -363,7 +371,9 @@ async function startServer(): Promise<void> {
     console.log(`[Server] Knowledge Base: http://localhost:${config.port}/tenants/{tenantId}/kb`);
     console.log(`[Server] Routing API: http://localhost:${config.port}/routing/rules`);
     console.log(`[Server] Templates API: http://localhost:${config.port}/templates`);
-    console.log(`[Server] Supervisor WS: ws://localhost:${config.port}/supervisor\n`);
+    console.log(`[Server] Supervisor WS: ws://localhost:${config.port}/supervisor`);
+    console.log(`[Server] Voiceprints API: http://localhost:${config.port}/voiceprints`);
+    console.log(`[Server] Voice A/B Tests: http://localhost:${config.port}/voices/abtests\n`);
 
     console.log("Features:");
     console.log(
