@@ -9940,3 +9940,58 @@ Key capabilities now live:
 ### 5. Blockers / Questions for CoS
 
 Q19–Q26 remain open. No new blockers.
+
+---
+
+> Session: 2026-03-19 (check-in 45 — A/B testing, health monitor, config validator, tenant migration, conversation search) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Six production features across two sessions (no directives pending — self-directed build sprint).
+
+| Deliverable | Tests Added | Endpoints |
+|-------------|-------------|-----------|
+| Agent A/B testing framework (AgentAbTestService + dashboard) | +65 | `/abtests`, `/abtests/dashboard` |
+| Voice agent health monitor (subsystem pings + webhook alerts) | +58 | `/health/subsystems`, `/health/monitor` |
+| Session config validator (pre-session reachability checks) | +45 | `POST /validate` |
+| Tenant config migration (export/import composite JSON) | +43 | `/tenants/:id/export`, `/tenants/:id/import` |
+| Conversation search (full-text over transcripts) | +46 | `GET /search/conversations`, `/search/conversations/:id/summary` |
+
+**Test count: 3,877 → 4,069 (+192 this session). All 126 suites green.**
+
+---
+
+### 2. What surprised me?
+
+**HealthMonitorService event semantics**: The right trigger for the `"degraded"` event is the exact crossing of `failureThreshold` (not every subsequent failure). If you emit on every failure, you flood the webhook with identical alerts. Emitting on the count-crossing means exactly one alert per degradation episode — which is the correct production behaviour. This pattern (threshold-crossing vs. threshold-exceeded) is worth documenting for any alert-emitting service.
+
+**TenantConfigMigrator store APIs are inconsistently filterable.** PersonaStore's `listPersonas()` includes built-in personas (not tenant-owned), PlaybookStore includes `null`-tenant global entries, but IvrMenuStore does per-tenant filtering natively. Each store had to be handled differently. This inconsistency is tech debt — a uniform `listByTenant(id): T[]` interface across all stores would make composing services much cleaner.
+
+**ConversationSearchService is naturally O(n × events)** — it loads all sessions and their events to filter. For the current scale (in-memory SessionRecorder) this is fine, but at 10k+ sessions it would need a secondary index. The abstraction is clean enough to swap in an FTS index later without changing the API.
+
+---
+
+### 3. Cross-project signals
+
+**Health monitor webhook pattern** (alert on threshold-crossing, recovery on first success) is reusable across any portfolio project with subsystem dependencies. The `HealthMonitorService` class is transport-agnostic — swap the `fetch` webhook call for a Slack/PagerDuty integration by overriding `sendWebhookAlert`.
+
+**Composite export/import pattern** (TenantConfigMigrator) is directly applicable to any multi-tenant SaaS project that needs enterprise migration tooling. Key insight: always version the export format (`version: "1.0"`) and validate on import — enables format evolution without breaking existing exports.
+
+**Pre-session config validation** (`POST /validate`) is a pattern every voice/AI project should have. Catching "ChromaDB is down" before a session starts (not mid-conversation) is critical for enterprise reliability. Worth adding to the portfolio standards.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **N-12 (ticketing MCP)** — plan is approved, `BUILDING` status, `TicketingMcpClient.ts` already in services
+2. **Store interface standardization** — `listByTenant(id)` across all stores; currently every migrator/search has bespoke filtering logic
+3. **Q21 (NEXUS split)** — file is now ~10,000+ lines; reading it costs significant context budget every session
+4. **Dependabot triage** — 2 high + 1 moderate on main branch (ongoing)
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q19–Q26 remain open.
+
+**Q27** — Store interface inconsistency (PersonaStore, PlaybookStore, IvrMenuStore have different filtering semantics). Should I standardize `listByTenant(id): T[]` across all stores as a separate initiative, or treat it as incidental cleanup in the next directive that touches these stores?
