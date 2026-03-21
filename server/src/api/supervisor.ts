@@ -52,6 +52,14 @@ export class SupervisorWebSocketServer {
     });
   }
 
+  /** Close all supervisor WebSocket connections and shut down the server. */
+  close(callback?: (err?: Error) => void): void {
+    for (const client of this.wss.clients) {
+      client.close(1001, "Server shutting down");
+    }
+    this.wss.close(callback);
+  }
+
   /** Call from server 'upgrade' handler when path is '/supervisor'. */
   handleUpgrade(request: any, socket: any, head: any): void {
     this.wss.handleUpgrade(request, socket, head, (ws) => {

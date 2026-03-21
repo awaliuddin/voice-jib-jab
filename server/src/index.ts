@@ -115,6 +115,7 @@ import { createAuthRouter } from "./api/auth.js";
 import { AuditEventLogger } from "./services/AuditEventLogger.js";
 import { createAuditEventsRouter } from "./api/auditEvents.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
+import { GracefulShutdown } from "./services/GracefulShutdown.js";
 
 const app = express();
 const server = createServer(app);
@@ -500,7 +501,7 @@ export const voiceTriggerService = new VoiceTriggerService(
 );
 app.use("/voice", voiceLimiter, createVoiceRouter(voiceTriggerService, `http://localhost:${config.port}`));
 
-async function startServer(): Promise<void> {
+async function startServer(): Promise<VoiceWebSocketServer> {
   // Initialize OPA singleton before accepting any sessions
   const opaEvaluator = await initializeOpa();
 
@@ -631,26 +632,14 @@ async function startServer(): Promise<void> {
       }).catch((err) => console.error("[RecordingStore] Prune failed:", err));
     }, ONE_DAY_MS).unref();
   });
+
+  return voiceWss;
 }
 
-startServer().catch((error) => {
+startServer().then((voiceWss) => {
+  // N-38: Graceful shutdown — close WS servers then HTTP server, with 10s force-exit fallback.
+  new GracefulShutdown([voiceWss, supervisorWsServer, server]).register();
+}).catch((error) => {
   console.error("[Server] Fatal startup error:", error);
   process.exit(1);
-});
-
-// Graceful shutdown
-process.on("SIGTERM", () => {
-  console.log("\n[Server] SIGTERM received, shutting down gracefully...");
-  server.close(() => {
-    console.log("[Server] HTTP server closed");
-    process.exit(0);
-  });
-});
-
-process.on("SIGINT", () => {
-  console.log("\n[Server] SIGINT received, shutting down gracefully...");
-  server.close(() => {
-    console.log("[Server] HTTP server closed");
-    process.exit(0);
-  });
 });

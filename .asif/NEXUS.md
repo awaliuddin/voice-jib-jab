@@ -47,6 +47,7 @@
 | N-35 | IntentClassifier Word-Boundary Fix | INTERACTION | SHIPPED | P1 | 2026-03-21 |
 | N-36 | Audit Event Enrichment (IP/method/keyId) | OBSERVABILITY | SHIPPED | P1 | 2026-03-21 |
 | N-37 | Request Correlation ID Middleware | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
+| N-38 | Graceful Shutdown (SIGTERM/SIGINT) | OBSERVABILITY | SHIPPED | P1 | 2026-03-21 |
 
 ---
 

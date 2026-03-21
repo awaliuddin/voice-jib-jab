@@ -139,6 +139,14 @@ export class VoiceWebSocketServer {
     console.log("[WebSocket] Server initialized");
   }
 
+  /** Close all voice WebSocket connections and shut down the server. */
+  close(callback?: (err?: Error) => void): void {
+    for (const client of this.wss.clients) {
+      client.close(1001, "Server shutting down");
+    }
+    this.wss.close(callback);
+  }
+
   private async handleConnection(ws: WebSocket): Promise<void> {
     console.log("[WebSocket] New client connected");
 
