@@ -10695,3 +10695,48 @@ The force-exit warning has three independent causes (stryker sandbox, pingInterv
 ### 5. Blockers / Questions for CoS
 
 Q37: Upgrade path for `eslint ^8.56` → `^9.x`? The root package.json has eslint v8 but typescript-eslint v7 prefers eslint v9 (flat config). Currently functional but will need migration if typescript-eslint v8 is ever needed. Recommend adding ESLint config file so lint rules are actually enforced.
+
+---
+
+> Session: 2026-03-20 (check-in 59) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship since last check-in?
+
+**Timer leak fix: `process.nextTick` → `setImmediate` + `.unref()` in test mocks** (`e18725d`):
+- `MockWebSocket.ts` constructor and `close()`: replaced `process.nextTick` callbacks with `setImmediate(...).unref()`. `process.nextTick` cannot be unref'd; `setImmediate` can.
+- `OpenAIRealtimeAdapter.test.ts`: all `await new Promise(resolve => process.nextTick(resolve))` → `setImmediate`, plus added `"setImmediate"` to `doNotFake` lists in `attemptReconnect` and `startPingInterval` describe blocks (fake timers were faking setImmediate, causing a timeout on one test).
+- `voice-pipeline.test.ts`, `T-013.test.ts`: same nextTick→setImmediate migration.
+
+**Result**: Force-exit warning drops from 3/3 runs to ~1/3 runs (race is now very minor — timer cleanup usually beats worker exit timeout).
+
+**Current state**: 3,894 tests, 128 suites, 0 failures. Commits: `e18725d`. Pre-push hook: PASSED.
+
+---
+
+### 2. What surprised me?
+
+The `jest.useFakeTimers({ doNotFake: ["nextTick"] })` in the `attemptReconnect` describe block was also faking `setImmediate`. After migrating `MockWebSocket` to use `setImmediate`, the test "should log reconnection failure when connect rejects" timed out because the awaited `setImmediate` promise never resolved (Jest was intercepting it). The fix was mechanical — add `"setImmediate"` to the `doNotFake` list — but the failure mode was subtle: no syntax error, just a 5s test timeout.
+
+`--detectOpenHandles` and `--runInBand` both make the warning disappear entirely. This confirms the remaining warning is a timing race at worker exit boundaries, not a genuine handle leak.
+
+---
+
+### 3. Cross-project signals
+
+**`jest.useFakeTimers` fakes `setImmediate` by default**: Any project migrating from `process.nextTick` to `setImmediate` for async test helpers must also update any `doNotFake` lists in fake-timer describe blocks. Missing this produces a mysterious test timeout, not a parse error.
+
+**`--runInBand` as a diagnostic tool**: If `--detectOpenHandles` shows nothing and `--runInBand` eliminates a force-exit warning, the leak is a parallel-execution race, not a real handle. At that point you're optimizing test worker exit speed, not plugging a real leak.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **N-12 Ticketing Integration (MCP)** — plan file exists (`keen-enchanting-yao.md`), N-12 is already marked SHIPPED in the dashboard (possible error — need to verify if code is actually in place)
+2. **Stryker mutation refresh** — stale since mid-March
+3. **ESLint v9 migration** (Q37) — typescript-eslint v7 prefers v9 flat config
+
+---
+
+### 5. Blockers / Questions for CoS
+
+None new. Q37 (ESLint upgrade path) still open.
