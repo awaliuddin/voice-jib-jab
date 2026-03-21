@@ -12647,3 +12647,41 @@ Continued CRUCIBLE branch coverage fixes from N-50. Targeted two files with low 
 Key technique: For the `!body` branch on line 65, `express.json()` with `strict: true` (default) always provides `{}` for no-body requests, making `!body` unreachable via HTTP. Solution: custom test app with raw body injection middleware (`req.body = null`) to directly cover the guard without modifying production code.
 
 4,359 → **4,371 tests** (+12). All passing. Dashboard: 51/51 SHIPPED.
+
+---
+
+### Check-in 84 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-51: Branch Coverage — laneC_control + tenantMigration error paths** — 12 new tests, 4,359 → 4,371 passing. Commit: `eac097d`.
+
+- `ControlEngine.test.ts` +6 tests: 8 uncovered branch points in `laneC_control.ts` covered. Key targets: constructor tenantId path (line 313), OPA evaluator ternary TRUE branch (line 341), `reasonCodes || "Policy violation"` fallback (line 418), `isFinal ?? false` nullish coalescing and tenantId ternaries in transcript handlers (lines 537/553/557/573/577).
+- `tenantMigration-api.test.ts` +6 tests: `tenantMigration.ts` 92.3% → 100% branch. Covers GET /export non-Error throw, POST /import `!body` guard (requires middleware injection — express.json strict mode makes line 65 unreachable via HTTP), and all four paths in the `importTenant` catch block (two 400 paths, generic 500, non-Error 500).
+
+#### 2. What surprised me?
+
+**`express.json()` strict mode creates unreachable guards in route handlers.** The `!body || typeof body !== "object"` guard on line 65 is a reasonable defensive check — but with `strict: true` (the Express default), `express.json()` either parses a valid object/array or rejects with its own 400 SyntaxError before the handler runs. No non-object value ever reaches the handler body. The only way to cover `!body` is middleware injection in tests. This is worth documenting as a pattern: defensive body guards after `express.json()` may need `/* istanbul ignore */` or explicit injection tests — they can't be reached via HTTP.
+
+**The TypeScript `noUnusedLocals: true` config doesn't respect the underscore prefix convention.** `_engine` still triggers TS6133. The fix is either `// @ts-ignore` or simply a bare constructor call `new ControlEngine(...)` (which TypeScript allows as a statement for its side effects). The latter is cleaner and idiomatic.
+
+#### 3. Cross-project signals
+
+**Express middleware order creates coverage dead zones.** Any `express.json()` guard of the form `if (!body || typeof body !== "object")` is structurally unreachable in default Express configs. API routers across the ASIF portfolio likely have similar guards. Teams should either: (a) document these as `/* istanbul ignore */` with a comment explaining the middleware contract, or (b) use middleware injection in tests (as done here) to exercise the production path. The injection approach is preferable for real coverage; the ignore annotation is preferable when the guard exists for non-HTTP callers (programmatic router use).
+
+**Branch coverage improvements plateau around middleware boundary conditions.** After N-49, N-50, and N-51, the remaining low-coverage files (`retrieval/index.ts` at 33%, `onboarding.ts` at 62.5%, `knowledge.ts` at 52.72%) likely have similar structural issues: singleton initialization, module-level code, or middleware contracts that prevent normal HTTP testing. The next improvement cycle will need `jest.resetModules()` or direct class instantiation rather than HTTP integration.
+
+#### 4. What would I prioritize next?
+
+1. **`onboarding.ts` (62.5% branch)** — user-facing enrollment path. Medium complexity but high value for compliance.
+2. **`knowledge.ts` (52.72% branch)** — knowledge management endpoints. Likely has similar error-path gaps to tenantMigration.ts.
+3. **`training.ts` (60% branch)** — training pipeline. Catch blocks likely untested.
+4. **Q41/Q42/Q43** — still awaiting CoS responses.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture. No change.
+**Q42 (open)** — Next directive batch or maintenance mode?
+**Q43 (open)** — Pre-push lock-file sync check (`npm ci --dry-run`).
+
+Dashboard: 51/51 SHIPPED.
