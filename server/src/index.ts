@@ -138,7 +138,6 @@ app.use((_req, res, next) => {
 const auditEventLogger = new AuditEventLogger(
   resolve(dirname(config.storage.databasePath), "audit-events.jsonl"),
 );
-app.use("/audit", createAuditEventsRouter(auditEventLogger));
 
 // ── API Key Authentication ────────────────────────────────────────────
 // Disabled in dev by setting API_KEY_AUTH_ENABLED=false (default: enabled).
@@ -152,8 +151,13 @@ const requireApiKey = createApiKeyMiddleware(
 );
 app.use("/auth", createAuthRouter(apiKeyStore));
 // Guard sensitive management routes before their handlers are registered.
-// /sessions added in N-32: transcript data, replay, and compliance reports require auth.
-app.use(["/admin", "/tenants", "/webhooks", "/sessions"], requireApiKey);
+// N-29: admin/tenants/webhooks | N-32: sessions | N-33: analytics/audit/recordings/export
+app.use(
+  ["/admin", "/tenants", "/webhooks", "/sessions", "/analytics", "/audit", "/recordings", "/export"],
+  requireApiKey,
+);
+// Audit event stream — registered after guard so requireApiKey fires first.
+app.use("/audit", createAuditEventsRouter(auditEventLogger));
 
 // Health check endpoint
 app.get("/health", (_req, res) => {

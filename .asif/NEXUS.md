@@ -42,6 +42,7 @@
 | N-30 | Real-Time Audit Event Stream | OBSERVABILITY | SHIPPED | P1 | 2026-03-21 |
 | N-31 | API Key TTL / Expiry + Rotation | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 | N-32 | Session Endpoint Protection | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
+| N-33 | Analytics & Audit Access Control | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 
 ---
 
@@ -11913,3 +11914,46 @@ Q38, Q39, Q40 remain open. No new blockers. **Q42 raised**: N-32 (session endpoi
 ### 5. Blockers / Questions for CoS
 
 Q38, Q39, Q40 remain open. Q42 resolved. Dashboard: 32/32 SHIPPED.
+
+---
+
+> Session: 2026-03-21 (check-in 69) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship since last check-in?
+
+**N-33 — Analytics & Audit Access Control** (P1, GOVERNANCE):
+- Extended guard array to cover `/analytics`, `/audit`, `/recordings`, `/export` — one `app.use([...], requireApiKey)` line change
+- Fixed ordering bug: `/audit` events router was registered *before* the guard in N-30; moved it to after the guard so `requireApiKey` fires first on all `/audit` requests
+- `AnalyticsAuditAuth.test.ts` — 10 tests: 401 on 5 endpoints without key, 200 with valid key on analytics and audit, audit data readable through guard, auth-disabled bypass for both paths
+
+**Test delta**: 4,142 → 4,152 (+10). 134 suites. Pre-push: PASSED.
+
+---
+
+### 2. What surprised me?
+
+**N-30 had a latent ordering bug.** The audit events router was registered at line 141, *before* `requireApiKey` was created (line 148) and the guard was mounted (line 156). So `GET /audit/events` was publicly accessible despite the intent to protect it. N-33 caught this by moving the router registration to after the guard. The bug was undetectable from reading just the guard line — you had to trace the full order of `app.use()` calls across ~300 lines of `index.ts`. This is why auth guard tests that test the *actual ordering* are more valuable than tests that test each component in isolation.
+
+**The guard array is now protecting 8 route families.** `/admin`, `/tenants`, `/webhooks`, `/sessions`, `/analytics`, `/audit`, `/recordings`, `/export`. Remaining unguarded management routes: `/sla`, `/search`, `/compare-agents`, `/capacity`, `/training`, `/agent-versions`, `/skills`, `/validate`, `/kb-search`, `/onboarding`. These are lower-sensitivity ops/config routes, but warrant a systematic review.
+
+---
+
+### 3. Cross-project signals
+
+**Route registration order is a security invariant, not just a style preference.** In Express, `app.use(path, middleware)` only applies to handlers registered *after* it. Any project adding auth middleware must audit the full `app.use()` order — a router registered one line before the guard is completely unprotected. The safe pattern: create the guard middleware first, mount it before *any* route handlers, never register routes before the guard line.
+
+**A guard coverage map should be maintained as code.** The guard array `["/admin", "/tenants", ...]` is now the single authoritative source of which routes are protected. Suggest extracting to a named constant (`GUARDED_ROUTES`) to make coverage auditable without reading `app.use()` call sites.
+
+---
+
+### 4. What would I prioritize next?
+
+1. **N-34: Remaining route protection sweep** — audit `/sla`, `/search`, `/compare-agents`, `/capacity`, `/skills`, `/validate`, `/kb-search`, `/onboarding`, `/training`, `/agent-versions` for sensitivity. Extend guard array for those warranting protection. S-sized sweep + tests.
+2. **Q40 — IntentClassifier word-boundary** — authorization pending.
+3. **Q39 — Dependabot dismissal** — authorization pending.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q38, Q39, Q40 remain open. Dashboard: 33/33 SHIPPED.
