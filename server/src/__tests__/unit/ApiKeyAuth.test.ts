@@ -531,6 +531,144 @@ describe("ApiKeyStore — TTL / Expiry (N-31)", () => {
   });
 });
 
+// ── N-36: Audit Event Enrichment ─────────────────────────────────────────
+
+describe("createApiKeyMiddleware() — audit enrichment (N-36)", () => {
+  let store: ApiKeyStore;
+
+  function makeReq(
+    headers: Record<string, string>,
+    overrides: Partial<{ ip: string; socketRemoteAddress: string; method: string; path: string }> = {},
+  ) {
+    return {
+      headers,
+      ip: overrides.ip ?? "10.0.0.1",
+      socket: { remoteAddress: overrides.socketRemoteAddress ?? "10.0.0.2" },
+      method: overrides.method ?? "GET",
+      path: overrides.path ?? "/admin",
+    } as unknown as Parameters<ReturnType<typeof createApiKeyMiddleware>>[0];
+  }
+
+  function makeRes() {
+    return { status: jest.fn().mockReturnThis(), json: jest.fn() } as unknown as Parameters<ReturnType<typeof createApiKeyMiddleware>>[1];
+  }
+
+  beforeEach(() => {
+    store = new ApiKeyStore(makeTmpFile());
+  });
+
+  it("logs ipAddress from req.ip on missing_header rejection", () => {
+    const auditLogger = { log: jest.fn() };
+    const mw = createApiKeyMiddleware(store, true, auditLogger as never);
+    mw(makeReq({}, { ip: "192.168.1.1" }), makeRes(), jest.fn());
+    expect(auditLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: expect.objectContaining({ ipAddress: "192.168.1.1" }) }),
+    );
+  });
+
+  it("logs method on missing_header rejection", () => {
+    const auditLogger = { log: jest.fn() };
+    const mw = createApiKeyMiddleware(store, true, auditLogger as never);
+    mw(makeReq({}, { method: "POST" }), makeRes(), jest.fn());
+    expect(auditLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: expect.objectContaining({ method: "POST" }) }),
+    );
+  });
+
+  it("falls back to socket.remoteAddress when req.ip is undefined", () => {
+    const auditLogger = { log: jest.fn() };
+    const mw = createApiKeyMiddleware(store, true, auditLogger as never);
+    const req = {
+      headers: {},
+      ip: undefined,
+      socket: { remoteAddress: "172.16.0.1" },
+      method: "GET",
+      path: "/admin",
+    } as unknown as Parameters<ReturnType<typeof createApiKeyMiddleware>>[0];
+    mw(req, makeRes(), jest.fn());
+    expect(auditLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: expect.objectContaining({ ipAddress: "172.16.0.1" }) }),
+    );
+  });
+
+  it("falls back to 'unknown' when both req.ip and socket.remoteAddress are undefined", () => {
+    const auditLogger = { log: jest.fn() };
+    const mw = createApiKeyMiddleware(store, true, auditLogger as never);
+    const req = {
+      headers: {},
+      ip: undefined,
+      socket: { remoteAddress: undefined },
+      method: "DELETE",
+      path: "/admin",
+    } as unknown as Parameters<ReturnType<typeof createApiKeyMiddleware>>[0];
+    mw(req, makeRes(), jest.fn());
+    expect(auditLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: expect.objectContaining({ ipAddress: "unknown" }) }),
+    );
+  });
+
+  it("logs ipAddress and method on invalid_key rejection", () => {
+    const auditLogger = { log: jest.fn() };
+    const mw = createApiKeyMiddleware(store, true, auditLogger as never);
+    mw(makeReq({ "x-api-key": "vjj_invalid" }, { ip: "1.2.3.4", method: "PUT" }), makeRes(), jest.fn());
+    expect(auditLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: expect.objectContaining({ reason: "invalid_key", ipAddress: "1.2.3.4", method: "PUT" }),
+      }),
+    );
+  });
+
+  it("logs keyId on expired key rejection", () => {
+    const created = store.createKey("t1", "d", 30);
+    const record = store["keys"].find((k: { keyId: string }) => k.keyId === created.keyId)!;
+    record.expiresAt = new Date(Date.now() - 1000).toISOString();
+    const auditLogger = { log: jest.fn() };
+    const mw = createApiKeyMiddleware(store, true, auditLogger as never);
+    mw(makeReq({ "x-api-key": created.rawKey }), makeRes(), jest.fn());
+    expect(auditLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: expect.objectContaining({ reason: "expired", keyId: created.keyId }),
+      }),
+    );
+  });
+
+  it("does NOT include keyId on invalid_key rejection", () => {
+    const auditLogger = { log: jest.fn() };
+    const mw = createApiKeyMiddleware(store, true, auditLogger as never);
+    mw(makeReq({ "x-api-key": "vjj_invalid" }), makeRes(), jest.fn());
+    const loggedDetail = (auditLogger.log as jest.Mock).mock.calls[0][0].detail as Record<string, unknown>;
+    expect(loggedDetail).not.toHaveProperty("keyId");
+  });
+
+  it("logs ipAddress, method, and keyId on api_key_used event", () => {
+    const created = store.createKey("acme", "test");
+    const auditLogger = { log: jest.fn() };
+    const mw = createApiKeyMiddleware(store, true, auditLogger as never);
+    mw(makeReq({ "x-api-key": created.rawKey }, { ip: "10.1.2.3", method: "DELETE" }), makeRes(), jest.fn());
+    expect(auditLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "api_key_used",
+        detail: expect.objectContaining({ keyId: created.keyId, ipAddress: "10.1.2.3", method: "DELETE" }),
+      }),
+    );
+  });
+
+  it("does not log audit events when auditLogger is not provided", () => {
+    // Should not throw even without auditLogger
+    const mw = createApiKeyMiddleware(store, true);
+    expect(() => mw(makeReq({}), makeRes(), jest.fn())).not.toThrow();
+  });
+
+  it("logs path in all audit events", () => {
+    const auditLogger = { log: jest.fn() };
+    const mw = createApiKeyMiddleware(store, true, auditLogger as never);
+    mw(makeReq({}, { path: "/tenants" }), makeRes(), jest.fn());
+    expect(auditLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ detail: expect.objectContaining({ path: "/tenants" }) }),
+    );
+  });
+});
+
 describe("createApiKeyMiddleware() — expiry (N-31)", () => {
   let store: ApiKeyStore;
 
