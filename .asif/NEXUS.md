@@ -12485,3 +12485,45 @@ Dashboard: 47/47 SHIPPED.
 **Q42 (open)** — Next directive batch or maintenance mode? No response yet.
 
 Dashboard: 48/48 SHIPPED.
+
+---
+
+### Check-in 81 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-48: Property-Based Testing (fast-check)** — 23 property tests across `IntentClassifier.property.test.ts` (12 properties) and `AllowedClaimsRegistry.property.test.ts` (11 properties). Installs `fast-check@4.6.0`. Closes CRUCIBLE oracle gap: project now has all 4/4 oracle types (example, property, contract, integration). 4,316 → 4,339 tests. Commit: `847d51b`.
+
+**CI hotfix** — `package-lock.json` was not staged in the N-48 commit. CI runs `npm ci` which requires the lock file to be in sync with `package.json`. `fast-check@4.6.0` and its transitive dep `pure-rand@8.3.0` were missing from the lock file. Fixed in `aa560f5`. CI is green.
+
+Total commits this session: 2 (`847d51b`, `aa560f5`). Net: +23 tests, 1 CI breakage resolved.
+
+#### 2. What surprised me?
+
+**`package-lock.json` wasn't staged by the pre-push hook.** The pre-push hook runs `npm test` against the already-installed local `node_modules` — it passes even when the lock file is out of sync. CI runs `npm ci` which is stricter: it validates that the lock file matches `package.json` before installing. The gap: local pre-push is green, CI is red. This is a structural blind spot in the current gate design.
+
+The fix is mechanical (commit the lock file), but the gap is worth addressing systematically. An `npm ci --dry-run` check in the pre-push hook would catch this before push. Noting it as a potential hook improvement.
+
+**fast-check's shrinking is aggressive on string arbitraries.** When P5 (pattern count) failed due to the `enableFileLoad` issue, fast-check shrunk the counterexample to an empty array `[]` immediately — the minimal witness. This made debugging fast: the counterexample was `patterns = []` (zero injected patterns), and the resulting count was still > 0 because the on-disk catalog was being merged. Without fast-check's shrinking, a random 8-pattern array would have been much harder to diagnose.
+
+#### 3. Cross-project signals
+
+**Pre-push hook should include `npm ci --dry-run` (or equivalent lock-file sync check).** Any ASIF project using workspaces should check that `package-lock.json` is committed and in sync before push. The current ASIF CI Gate Protocol only validates that tests pass locally — it does not validate that the install will succeed in CI. Recommend adding to the standard hook template.
+
+**`fast-check` shrinking is a debugging accelerant.** In example-based tests, a failing case is whatever random value happened to run. With fast-check, the failure is always the *minimal* counterexample. For AllowedClaimsRegistry, this immediately pointed to the empty-patterns edge case rather than a complex 10-pattern scenario. Worth highlighting in ASIF test quality documentation.
+
+**Workspace-level `package-lock.json` is the authoritative lock for CI.** The repo has both a root `package-lock.json` and potentially `server/package-lock.json`. CI installs from the root workspace lock. Installing a dev dep in the `server/` workspace updates the root lock — both must be considered when staging files.
+
+#### 4. What would I prioritize next?
+
+1. **Pre-push hook hardening** — add `npm ci --dry-run` to the ASIF CI Gate to catch lock-file drift before push. Low effort, prevents recurrence of this exact CI break class.
+2. **VoiceTriggerService branch coverage** — CRUCIBLE fix #2. Lines 105-128, 157-158. 62.5% branch coverage in an audio-critical service.
+3. **Database.ts branch coverage** — CRUCIBLE fix #3. Lines 49/59/78/95. 68.18% branch coverage in the storage layer.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture.
+**Q42 (open)** — Next directive batch or maintenance mode?
+**Q43 (new)** — Pre-push hook gap: should I update the ASIF CI Gate hook template to include `npm ci --dry-run` as a lock-file sync check? This would prevent the N-48 CI break class system-wide. Ready to execute immediately on authorization, or happy to treat as a low-priority idle task.
+
+Dashboard: 48/48 SHIPPED.
