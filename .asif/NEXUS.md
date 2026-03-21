@@ -1254,6 +1254,36 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ---
 
+### Mutation Gap-Fill + Research Docs — 2026-03-20 (Idle Protocol Items 2-5)
+
+**Trigger**: Idle Time Protocol continuation — all 25 N-initiatives SHIPPED, no pending directives.
+**Test baseline entering**: 3,894 → **3,920 total** (+26 targeted mutation gap-fill tests)
+
+**Actions taken**:
+
+1. **Item 2 — Research docs** (3 new files in `docs/research/`):
+   - `jest-timer-leak-analysis.md` — 3 root causes of Jest force-exit warning: Stryker sandbox phantom tests (`.stryker-tmp/` not in testPathIgnorePatterns), `setInterval` without `.unref()` in OpenAIRealtimeAdapter, `process.nextTick` in MockWebSocket (cannot be unref'd). Pattern: `setImmediate + .unref()` is the correct approach.
+   - `stryker-related-test-discovery.md` — Stryker marks mutants as "no coverage" when file-scoped discovery misses transitive/indirect coverage. Not the same as genuinely uncovered code. Fix: add direct unit tests (Stryker can find them).
+   - `test-arithmetic-assertion-pattern.md` — `jest.setSystemTime(T1)` pattern for elapsed-time arithmetic tests. `toBeGreaterThan(0)` is mutation-blind; `toBe(350)` kills arithmetic operator mutations.
+
+2. **Item 3 — Strengthen hollow assertions (Gate 6 gap-fill)**:
+   - **LaneArbitrator.test.ts**: +13 tests (47→60). New: TTFB arithmetic (`jest.setSystemTime`, exact 350ms assertion), FALLBACK_PLAYING barge-in/policy-cancel branches, ENDED state guards. Expected Stryker score: 54% → ~65%+.
+   - **AllowedClaimsRegistry.test.ts**: +16 tests (43→59). New: dense embedding paths (`initialize()`, `isEmbeddingInitialized`, multi-claim max-score, clamping, TF-IDF fallback), file-loading via `writeTmp()` helper (7 formats). Expected Stryker score: 36% → ~55%+.
+   - **Research finding**: Numeric separators (`1_700_000_000_000`) are valid TypeScript but rejected by Babel/ts-jest transform. Use plain numbers in test files.
+   - **Research finding**: `AllowedClaimsRegistry.resolveClaimsPath()` always falls back to `cwd/../knowledge/allowed_claims.json` — CWD fallback loads real production data even when `sourcePath` points to nonexistent file.
+
+3. **Item 4 — Portfolio Intelligence review**: PI-007 (Fish Speech v1.5 / Qwen3-TTS) noted — potential Kokoro+RVC replacement. Architecture change — out of scope for idle. No immediate action.
+
+4. **Item 5 — Stale docs**: README updated: 3,894 → 3,920 tests. Mutation baseline note updated to reflect gap-fill targets.
+
+**Timer leak resolution** (carried from prior session): `process.nextTick` → `setImmediate + .unref()` in MockWebSocket. `OpenAIRealtimeAdapter.test.ts` `doNotFake` lists updated to include `"setImmediate"`. Force-exit warning reduced from 100% to ~0-1 in 10 runs. Committed `e18725d`.
+
+**Open items** (awaiting CoS authorization):
+- Q38: Stryker refresh scope (full 13-file suite vs 3-file critical path). Authorization needed before running.
+- Q37: ESLint v9 migration (functional but deferred).
+
+---
+
 ## Team Feedback
 
 > Session: 2026-03-18 (check-in 259) | Author: Claude Sonnet 4.6
