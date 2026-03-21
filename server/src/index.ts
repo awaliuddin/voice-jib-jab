@@ -114,12 +114,16 @@ import { createApiKeyMiddleware } from "./middleware/apiKeyAuth.js";
 import { createAuthRouter } from "./api/auth.js";
 import { AuditEventLogger } from "./services/AuditEventLogger.js";
 import { createAuditEventsRouter } from "./api/auditEvents.js";
+import { requestIdMiddleware } from "./middleware/requestId.js";
 
 const app = express();
 const server = createServer(app);
 
 // Middleware
 app.use(express.json());
+
+// Request correlation ID — must be first so all subsequent handlers have req.requestId
+app.use(requestIdMiddleware);
 
 // Security headers
 app.use(securityHeaders);

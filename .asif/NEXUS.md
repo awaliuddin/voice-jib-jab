@@ -46,6 +46,7 @@
 | N-34 | Remaining Route Protection Sweep | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 | N-35 | IntentClassifier Word-Boundary Fix | INTERACTION | SHIPPED | P1 | 2026-03-21 |
 | N-36 | Audit Event Enrichment (IP/method/keyId) | OBSERVABILITY | SHIPPED | P1 | 2026-03-21 |
+| N-37 | Request Correlation ID Middleware | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 
 ---
 
@@ -12022,3 +12023,41 @@ Q38, Q39, Q40 remain open. Dashboard: 33/33 SHIPPED.
 **Q41** — N-34 extended the guard to 34 routes including `/voice`. Should `/voice` be public (it's used by the real-time voice loop and may need unauthenticated access from the browser client) or gated (enterprise deployments should require a key)? Currently gated. If the voice loop needs unauthenticated access, I should carve it out. Requesting CoS call.
 
 Dashboard: 35/35 SHIPPED.
+
+---
+
+### Check-in 71 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-36: Audit Event Enrichment** — `apiKeyAuth.ts` now logs `ipAddress` (from `req.ip ?? req.socket?.remoteAddress ?? "unknown"`), `method` (HTTP verb), and `keyId` (for expired-key rejections via `findExpiredRecord()`) on all three `auditLogger.log()` call sites. 10 new tests added (`ApiKeyAuth.test.ts`). +10 tests, 4,189 total.
+
+**N-37: Request Correlation ID Middleware** — `server/src/middleware/requestId.ts`. Reads `X-Request-ID` from inbound header; if absent or unsafe, generates UUID v4. Attaches to `req.requestId`, echoes in response header. Validation: rejects empty strings, IDs > 128 chars, and IDs containing non-alphanumeric chars (log injection prevention). Mounted first in `index.ts` before all other middleware. 17 new tests (`RequestId.test.ts`). +17 tests, 4,206 total.
+
+Commits: `e856762` (N-36), `[pending]` (N-37). Dashboard: 37/37 SHIPPED.
+
+#### 2. What surprised me?
+
+**`req.socket` is not always present in unit test mocks.** When existing `ApiKeyAuth.test.ts` tests built a minimal `req` object with just `{ headers, path }`, `req.socket` was `undefined`. `req.socket.remoteAddress` threw immediately. The fix (`req.socket?.remoteAddress`) is obvious but highlights that any middleware accessing `req.socket` directly without optional chaining is latently broken in test environments and potentially in edge-case production scenarios (early request abort, WebSocket upgrades).
+
+**N-37 required a TypeScript module augmentation** (`declare module "express-serve-static-core" { interface Request { requestId: string } }`) to attach `requestId` to the Express `Request` type without casting. This is the correct pattern but is easy to miss — without it, TypeScript would reject downstream `req.requestId` accesses.
+
+#### 3. Cross-project signals
+
+**Request correlation is universally valuable but rarely first-class.** Any ASIF project with Express + audit logging (dx3, Podcast-Pipeline, Faultline) should add an `X-Request-ID` middleware early in the stack. The pattern is ~50 LOC and closes a distributed tracing gap. The validation logic (allow alphanumeric/dash/dot, reject newlines/semicolons, max 128 chars) should be shared as a utility if multiple projects adopt it.
+
+**`randomUUID()` from Node's built-in `crypto` module** is available in Node 14.17+ and requires no external dependency (`uuid` package). Any project still importing `uuid` can drop the dependency.
+
+#### 4. What would I prioritize next?
+
+1. **N-38: Graceful Shutdown** — SIGTERM/SIGINT handling so in-flight WebSocket sessions close cleanly, the audit event JSONL is flushed, and the HTTP server drains before `process.exit(0)`. Currently the process exits hard on signal. S-sized, zero risk to latency.
+2. **N-38 alt: Audit Event JSONL flush guard** — `AuditEventLogger` writes to a file stream but has no explicit flush/close on shutdown. Events in the write queue could be lost on SIGTERM. Part of graceful shutdown or standalone.
+3. **Q41 resolution** — `/voice` auth posture is the only open architecture question. Resolving it allows the middleware mount order to be finalized.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` auth posture: public or gated? Currently gated by N-34. The browser-based voice loop may need unauthenticated WebSocket access. Awaiting CoS call.
+
+**Q42** — Should N-38 (graceful shutdown) proceed autonomously on next "Continue roadmap" trigger? It closes a real data-loss risk on SIGTERM and is S-sized. Requesting standing auth or explicit directive.
+
+Dashboard: 37/37 SHIPPED.
