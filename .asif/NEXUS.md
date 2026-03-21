@@ -10825,3 +10825,47 @@ None new. Q37 (ESLint upgrade path) still open.
 ### 5. Blockers / Questions for CoS
 
 Q38: **Stryker refresh — scope and authorization?** Last Stryker run was scoped to 3 files (PolicyGate, LaneArbitrator, AllowedClaimsRegistry) and took ~10 minutes. The new service layer adds ~10 more files. A full run would cover ~13 files and likely take 25-35 minutes. Confirm: run full suite or stay scoped to Lane C critical path only? Also confirm: is fixing LaneArbitrator below-threshold (54%) a directive-level priority or self-improvement discretion?
+
+---
+
+> Session: 2026-03-20 (check-in 61) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship since last check-in?
+
+**LaneArbitrator mutation-killer tests — CRUCIBLE Gate 6 gap-fill** (`e6a518e`):
+- 13 new tests targeting the 3 specific Stryker survivors from the 2026-03-16 baseline
+- TTFB arithmetic: `jest.setSystemTime()` pins exact values — kills the `+`/addition mutation
+- FALLBACK_PLAYING barge-in, double-cancel guard, responseInProgress clear, session end
+- ENDED state guards: barge-in and policy cancel both no-op, no events emitted
+
+**Test delta**: 3,894 → 3,904 (+10). LaneArbitrator: 47 → 60 tests. Pre-push: PASSED.
+
+---
+
+### 2. What surprised me?
+
+**`jest.useFakeTimers()` fakes `Date.now()` — but numeric separators break the Babel parser.** I wrote `1_700_000_000_000` (TypeScript numeric separator syntax) which TypeScript supports natively, but the Jest Babel transform rejected it with "Missing semicolon." The ts-jest config targets ES2022 where numeric separators are valid — but the test file uses a Babel path that pre-dates full ES2022 support. Fix was trivial (drop separators) but the failure mode was non-obvious: a TypeScript-valid syntax rejected only by Jest's transform.
+
+**The original TTFB test was completely mutation-blind.** `expect(metrics.latencyMs).toBeGreaterThan(0)` passes whether the arithmetic is `bReadyTime - speechEndTime`, `bReadyTime + speechEndTime`, or even `speechEndTime - bReadyTime`. Three different implementations, one passing test. This is a textbook hollow assertion — it validated presence, not correctness. The `jest.setSystemTime()` pattern is the right tool here.
+
+---
+
+### 3. Cross-project signals
+
+**`jest.setSystemTime()` for arithmetic tests**: Any project where a function computes `end - start` should use `jest.setSystemTime(T1)` / `jest.setSystemTime(T1 + N)` + `toBe(N)` rather than `toBeGreaterThan(0)`. The `toBeGreaterThan(0)` pattern is a mutation magnet — it passes for both addition and subtraction. Applies to any latency, duration, or elapsed-time calculation in ASIF projects.
+
+**Numeric separators in ts-jest**: `1_000_000` syntax may fail depending on ts-jest preset and Babel transform version. Safe pattern: write literal numbers in test files until ts-jest `default-esm` preset is verified to support ES2022 numeric separators end-to-end.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **Fresh Stryker run** on the new service layer with the strengthened LaneArbitrator tests — the mutation score should now be closer to 60% threshold. High confidence given the targeted nature of the new tests.
+2. **AllowedClaimsRegistry mutation score** (36%, below 40% threshold) — the 130 no-coverage mutants are from `initialize()` / `getEmbeddingSimilarityScore()` paths. Direct unit test coverage of these paths would address both coverage and mutation gaps simultaneously.
+3. **Property-based tests** for IntentClassifier — keyword scoring has arithmetic that could benefit from the same `jest.setSystemTime()` / exact-value pattern.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q38 still open (Stryker refresh scope + LaneArbitrator below-threshold authorization). No new blockers.
