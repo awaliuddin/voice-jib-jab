@@ -103,6 +103,8 @@ import { ConversationAnalyticsService } from "./services/ConversationAnalyticsSe
 import { createConversationAnalyticsRouter } from "./api/conversationAnalytics.js";
 import { createHealthRouter } from "./api/health.js";
 import { healthMonitorDashboardHtml } from "./api/healthMonitorDashboard.js";
+import { createDemoRouter } from "./api/demo.js";
+import { demoDashboardHtml } from "./api/demoDashboard.js";
 
 const app = express();
 const server = createServer(app);
@@ -407,6 +409,10 @@ app.use("/agent-versions", createAgentVersionsRouter(agentVersionStore));
 // ── Conversation Analytics ────────────────────────────────────────────
 const conversationAnalytics = new ConversationAnalyticsService(sessionRecorder);
 app.use("/analytics/conversations", createConversationAnalyticsRouter(conversationAnalytics));
+
+// ── Demo Mode ─────────────────────────────────────────────────────────
+app.use("/demo", createDemoRouter());
+app.get("/demo", (_req, res) => res.type("html").send(demoDashboardHtml()));
 
 // ── Call Routing + Queue System ───────────────────────────────────────
 const routingEngine = initRoutingEngine(resolve(dirname(config.storage.databasePath), "routing-rules.json"));
