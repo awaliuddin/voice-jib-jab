@@ -10779,3 +10779,49 @@ The `jest.useFakeTimers({ doNotFake: ["nextTick"] })` in the `attemptReconnect` 
 ### 5. Blockers / Questions for CoS
 
 None new. Q37 (ESLint upgrade path) still open.
+
+---
+
+> Session: 2026-03-20 (check-in 60) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship since last check-in?
+
+**CRUCIBLE Audit — Idle Time Protocol** (`1bca4fc`):
+- README badge accuracy: test count 3,746→3,894; status "24/25+BUILDING"→"25/25 SHIPPED"; branch coverage overclaim fixed (83.5%→82.37%); test suites 112→128; React SDK tests 39→79
+- `jest.config.js`: added `OMIT JUSTIFIED` inline comments to all 3 coverage exclusions
+- Integration tests: added `MOCK JUSTIFIED` headers to `FullPipelineE2E.test.ts`, `MultiTenantE2E.test.ts`, `RegressionRunner.test.ts`
+- NEXUS Self-Improvement Log: full Gate 1-8 audit documented
+
+**Current state**: 3,894 tests, 128 suites, 0 failures. Pre-push: PASSED.
+
+---
+
+### 2. What surprised me?
+
+**README was overclaiming branch coverage** — 83.5% stated vs 82.37% actual. The floor is 79%, so no CI failure, but the public-facing metric was wrong by ~1.1 percentage points. This kind of drift happens silently: coverage fluctuates run-to-run as new code is added and the README is only updated manually after milestones. The fix is to treat README metrics as "needs refresh on every audit," not "set and forget."
+
+**No `OMIT JUSTIFIED` comments anywhere** despite two previous CRUCIBLE audits finding the omissions and accepting them. The first audit said "no inline comment — low severity." The second repeated the finding. This session actually added the comments rather than re-documenting the gap. Pattern: CRUCIBLE audits report findings but fixing them requires a separate action. The audit → fix loop needs to complete in one session.
+
+---
+
+### 3. Cross-project signals
+
+**README badge drift**: Any ASIF project that hardcodes coverage/test-count numbers in the README will drift. The correct pattern is to regenerate these numbers on every release or audit cycle, not after milestones only. Projects to check: dx3, FamilyMind, Podcast-Pipeline.
+
+**MOCK JUSTIFIED annotation pattern**: The `// MOCK JUSTIFIED: <reason>` comment in integration test mock blocks is now consistently applied across all integration test files in this project. Other ASIF projects using `jest.mock()` in integration tests should adopt this annotation to pass Gate 8.3 cleanly.
+
+**CRUCIBLE audit → fix gap**: Two prior audits flagged the `OMIT JUSTIFIED` issue as "low severity — not fixing." It stayed unfixed for multiple sessions. Small quality hygiene items accumulate this way. Recommend: CRUCIBLE findings below P1 should still be fixed immediately if trivially small (< 5 min effort). Only defer if non-trivial.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **Fresh Stryker run** on new service layer (IntentClassifier, TranslationService, FlowEngine, PipelineProfiler, VoiceprintStore, SentimentTracker). Suite has grown from 1,082 tests (when Stryker last ran) to 3,894 — baseline is 3x stale. LaneArbitrator is still below 60% threshold.
+2. **ESLint v9 migration** (Q37) — typescript-eslint v7 prefers v9 flat config. Currently functional but will block typescript-eslint v8 upgrade when needed.
+3. **Property-based tests** for IntentClassifier (keyword scoring arithmetic) and TranslationService (language pair symmetry) — closes the oracle gap from 2/4 to 3/4 types.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q38: **Stryker refresh — scope and authorization?** Last Stryker run was scoped to 3 files (PolicyGate, LaneArbitrator, AllowedClaimsRegistry) and took ~10 minutes. The new service layer adds ~10 more files. A full run would cover ~13 files and likely take 25-35 minutes. Confirm: run full suite or stay scoped to Lane C critical path only? Also confirm: is fixing LaneArbitrator below-threshold (54%) a directive-level priority or self-improvement discretion?
