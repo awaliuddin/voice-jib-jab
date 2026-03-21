@@ -10428,3 +10428,56 @@ Same as check-in 52. No change.
 
 Q19–Q34 remain open.
 
+
+---
+
+> Session: 2026-03-20 (check-in 54 — Demo Mode shipped) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship since last check-in?
+
+**Voice Agent Demo Mode** — full pre-recorded pipeline playback. Commit `ecdc5d5`.
+
+**New files (7):**
+- `src/demo/script.ts` — scripted turn sequences for 3 scenarios (8-10 turns each), with per-turn timing, speaker, policy decisions, sentiment, reason codes
+- `src/demo/DemoPlayer.ts` — `EventEmitter` replay engine; `speedMultiplier` param (0 = instant for tests, 1.0 = realtime, 5x max); events stored per-sessionId in Map; idempotent `play()` guard
+- `src/demo/run.ts` — CLI runner with ASCII framing, emoji policy icons (✅ allow, ❌ refuse, ⚠️ escalate, ✏️ rewrite), sentiment indicators
+- `src/api/demo.ts` — REST API: `POST /demo/start`, `GET /demo/events/:sessionId` (polling), `GET /demo/scenarios`, `DELETE /demo/session/:id`
+- `src/api/demoDashboard.ts` — self-contained web dashboard at `GET /demo`; animated chat bubbles, inline policy badges, scenario selector, speed control, live sidebar metrics, summary card
+- `src/__tests__/unit/DemoPlayer.test.ts` — 53 tests (all scenarios, event ordering, speedMultiplier, summary, isPlaying lifecycle)
+- `src/__tests__/unit/demo.test.ts` — 37 tests (all API routes, dashboard content)
+
+**CLI usage**: `npx tsx src/demo/run.ts [support|compliance|sales]`
+**Web**: `GET /demo`
+**npm scripts**: `demo:play`, `demo:play:support`, `demo:play:compliance`, `demo:play:sales`
+
+**Tests: 4,921 passed, 0 failed** (+90 from 4,831)
+
+---
+
+### 2. What surprised me?
+
+The `speedMultiplier: 0` edge case in DemoPlayer required explicit handling — a naive `delay / speedMultiplier` formula divides by zero. The fix: detect `speedMultiplier === 0` in the `_delay()` helper and return `Promise.resolve()` immediately, yielding once to the microtask queue so the event loop stays coherent.
+
+The parallel agent approach worked well here — service/CLI agent and API/dashboard agent ran concurrently with a shared interface contract, then wired in `index.ts` with 4 lines. Build time ~16 minutes for 90 new tests.
+
+---
+
+### 3. Cross-project signals
+
+`DemoPlayer` + scripted turn sequences is a reusable pattern for any project that needs "offline showcase mode" — no external APIs, deterministic output, configurable speed. The `speedMultiplier` trick (0 = instant) is valuable for fast test execution on time-dependent replays.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **Integration test teardown fix** — `WebhookService.test.ts` force-exit warning
+2. **NEXUS split** — file approaching 10,500 lines (Q21)
+3. **Store async initialize refactor** — Q33
+4. **Stryker mutation refresh**
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q19–Q35 remain open. No new questions this cycle.
+
