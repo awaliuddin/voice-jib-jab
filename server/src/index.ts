@@ -117,6 +117,7 @@ import { createAuditEventsRouter } from "./api/auditEvents.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
 import { GracefulShutdown } from "./services/GracefulShutdown.js";
 import { createCorsMiddleware } from "./middleware/cors.js";
+import { RATE_LIMITS } from "./config/rateLimits.js";
 
 const app = express();
 const server = createServer(app);
@@ -287,13 +288,12 @@ export const recordingStore = new RecordingStore({
   retentionDays: Number.isFinite(recordingRetentionDays) ? recordingRetentionDays : 30,
 });
 
-// ── Rate limiters ────────────────────────────────────────────────────
-const adminLimiter = createRateLimiter({ windowMs: 60_000, max: 30, message: "Admin API rate limit exceeded" });
-const voiceLimiter = createRateLimiter({ windowMs: 60_000, max: 10, message: "Voice API rate limit exceeded" });
-const analyticsLimiter = createRateLimiter({ windowMs: 60_000, max: 60, message: "Analytics API rate limit exceeded" });
-const sessionsLimiter = createRateLimiter({ windowMs: 60_000, max: 60, message: "Sessions API rate limit exceeded" });
-// N-39: Auth endpoints are key-management surfaces — tighter limit prevents brute-force key creation.
-const authLimiter = createRateLimiter({ windowMs: 60_000, max: 20, message: "Auth API rate limit exceeded" });
+// ── Rate limiters (N-41: configs sourced from config/rateLimits.ts) ──
+const adminLimiter = createRateLimiter(RATE_LIMITS.admin);
+const voiceLimiter = createRateLimiter(RATE_LIMITS.voice);
+const analyticsLimiter = createRateLimiter(RATE_LIMITS.analytics);
+const sessionsLimiter = createRateLimiter(RATE_LIMITS.sessions);
+const authLimiter = createRateLimiter(RATE_LIMITS.auth);
 
 // Mount sessions API
 app.use("/sessions", sessionsLimiter, createSessionsRouter(sessionRecorder));
