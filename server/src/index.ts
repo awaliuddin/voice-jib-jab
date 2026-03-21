@@ -510,6 +510,12 @@ export const voiceTriggerService = new VoiceTriggerService(
 );
 app.use("/voice", voiceLimiter, createVoiceRouter(voiceTriggerService, `http://localhost:${config.port}`));
 
+// N-46: JSON 404 handler — catches any request that fell through all routes.
+// Must be mounted before the error handler so it produces a clean 404, not a 500.
+app.use((_req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
+
 // N-45: Global JSON error handler — must be mounted after all routes.
 // Converts unhandled Express errors to structured JSON; prevents HTML 500 leaking stack traces.
 app.use(jsonErrorHandler);

@@ -55,6 +55,7 @@
 | N-43 | Helmet.js Security Headers | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 | N-44 | Request Body Size Limit (256 KB) | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 | N-45 | Global JSON Error Handler | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
+| N-46 | JSON 404 Handler (catch-all) | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 
 ---
 
@@ -158,7 +159,7 @@
 **Shipped scope**: Load test (200 concurrent WS sessions, p95 TTFB 126.7ms vs 1200ms SLA), SLA baseline, security audit (0 production vulns, 36 devDeps-only), secrets review (clean), production runbook (`RUNBOOK.md`), UAT guide (`UAT-Guide.md`). Monitoring/alerting deferred to production deployment (requires Prometheus/Grafana infrastructure).
 
 ### N-11: SIP Telephony
-**Pillar**: EXTENSIBILITY | **Status**: BUILDING | **Priority**: P1
+**Pillar**: EXTENSIBILITY | **Status**: SHIPPED | **Priority**: P1
 **What**: StubTelephonyAdapter v1 (testing). LiveKitSIPTelephonyAdapter for v2 (real SIP).
 **Research**: `docs/sip-telephony-research.md` — SIP.js recommended, `dgram`+`g711` codec bridge, Telnyx for production.
 **Phase 1 SHIPPED**: `SipTelephonyAdapter` interface + `StubSipTelephonyAdapter` + `SipBridgeService`. 27 tests. Zero existing file modifications.
