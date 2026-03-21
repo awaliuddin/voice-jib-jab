@@ -105,6 +105,10 @@ import { createHealthRouter } from "./api/health.js";
 import { healthMonitorDashboardHtml } from "./api/healthMonitorDashboard.js";
 import { createDemoRouter } from "./api/demo.js";
 import { demoDashboardHtml } from "./api/demoDashboard.js";
+import { TenantQuotaService } from "./services/TenantQuotaService.js";
+import { createQuotaRouter } from "./api/quota.js";
+import { WebhookRetryQueue } from "./services/WebhookRetryQueue.js";
+import { createWebhookRetryRouter } from "./api/webhookRetry.js";
 
 const app = express();
 const server = createServer(app);
@@ -132,6 +136,17 @@ app.get("/health", (_req, res) => {
     timestamp: new Date().toISOString(),
     sessions: sessionManager.getSessionCount(),
   });
+});
+
+// Readiness probe — for Kubernetes/load-balancer health checks.
+// Returns 503 during startup; 200 once all async initialization is complete.
+let serverReady = false;
+app.get("/ready", (_req, res) => {
+  if (serverReady) {
+    res.json({ ready: true, timestamp: new Date().toISOString() });
+  } else {
+    res.status(503).json({ ready: false, reason: "Server initializing" });
+  }
 });
 
 // Status endpoint
@@ -252,6 +267,10 @@ app.use("/admin", adminLimiter, createAdminRouter(tenantRegistry, systemConfigSt
 // ── Conversation Memory Store + API ─────────────────────────────────
 const memoryStore = initConversationMemoryStore(resolve(dirname(config.storage.databasePath), "memory"));
 app.use("/tenants", createMemoryRouter(memoryStore));
+
+// ── Per-Tenant Quota & Rate Limiting ─────────────────────────────────
+const tenantQuotaService = new TenantQuotaService(resolve(dirname(config.storage.databasePath), "tenant-quotas.json"));
+app.use("/tenants", createQuotaRouter(tenantQuotaService));
 
 // ── Voice Profile Store + Voices API ─────────────────────────────────
 const voiceProfileStore = initVoiceProfileStore(resolve(dirname(config.storage.databasePath), "voices"));
@@ -392,6 +411,13 @@ app.use("/onboarding", createOnboardingRouter(onboardingWizardService));
 
 // ── Webhook Management ────────────────────────────────────────────────
 const webhookService = initWebhookService(resolve(dirname(config.storage.databasePath), "webhooks.json"));
+// Retry queue — mount BEFORE existing webhooks router so static paths
+// (/queue, /dead-letter, /retry-stats, /process-queue) take priority over /:webhookId
+const webhookRetryQueue = new WebhookRetryQueue(
+  webhookService,
+  resolve(dirname(config.storage.databasePath), "webhook-retry.json"),
+);
+app.use("/webhooks", createWebhookRetryRouter(webhookRetryQueue));
 app.use("/webhooks", createWebhooksRouter(webhookService));
 
 // ── Capacity Planner ──────────────────────────────────────────────────
@@ -474,6 +500,7 @@ async function startServer(): Promise<void> {
   }
 
   server.listen(config.port, () => {
+    serverReady = true;
     console.log(
       "\n╔══════════════════════════════════════════════════════════╗",
     );

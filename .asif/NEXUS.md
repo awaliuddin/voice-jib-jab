@@ -35,6 +35,9 @@
 | N-23 | Real-Time Translation Pipeline | INTERACTION | SHIPPED | P1 | 2026-03-19 |
 | N-24 | Intent Detection — Smart Caller Routing | INTERACTION | SHIPPED | P1 | 2026-03-19 |
 | N-25 | Voice Pipeline Profiler | OBSERVABILITY | SHIPPED | P1 | 2026-03-19 |
+| N-26 | Per-Tenant Rate Limiting & Quota | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
+| N-27 | Webhook Retry Queue + Dead-Letter | EXTENSIBILITY | SHIPPED | P1 | 2026-03-21 |
+| N-28 | Kubernetes Readiness Probe | OBSERVABILITY | SHIPPED | P1 | 2026-03-21 |
 
 ---
 
@@ -1357,6 +1360,62 @@ Verification Stryker run confirmed: 218 killed, 11 timeout, 111 survived, 12 no-
 **Q38 RESOLVED**: Verification Stryker run confirmed LaneArbitrator 65.06% ✅. 10 targeted tests added this session killed survivors on lines 131, 213, 289, 412-413, 434, 438. All 3 files exceed thresholds.
 
 **Q39, Q40 still open.**
+
+---
+
+> Session: 2026-03-21 (check-in 101) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+| Commit | Deliverable | Tests |
+|--------|-------------|-------|
+| (this commit) | N-26: TenantQuotaService + quota routes + 51 tests | 3,940 → 3,991 |
+| (this commit) | N-27: WebhookRetryQueue + retry routes + 43 tests | 3,991 → 4,034 |
+| (this commit) | N-28: `GET /ready` k8s readiness probe (serverReady flag in index.ts) | — |
+
+**N-26 — Per-Tenant Rate Limiting & Quota Enforcement**:
+- `TenantQuotaService`: sliding window rate limiting per tenant (in-memory), monthly audio-minutes quota (JSON-persisted), per-tenant config (requestsPerMinute, maxConcurrentSessions, monthlyMinutesQuota)
+- Routes: `GET/PUT/DELETE /tenants/:id/quota`, `GET /tenants/:id/usage`, `POST /tenants/:id/usage/record`
+- Prior IP-based limiter still in place; this adds the tenant-level layer on top
+
+**N-27 — Webhook Retry Queue with Exponential Backoff**:
+- `WebhookRetryQueue`: wraps WebhookService, exponential backoff (1/2/4/8/16s), 5-attempt max before dead-letter promotion, JSON-persisted queue + dead-letter store
+- Routes: `GET /webhooks/queue`, `GET /webhooks/dead-letter`, `POST /webhooks/dead-letter/:id/retry`, `DELETE /webhooks/dead-letter/:id`, `GET /webhooks/retry-stats`, `POST /webhooks/process-queue`
+- Static routes registered before `/:webhookId` to avoid Express shadowing
+
+**N-28 — Kubernetes Readiness Probe**:
+- `GET /ready` returns 503 during startup, 200 after `server.listen()` callback fires
+- `GET /health` unchanged (liveness probe, always 200)
+
+---
+
+### 2. What surprised you?
+
+The CoS had 25 idle-cycle triggers to work with but the actual enterprise gaps were straightforward once I read the code. The `WebhookService.deliver()` was genuinely fire-and-forget with no retry path — one failed HTTP call and the event is permanently lost. The rate limiter was IP-only with no tenant awareness despite the multi-tenant architecture being fully built. Both are real production blockers for enterprise deployment.
+
+**Express routing order is load-bearing** for `/webhooks`. The `WebhookRetryQueue` router must be mounted BEFORE `createWebhooksRouter` or the parameterised `/:webhookId` handler eats `/queue`, `/dead-letter`, etc. This is the third time this pattern has appeared in this project (flows.ts had the same issue).
+
+---
+
+### 3. Cross-project signals?
+
+**Express static-before-parameterised** is a recurring gotcha across this project (flows.ts, webhooks.ts, now webhookRetry.ts). Any ASIF project with Express routers that mix static paths and `/:id` parameters needs this documented — it's easy to get right but catastrophic when wrong (silent 404s or wrong handler).
+
+**Retry queue pattern** (`enqueue → processQueue → dead-letter → manual retry`) is a reusable pattern. The `WebhookRetryQueue` in this project could be extracted to a shared ASIF utility for any service that needs guaranteed delivery.
+
+---
+
+### 4. What would you prioritize next?
+
+1. **N-29: OpenTelemetry trace export** — PipelineProfiler has per-stage timing already; adding OTEL SDK would let enterprise ops teams see distributed traces in Datadog/Jaeger/Honeycomb. The spans are already measured, just need exporting.
+2. **Q40 — IntentClassifier word-boundary fix** — still S-sized and still correct; just needs auth.
+3. **Q39 — Dependabot dismissal** — still a one-liner.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+None on N-26/N-27/N-28 — all shipped clean. Q39/Q40 still pending. Ready for next directive.
 
 ---
 
