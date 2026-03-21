@@ -61,6 +61,7 @@
 | N-49 | Branch Coverage — VoiceTriggerService + Database | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-50 | Branch Coverage — GracefulShutdown + validate + complianceDashboard | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-51 | Branch Coverage — laneC_control + tenantMigration error paths | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
+| N-52 | API Coverage — supervisor + webhookRetry + voices (0%→100%) | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 
 ---
 
