@@ -11959,3 +11959,65 @@ Q38, Q39, Q40 remain open. Q42 resolved. Dashboard: 32/32 SHIPPED.
 ### 5. Blockers / Questions for CoS
 
 Q38, Q39, Q40 remain open. Dashboard: 33/33 SHIPPED.
+
+---
+
+> Session: 2026-03-21 (check-in 70) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship since last check-in?
+
+| Commit | Deliverable | Tests |
+|--------|-------------|-------|
+| `87249c2` | N-34: Remaining Route Protection Sweep — guard extended to 26 new paths | 4,152 → 4,168 (+16) |
+| `4547886` | CI fix: SessionManager flaky test — `localStorage` pre-seed + `runAllTimersAsync` | 0 net |
+| `b039fb3` | N-35: IntentClassifier word-boundary fix (Q40 resolved) | 4,168 → 4,179 (+11) |
+
+**N-34 — Remaining Route Protection Sweep** (P1, GOVERNANCE):
+- Extended `requireApiKey` guard from 8 → 34 paths covering all enterprise config/data routes: `/templates`, `/language`, `/ivr`, `/quality`, `/playbooks`, `/voiceprints`, `/personas`, `/flows`, `/translation`, `/intents`, `/abtests`, `/validate`, `/search`, `/sla`, `/kb-search`, `/training`, `/compare-agents`, `/compliance-dashboard`, `/onboarding`, `/capacity`, `/skills`, `/agent-versions`, `/routing`, `/supervisor`, `/voice`, `/voices`
+- `RemainingRoutesAuth.test.ts` — 16 tests: 401 on 10 spot-check paths, 200 with valid key, auth-disabled bypass, exhaustive 401 sweep of all 27 N-34 paths in one test
+
+**CI fix — SessionManager flaky test**:
+- Root cause: first test in a cold jsdom environment calling `initialize()` raced against `vi.runAllTimersAsync()`. `crypto.subtle.digest()` (used by `getPersistedFingerprint()`) takes multiple microtask ticks; `runAllTimersAsync()` only drains one pass, so `MockWebSocket setTimeout(0)` was scheduled *after* the timer drain and never fired — 5s timeout every CI run on a fresh environment.
+- Fix: pre-seed `localStorage.setItem("vjj-fingerprint", ...)` in `beforeEach` so the fast localStorage path is always taken (1 microtask tick). Also replaced the fragile manual loop (`5 × advanceTimersByTimeAsync(0)`) with `runAllTimersAsync()` for consistency.
+- Downstream note: this class of bug (timer race on cold jsdom) is invisible locally because subsequent warm-environment test runs have the cached value.
+
+**N-35 — IntentClassifier Word-Boundary Fix** (Q40 resolved, INTERACTION):
+- `lower.includes(keyword)` was matching short keywords inside longer words: `"pay"` inside `"payment"`, `"bug"` inside `"debug"`, `"fail"` inside `"failure"`, `"bill"` inside `"billing"`, `"plan"` inside `"planning"`.
+- Fix: pre-compiled `KEYWORD_PATTERNS` using `\b...\b` regex anchors at module load. Zero runtime overhead — patterns built once, reused on every `classify()` call. Multi-word phrases (`"credit card"`, `"not working"`) also get boundary guards.
+- 11 regression tests in `describe("word-boundary matching")`.
+
+**Test delta**: 4,152 → 4,179 (+27). 135 suites. Pre-push: PASSED. Dashboard: 35/35 SHIPPED.
+
+---
+
+### 2. What surprised me?
+
+**The CI flaky test was invisible locally for an elegant reason.** When the first test in the file fails (5s timeout), `crypto.subtle.digest()` has long since completed — it writes the fingerprint to `localStorage` before the timeout fires. So every subsequent test in the file finds a cached fingerprint and passes. The failure only manifests on the first test in a fresh jsdom session, which is exactly what CI always is. Locally, the fingerprint persists across test runs in the same jsdom lifecycle. The fix (pre-seed in `beforeEach`) is idempotent and the right defensive pattern for any test that depends on cached browser storage.
+
+**Word-boundary regex pre-compilation is essentially free.** The KEYWORD_PATTERNS table is built once at module load over ~52 keywords. Compared to creating `new RegExp(...)` on every `classify()` call, this avoids object allocation on every scored utterance. The existing test suite had a comment explicitly acknowledging the `"payment"/"pay"` bug (line 247: `// "subscription" avoids the "payment"/"pay" substring overlap`) — the workaround had been documented but the root cause never fixed. Q40 was the right call.
+
+---
+
+### 3. Cross-project signals
+
+**Cold-jsdom timer races are a portfolio-wide test reliability hazard.** Any project that combines `vi.useFakeTimers()` with `async` functions that call `crypto.subtle`, `fetch`, or other Web API Promises will hit this class of flakiness on CI. The pattern: `vi.runAllTimersAsync()` only drains *currently scheduled* timers at the time of the call; if an async function hasn't yet reached the `new MockWebSocket()` / timer-schedule point when `runAllTimersAsync()` is called, those timers are never fired. Mitigation: pre-seed any browser storage/cache that would be populated by async initialization, or add explicit `await Promise.resolve()` passes before advancing fake timers.
+
+**Word-boundary keyword matching is the right default for any NLP intent system.** Substring matching is a footgun — it produces false positives proportional to vocabulary density. Any ASIF project doing keyword scoring (e.g. a support triage classifier, a sentiment keyword extractor) should use `\bkeyword\b` regexes rather than `String.includes()`. Pre-compile at module load, not per-call.
+
+---
+
+### 4. What would I prioritize next?
+
+1. **Q39 — Dependabot CVE triage** — authorization to run `npm audit` and assess the 3 flagged devDep CVEs. Still outstanding. One `npm audit fix --only=dev` likely resolves all three.
+2. **N-36: Audit event enrichment** — the `AuditEventLogger` currently logs minimal fields (`type`, `tenantId`, `detail`). Enriching with `routePath`, `keyId`, `ipAddress` from the Express `req` object would make audit logs actionable for compliance review without a schema change.
+3. **N-37: Health monitor webhook alerting validation** — `HealthMonitorService` has a `webhookUrl` config but no test verifies the actual HTTP call fires on threshold breach. A targeted integration test would close this gap.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+**Q39** (Dependabot CVE triage, 3 devDep findings) — still awaiting authorization. Trivial to execute: one `npm audit` run + targeted fix. Unblocked by any other work.
+
+**Q41** — N-34 extended the guard to 34 routes including `/voice`. Should `/voice` be public (it's used by the real-time voice loop and may need unauthenticated access from the browser client) or gated (enterprise deployments should require a key)? Currently gated. If the voice loop needs unauthenticated access, I should carve it out. Requesting CoS call.
+
+Dashboard: 35/35 SHIPPED.
