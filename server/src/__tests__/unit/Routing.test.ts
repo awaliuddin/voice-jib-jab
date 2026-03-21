@@ -532,3 +532,94 @@ describe("Routing API Endpoints", () => {
     });
   });
 });
+
+// ── Branch coverage: uncovered source paths ───────────────────────────────────
+
+describe("Routing API — branch coverage", () => {
+  let engine: ReturnType<typeof makeMockEngine>;
+  let queue: ReturnType<typeof makeMockQueue>;
+  let server: Server;
+
+  beforeAll((done) => {
+    engine = makeMockEngine();
+    queue = makeMockQueue();
+    const app = buildApp(engine as unknown as RoutingEngine, queue as unknown as CallQueueService);
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(done);
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // ── POST /routing/rules — conditions is a string (not object) ─────────────
+
+  describe("POST /routing/rules — conditions type guard", () => {
+    it("returns 400 when conditions is a string (not an object)", async () => {
+      const res = await httpRequest(server, "POST", "/routing/rules", {
+        tenantId: "tenant-acme",
+        priority: 10,
+        conditions: "invalid-string",
+        targetTemplateId: "tmpl-default",
+        active: true,
+      });
+      expect(res.status).toBe(400);
+      const body = res.json() as { error: string };
+      expect(body.error).toContain("conditions");
+    });
+  });
+
+  // ── PUT /routing/rules/:ruleId — tenantId null ────────────────────────────
+
+  describe("PUT /routing/rules/:ruleId — tenantId: null", () => {
+    it("sets tenantId to null in the patch when body.tenantId is null", async () => {
+      engine.getRule.mockReturnValue(SAMPLE_RULE as never);
+      const updatedRule = { ...SAMPLE_RULE, tenantId: null };
+      engine.updateRule.mockReturnValue(updatedRule as never);
+
+      const res = await httpRequest(server, "PUT", "/routing/rules/rule-001", { tenantId: null });
+
+      expect(res.status).toBe(200);
+      expect(engine.updateRule).toHaveBeenCalledWith(
+        "rule-001",
+        expect.objectContaining({ tenantId: null }),
+      );
+    });
+  });
+
+  // ── PUT /routing/rules/:ruleId — conditions is null ──────────────────────
+
+  describe("PUT /routing/rules/:ruleId — conditions: null", () => {
+    it("succeeds (200) but does not include conditions in the patch when body.conditions is null", async () => {
+      engine.getRule.mockReturnValue(SAMPLE_RULE as never);
+      engine.updateRule.mockReturnValue(SAMPLE_RULE as never);
+
+      const res = await httpRequest(server, "PUT", "/routing/rules/rule-001", { conditions: null });
+
+      expect(res.status).toBe(200);
+      const patch = (engine.updateRule.mock.calls[0] as unknown[])[1] as Record<string, unknown>;
+      expect(patch).not.toHaveProperty("conditions");
+    });
+  });
+
+  // ── PUT /routing/rules/:ruleId — conditions is a string ──────────────────
+
+  describe("PUT /routing/rules/:ruleId — conditions: string", () => {
+    it("succeeds (200) but does not include conditions in the patch when body.conditions is a string", async () => {
+      engine.getRule.mockReturnValue(SAMPLE_RULE as never);
+      engine.updateRule.mockReturnValue(SAMPLE_RULE as never);
+
+      const res = await httpRequest(server, "PUT", "/routing/rules/rule-001", {
+        conditions: "string-value",
+      });
+
+      expect(res.status).toBe(200);
+      const patch = (engine.updateRule.mock.calls[0] as unknown[])[1] as Record<string, unknown>;
+      expect(patch).not.toHaveProperty("conditions");
+    });
+  });
+});

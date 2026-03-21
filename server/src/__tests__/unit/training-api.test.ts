@@ -530,3 +530,127 @@ describe("Training API — validation branch coverage", () => {
     expect(body.error).toContain("name");
   });
 });
+
+// ── Branch coverage: whitespace strings and malformed filter values ────────────
+
+describe("Training API — whitespace + malformed filter branch coverage", () => {
+  let server: Server;
+
+  beforeEach((done) => {
+    jest.clearAllMocks();
+    server = createServer(buildApp());
+    server.listen(0, "127.0.0.1", done);
+  });
+
+  afterEach((done) => {
+    server.close(done);
+  });
+
+  const req = (method: string, path: string, body?: unknown) =>
+    httpRequest(server, method, `/training${path}`, body);
+
+  // ── POST /annotations — whitespace-only sessionId (line ~32 requireString) ──
+
+  it("POST /annotations returns 400 for whitespace-only sessionId", async () => {
+    const res = await req("POST", "/annotations", {
+      sessionId: "   ",
+      turnIndex: 0,
+      speaker: "user",
+      text: "hello",
+    });
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toContain("sessionId");
+  });
+
+  // ── POST /annotations — whitespace-only text (line ~32 requireString) ───────
+
+  it("POST /annotations returns 400 for whitespace-only text", async () => {
+    const res = await req("POST", "/annotations", {
+      sessionId: "sess-1",
+      turnIndex: 0,
+      speaker: "user",
+      text: "   ",
+    });
+
+    expect(res.status).toBe(400);
+    const body = res.json() as { error: string };
+    expect(body.error).toContain("text");
+  });
+
+  // ── POST /datasets — filters.labels is not an array (line ~225) ─────────────
+
+  it("POST /datasets ignores non-array filters.labels and returns 201", async () => {
+    mockSvc.buildDataset.mockReturnValue(DATASET_1);
+
+    const res = await req("POST", "/datasets", {
+      name: "DS",
+      filters: { labels: "not-array" },
+    });
+
+    expect(res.status).toBe(201);
+    const calledFilters = mockSvc.buildDataset.mock.calls[0][1] as Record<string, unknown>;
+    expect(calledFilters).not.toHaveProperty("labels");
+  });
+
+  // ── POST /datasets — filters.sessionIds is not an array (line ~226) ─────────
+
+  it("POST /datasets ignores non-array filters.sessionIds and returns 201", async () => {
+    mockSvc.buildDataset.mockReturnValue(DATASET_1);
+
+    const res = await req("POST", "/datasets", {
+      name: "DS",
+      filters: { sessionIds: 42 },
+    });
+
+    expect(res.status).toBe(201);
+    const calledFilters = mockSvc.buildDataset.mock.calls[0][1] as Record<string, unknown>;
+    expect(calledFilters).not.toHaveProperty("sessionIds");
+  });
+
+  // ── POST /datasets — filters.from is not a string (line ~227) ───────────────
+
+  it("POST /datasets ignores non-string filters.from and returns 201", async () => {
+    mockSvc.buildDataset.mockReturnValue(DATASET_1);
+
+    const res = await req("POST", "/datasets", {
+      name: "DS",
+      filters: { from: 123 },
+    });
+
+    expect(res.status).toBe(201);
+    const calledFilters = mockSvc.buildDataset.mock.calls[0][1] as Record<string, unknown>;
+    expect(calledFilters).not.toHaveProperty("from");
+  });
+
+  // ── POST /datasets — filters.to is not a string (line ~228) ─────────────────
+
+  it("POST /datasets ignores non-string filters.to and returns 201", async () => {
+    mockSvc.buildDataset.mockReturnValue(DATASET_1);
+
+    const res = await req("POST", "/datasets", {
+      name: "DS",
+      filters: { to: null },
+    });
+
+    expect(res.status).toBe(201);
+    const calledFilters = mockSvc.buildDataset.mock.calls[0][1] as Record<string, unknown>;
+    expect(calledFilters).not.toHaveProperty("to");
+  });
+
+  // ── POST /datasets — filters.tenantId is not a string (line ~229) ───────────
+
+  it("POST /datasets ignores non-string filters.tenantId and returns 201", async () => {
+    mockSvc.buildDataset.mockReturnValue(DATASET_1);
+
+    const res = await req("POST", "/datasets", {
+      name: "DS",
+      filters: { tenantId: {} },
+    });
+
+    expect(res.status).toBe(201);
+    const calledFilters = mockSvc.buildDataset.mock.calls[0][1] as Record<string, unknown>;
+    expect(calledFilters).not.toHaveProperty("tenantId");
+  });
+});

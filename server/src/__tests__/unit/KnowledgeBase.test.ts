@@ -364,6 +364,70 @@ describe("KnowledgeBaseStore", () => {
   });
 });
 
+// ── Branch Coverage: KnowledgeBaseStore edge cases ────────────────────
+
+describe("KnowledgeBaseStore — branch coverage", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = tempDir("branch");
+    mkdirSync(dir, { recursive: true });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    if (existsSync(dir)) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("loadTenant() re-throws non-ENOENT errors (e.g. EACCES)", () => {
+    // Step 1: Use a real store to write a tenant file to disk.
+    const realStore = new KnowledgeBaseStore(dir);
+    realStore.addEntry({ tenantId: "org_eacces", question: "Q?", answer: "A" });
+
+    // Step 2: Spy on readFileSync to throw EACCES for any path.
+    // A fresh store instance has an empty cache, so listEntries will
+    // call loadTenant → readFileSync → should propagate the error.
+    const fs = require("fs") as typeof import("fs");
+    const throwingSpy = jest.spyOn(fs, "readFileSync").mockImplementation(() => {
+      const err = Object.assign(new Error("Permission denied"), { code: "EACCES" });
+      throw err;
+    });
+
+    const restrictedStore = new KnowledgeBaseStore(dir);
+    expect(() => restrictedStore.listEntries("org_eacces")).toThrow("Permission denied");
+
+    throwingSpy.mockRestore();
+  });
+
+  it("incrementHit() with nonexistent id returns void without throwing", () => {
+    const store = new KnowledgeBaseStore(dir);
+    expect(() => store.incrementHit("nonexistent-id")).not.toThrow();
+  });
+
+  it("search() with empty string returns empty array", () => {
+    const store = new KnowledgeBaseStore(dir);
+    store.addEntry({ tenantId: "org_srch", question: "Meaningful question?", answer: "A" });
+    const results = store.search("org_srch", "");
+    expect(results).toEqual([]);
+  });
+
+  it("search() with only stopwords returns empty array", () => {
+    const store = new KnowledgeBaseStore(dir);
+    store.addEntry({ tenantId: "org_srch2", question: "Meaningful question?", answer: "A" });
+    const results = store.search("org_srch2", "the a an or");
+    expect(results).toEqual([]);
+  });
+
+  it("clearTenant() when no file exists on disk does not throw", () => {
+    const store = new KnowledgeBaseStore(dir);
+    // Never add any entries — no file is written for this tenant
+    expect(() => store.clearTenant("org_never_written")).not.toThrow();
+    expect(store.listEntries("org_never_written")).toEqual([]);
+  });
+});
+
 // ── Unit Tests: FaqExtractor ──────────────────────────────────────────
 
 describe("FaqExtractor", () => {
