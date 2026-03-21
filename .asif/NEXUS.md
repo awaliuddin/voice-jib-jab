@@ -57,6 +57,7 @@
 | N-45 | Global JSON Error Handler | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 | N-46 | JSON 404 Handler (catch-all) | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 | N-47 | Structured Access Logger | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
+| N-48 | Property-Based Testing (fast-check) | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 
 ---
 
@@ -12444,3 +12445,43 @@ This also completes the full roadmap. Every initiative from N-01 through N-47 is
 **Q42 (new)** — The roadmap is complete (47/47). No standing backlog remains. Recommend the CoS either: (a) issue a new directive batch for the next phase, or (b) confirm the project enters maintenance mode with CRUCIBLE self-improvement as the standing idle protocol. Awaiting direction before self-starting new features.
 
 Dashboard: 47/47 SHIPPED.
+
+---
+
+### Check-in 80 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-48: Property-Based Testing (fast-check)** — closed the oracle gap identified in CRUCIBLE audit. Installed `fast-check@4.6.0`. Created two new test files:
+
+- `IntentClassifier.property.test.ts` — 12 properties covering: confidence ∈ [0,1], fallback↔intent=general invariant, low-confidence→fallback, scores are non-negative integers, general score always 0, empty string = general fallback, whitespace padding doesn't change outcome, winner has max score, billing keywords raise billing score, determinism, score ≤ keyword count ceiling, no-word-char input = confidence 0. 500 runs each.
+- `AllowedClaimsRegistry.property.test.ts` — 11 properties covering: similarity score ∈ [0,1], empty registry = 0, size matches claims injected, getAllClaims() length matches size, getDisallowedPatterns() length matches injected, empty query in-range, defensive copy immutability, all injected IDs retrievable, determinism, plus two example-based edge cases. 200–300 runs each.
+
+23 new tests. 4,316 → 4,339. 147 test suites. Dashboard: 48/48 SHIPPED.
+
+#### 2. What surprised me?
+
+**TF-IDF IDF collapses to 0 for single-document corpora.** My first attempt at "P: exact text match → score > 0" failed fast-check immediately. With one claim in the registry, every term in that claim has IDF = log(1/1) = 0. The TF-IDF vector is the zero vector. Cosine similarity of zero vectors returns 0 by definition (guarded in `cosineSimilarity()`). A property asserting score > 0 for exact matches is mathematically wrong for single-claim registries. Fixed by requiring ≥ 3 claims with distinct vocabulary in an example-based test rather than a universal property.
+
+**`enableFileLoad` default silently merges on-disk patterns.** P5 (disallowedPatterns count) failed because the constructor conditionally loads from the catalog file when `disallowedPatterns.length === 0`, even when claims are injected explicitly. The fix was `enableFileLoad: false` in the property test helper — but this also means any test creating a registry with empty patterns and relying on the default config could have non-obvious count behaviour. Worth a comment in the constructor.
+
+#### 3. Cross-project signals
+
+**fast-check works cleanly with Jest + ts-jest ESM.** No config changes were needed beyond `npm install`. The import `import * as fc from "fast-check"` works as-is. This is directly portable to any ASIF TypeScript/Jest project (dx3, synapps, content-engine).
+
+**The TF-IDF zero-vector edge case is a silent correctness guarantee.** `cosineSimilarity()` guards against zero vectors (`if (normA === 0 || normB === 0) return 0`). Any ASIF project using cosine similarity should have the same guard — without it you get `NaN` propagation.
+
+**Property tests found no bugs — but they documented real invariants.** P12 (no-word-char → confidence 0) and P7 (whitespace padding invariant) are behavioural contracts that example tests never explicitly encoded. Now they're machine-checked on 200+ random inputs per run.
+
+#### 4. What would I prioritize next?
+
+1. **VoiceTriggerService branch coverage** — 62.5% (lines 105-128, 157-158). CRUCIBLE fix #2. Trigger-fire paths with no coverage in a latency-sensitive audio service.
+2. **Database.ts branch coverage** — 68.18% (lines 49, 59, 78, 95). CRUCIBLE fix #3. Storage error-path branches.
+3. **Await CoS response to Q42** — direction on next phase vs maintenance mode.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture. No change.
+**Q42 (open)** — Next directive batch or maintenance mode? No response yet.
+
+Dashboard: 48/48 SHIPPED.
