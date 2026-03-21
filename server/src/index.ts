@@ -131,8 +131,10 @@ if (rawTrustProxy !== undefined && rawTrustProxy !== "") {
   app.set("trust proxy", Number.isInteger(numericProxy) && numericProxy >= 0 ? numericProxy : rawTrustProxy);
 }
 
-// Middleware
-app.use(express.json());
+// Middleware — N-44: explicit 256 KB body size limit prevents oversized-payload DoS.
+// Default Express limit is 100 KB (undocumented); being explicit makes the policy reviewable.
+// Clients that exceed the limit receive 413 Payload Too Large with a JSON error body.
+app.use(express.json({ limit: "256kb" }));
 
 // Request correlation ID — must be first so all subsequent handlers have req.requestId
 app.use(requestIdMiddleware);

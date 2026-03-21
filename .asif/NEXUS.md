@@ -53,6 +53,7 @@
 | N-41 | Rate Limiter Config Constants | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-42 | Trust Proxy Configuration | GOVERNANCE | SHIPPED | P0 | 2026-03-21 |
 | N-43 | Helmet.js Security Headers | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
+| N-44 | Request Body Size Limit (256 KB) | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 
 ---
 
@@ -175,11 +176,11 @@
 **E2E SHIPPED**: `MultiTenantE2E.test.ts` — 24 tests, dual-tenant isolation across all 3 phases. Map.get O(1) < 0.1ms.
 
 ### N-15: Dense Embedding Similarity for Claims
-**Pillar**: GOVERNANCE | **Status**: IDEA | **Priority**: P2
+**Pillar**: GOVERNANCE | **Status**: SHIPPED | **Priority**: P2
 **What**: Replace `AllowedClaimsRegistry.getSimilarityScore()` TF-IDF internals with `all-MiniLM-L6-v2` ONNX (22MB, in-process, offline). Handles paraphrasing that TF-IDF misses ("response is instant" ≈ "latency is near zero"). `OpaClaimsCheck` interface unchanged — swap is internal to `getSimilarityScore()`. Must work offline (no OpenAI embeddings API — policy engine must be local-first).
 
 ### N-14: Lane C v2: Semantic Governance
-**Pillar**: GOVERNANCE | **Status**: BUILDING | **Priority**: P2
+**Pillar**: GOVERNANCE | **Status**: SHIPPED | **Priority**: P2
 **What**: Tier 2 semantic moderation (OpenAI Moderation API) for subtle/context-dependent violations. Embedding similarity for claims matching (vs. word-overlap). OPA integration (PI-002) for declarative policy rules. Successor to N-07 v1 scope.
 
 **Phase 3 SHIPPED (2026-03-07)**:

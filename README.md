@@ -2,7 +2,7 @@
 
 A production voice agent runtime that eliminates the two things that kill enterprise voice deployments: **bad latency** and **ungoverned output**. Browser-based and SIP-ready speech-to-speech assistant with three-lane orchestration, async policy enforcement, retrieval-augmented generation, and a full enterprise feature stack.
 
-**Status:** 43/43 initiatives SHIPPED | 4,280 server tests | 92%+ coverage
+**Status:** 44/44 initiatives SHIPPED | 4,287 server tests | 92%+ coverage
 
 ---
 
