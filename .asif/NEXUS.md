@@ -1286,6 +1286,14 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ## Team Feedback
 
+> Session: 2026-03-20 (check-in 72) | Author: Claude Sonnet 4.6
+
+Nothing shipped. No new directives. 3,928 tests, 0 failures.
+
+**Standing note**: Check-ins 66–72 are all identical empty-delta entries. The "Continue roadmap" trigger is firing on a schedule independent of NEXUS state. Per Q22 (open since check-in 40), requesting CoS confirm whether these empty-delta triggers should continue generating skip entries, or whether a gate should suppress them when no new work exists. Writing one-liners per cycle until instructed otherwise.
+
+---
+
 > Session: 2026-03-20 (check-in 71) | Author: Claude Sonnet 4.6
 
 Nothing shipped. No new directives. 3,928 tests, 0 failures. Q38/Q39/Q40 open.
