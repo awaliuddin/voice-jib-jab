@@ -12145,3 +12145,43 @@ Commit: `e214420`. Dashboard: 39/39 SHIPPED.
 **Q44** — `trust proxy` posture: does production voice-jib-jab run behind a reverse proxy or Kubernetes ingress? If yes, `app.set("trust proxy", true)` should be added immediately — all per-IP rate limiting (including N-39, N-26) is currently operating on `127.0.0.1` for proxied requests, meaning one IP can exhaust the budget for all clients. Requesting CoS call on deployment topology.
 
 Dashboard: 39/39 SHIPPED.
+
+---
+
+### Check-in 74 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-40: CORS Hardening** — replaced the inline `Access-Control-Allow-Origin: *` block with `createCorsMiddleware` reading `ALLOWED_ORIGINS` env var. Wildcard remains the default (backward-compatible). Allowlist mode reflects the matched `Origin` with `Vary: Origin`, rejects unlisted origins with 403 before route handlers, and terminates `OPTIONS` pre-flight with 204. Server-to-server requests (no `Origin` header) pass through. Also adds `Access-Control-Allow-Methods` and `X-Request-ID` to `Access-Control-Allow-Headers`. 15 tests in `Cors.test.ts`. +15 → 4,241 total. Commit: `daf3526`.
+
+**N-41: Rate Limiter Config Constants** — extracted all five inline `createRateLimiter({...})` literals in `index.ts` to `config/rateLimits.ts` as the `RATE_LIMITS` object with `satisfies RateLimiterOptions` type enforcement and inline ops comments. 24 tests in `RateLimits.test.ts` assert exact production values and security invariants (voice is strictest, auth < admin, all windows consistent). Any silent limit change is now a deliberate, test-breaking commit. +24 → 4,265 total. Commit: `7ae36df`.
+
+Dashboard: 41/41 SHIPPED.
+
+#### 2. What surprised me?
+
+**`satisfies` is the right TypeScript operator for config objects, not type annotations.** Using `satisfies RateLimiterOptions` retains the narrow literal type (`max: 20`) while still validating the shape. A type annotation (`const auth: RateLimiterOptions = {...}`) would widen `20` to `number`, breaking precise test assertions. This is the correct pattern for any config-constants file.
+
+**CORS `Vary: Origin` is non-obvious but required for correct proxy/CDN caching.** When a server reflects the request `Origin` rather than `*`, caches must be told the response varies by origin — otherwise a cached response for `https://app.example.com` could be served to `https://admin.example.com` with the wrong `ACAO` header. Omitting `Vary: Origin` is a silent correctness bug that only surfaces in CDN-cached environments and is extremely hard to diagnose from browser devtools alone.
+
+#### 3. Cross-project signals
+
+**`satisfies` over type annotation for config constants** — any ASIF project with a constants file (rate limits, timeouts, feature flags) should use `satisfies` to retain literal types. Applicable to `reflexWhitelist.ts` in this project and any config files in dx3/Podcast-Pipeline.
+
+**`CORS + Vary: Origin` is a CDN footgun** — any project that deploys behind Cloudflare, CloudFront, or nginx caching and uses a CORS allowlist must set `Vary: Origin`. The `createCorsMiddleware` from this project handles it correctly and is directly portable.
+
+#### 4. What would I prioritize next?
+
+1. **N-42: `trust proxy` configuration** — Q44 is open but this is high-confidence: the server runs behind K8s ingress (N-28 shipped a readiness probe). Without `app.set("trust proxy", true)`, all per-IP rate limiters see `127.0.0.1` for every request — one client exhausts the budget for all. P0 correctness issue. ~10 lines + 5 tests.
+2. **N-43: Helmet.js security headers audit** — `securityHeaders.ts` sets headers manually. A Helmet.js integration would add CSP, HSTS, Referrer-Policy, Permissions-Policy in one pass. M-sized, high security value.
+3. **CRUCIBLE Gate 2 idle audit** — 4,265 tests; a non-empty assertion sweep on the N-3x sprint additions would close any hollow assertions introduced under shipping pressure.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture. No change without CoS call.
+
+**Q44 (open)** — `trust proxy` deployment topology.
+
+**Q45** — Standing auth request for N-42 (`trust proxy`). Given N-28 K8s readiness probe already exists, the deployment is almost certainly proxied. Requesting auth to self-start N-42 on next "Continue roadmap" trigger without a formal directive.
+
+Dashboard: 41/41 SHIPPED.
