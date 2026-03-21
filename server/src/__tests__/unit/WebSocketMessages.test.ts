@@ -1452,3 +1452,414 @@ describe("JSON parse error", () => {
     );
   });
 });
+
+// ────────────────────────────────────────────────────────────────────
+// WebSocketServer — optional service injection (branch coverage)
+// ────────────────────────────────────────────────────────────────────
+
+/** Helper: create a VoiceWebSocketServer with injected optional services,
+ *  then simulate a new client connection. Returns the server and the mock WS. */
+async function setupConnectionWithServices(services: {
+  memoryStore?: any;
+  voiceProfileStore?: any;
+  kbStore?: any;
+  verificationService?: any;
+} = {}) {
+  const server = new VoiceWebSocketServer(
+    {},                         // server
+    undefined,                  // opaEvaluator
+    undefined,                  // sessionRecorder
+    undefined,                  // voiceTriggerService
+    services.memoryStore,
+    services.voiceProfileStore,
+    services.kbStore,
+    services.verificationService,
+  );
+  // Find the "connection" handler registered by this constructor call.
+  // mockWssOn accumulates calls across all instances, so grab the latest pair.
+  const connectionCalls = mockWssOn.mock.calls.filter(([e]: [string]) => e === "connection");
+  const connectionHandler = connectionCalls[connectionCalls.length - 1]?.[1];
+  const mockWs = createMockWs();
+  await connectionHandler(mockWs);
+  return { server, mockWs };
+}
+
+/** Extract the rag.result event-bus handler registered during the last connection. */
+function getRagResultHandler(): ((event: any) => void) | undefined {
+  const ragCalls = mockEventBus.on.mock.calls.filter(([e]: [string]) => e === "rag.result");
+  return ragCalls[ragCalls.length - 1]?.[1];
+}
+
+describe("WebSocketServer — optional service injection (branch coverage)", () => {
+  // ── STT user_transcript event via laneB EventEmitter ──────────────
+  describe("STT segment callback (laneB user_transcript event)", () => {
+    it("L490: persists transcript when enablePersistentMemory=true and isFinal=true", async () => {
+      (config as any).features.enablePersistentMemory = true;
+      const mockTranscript = {
+        save: jest.fn(),
+        getSessionTurnCount: jest.fn(() => 1),
+        cleanupNonFinal: jest.fn(),
+      };
+      (getTranscriptStore as jest.Mock).mockReturnValue(mockTranscript);
+
+      const { mockWs: _ws } = await setupConnection();
+
+      mockLaneB.emit("user_transcript", {
+        text: "hello",
+        isFinal: true,
+        confidence: 0.9,
+        timestamp: Date.now(),
+      });
+
+      expect(mockTranscript.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: "test-session-id",
+          role: "user",
+          content: "hello",
+          isFinal: true,
+        }),
+      );
+
+      (config as any).features.enablePersistentMemory = false;
+    });
+
+    it("L495: userId defaults to undefined (null || undefined) when not set", async () => {
+      (config as any).features.enablePersistentMemory = true;
+      const mockTranscript = {
+        save: jest.fn(),
+        getSessionTurnCount: jest.fn(() => 1),
+        cleanupNonFinal: jest.fn(),
+      };
+      (getTranscriptStore as jest.Mock).mockReturnValue(mockTranscript);
+
+      // Do NOT send session.start with fingerprint — userId stays null
+      await setupConnection();
+
+      mockLaneB.emit("user_transcript", {
+        text: "hello",
+        isFinal: true,
+        confidence: 0.9,
+        timestamp: Date.now(),
+      });
+
+      expect(mockTranscript.save).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: undefined }),
+      );
+
+      (config as any).features.enablePersistentMemory = false;
+    });
+
+    it("L490: does NOT persist transcript when isFinal=false", async () => {
+      (config as any).features.enablePersistentMemory = true;
+      const mockTranscript = {
+        save: jest.fn(),
+        getSessionTurnCount: jest.fn(() => 0),
+        cleanupNonFinal: jest.fn(),
+      };
+      (getTranscriptStore as jest.Mock).mockReturnValue(mockTranscript);
+
+      await setupConnection();
+
+      mockLaneB.emit("user_transcript", {
+        text: "partial",
+        isFinal: false,
+        confidence: 0.5,
+        timestamp: Date.now(),
+      });
+
+      expect(mockTranscript.save).not.toHaveBeenCalled();
+
+      (config as any).features.enablePersistentMemory = false;
+    });
+
+    it("L515: logs escalation warning when sentimentTracker.shouldEscalate returns true", async () => {
+      const { SentimentTracker: RealST } = jest.requireActual(
+        "../../services/SentimentTracker.js",
+      ) as any;
+      const shouldEscalateSpy = jest
+        .spyOn(RealST.prototype, "shouldEscalate")
+        .mockReturnValue(true);
+
+      await setupConnection();
+
+      mockLaneB.emit("user_transcript", {
+        text: "this is frustrating",
+        isFinal: true,
+        confidence: 0.85,
+        timestamp: Date.now(),
+      });
+
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Escalation triggered"),
+      );
+
+      shouldEscalateSpy.mockRestore();
+    });
+
+    it("L522: calls verificationService.scan when verificationService is injected and isFinal=true", async () => {
+      const mockVerificationService = {
+        scan: jest.fn().mockResolvedValue({ hasClaims: false, claims: [] }),
+      };
+
+      await setupConnectionWithServices({ verificationService: mockVerificationService });
+
+      mockLaneB.emit("user_transcript", {
+        text: "our product is guaranteed",
+        isFinal: true,
+        confidence: 0.9,
+        timestamp: Date.now(),
+      });
+
+      // Fire-and-forget — let microtasks flush
+      await Promise.resolve();
+
+      expect(mockVerificationService.scan).toHaveBeenCalled();
+    });
+
+    it("L522: does NOT call scan when verificationService is not injected", async () => {
+      const mockVerificationService = {
+        scan: jest.fn().mockResolvedValue({ hasClaims: false, claims: [] }),
+      };
+
+      // Use plain setupConnection (no verificationService)
+      await setupConnection();
+
+      mockLaneB.emit("user_transcript", {
+        text: "our product is guaranteed",
+        isFinal: true,
+        confidence: 0.9,
+        timestamp: Date.now(),
+      });
+
+      await Promise.resolve();
+
+      expect(mockVerificationService.scan).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── RAG result event-bus handler ──────────────────────────────────
+  describe("RAG result event-bus handler", () => {
+    it("L691: returns early when event.type is not rag.result", async () => {
+      await setupConnection();
+      const handler = getRagResultHandler();
+      expect(handler).toBeDefined();
+
+      // Should not throw — just silently return
+      expect(() =>
+        handler!({ type: "other.event", session_id: "test-session-id", payload: {} }),
+      ).not.toThrow();
+
+      // laneB methods should be untouched
+      expect(mockLaneB.setRequiredDisclaimers).not.toHaveBeenCalled();
+    });
+
+    it("L691: returns early when session_id does not match", async () => {
+      await setupConnection();
+      const handler = getRagResultHandler();
+
+      expect(() =>
+        handler!({
+          type: "rag.result",
+          session_id: "different-session-id",
+          payload: { disclaimers: ["disc-1"] },
+        }),
+      ).not.toThrow();
+
+      expect(mockLaneB.setRequiredDisclaimers).not.toHaveBeenCalled();
+    });
+
+    it("L696: treats disclaimers as empty array when payload.disclaimers is not an array", async () => {
+      await setupConnection();
+      const handler = getRagResultHandler();
+
+      handler!({
+        type: "rag.result",
+        session_id: "test-session-id",
+        payload: { disclaimers: "not-an-array" },
+      });
+
+      // disclaimers.length === 0 so setRequiredDisclaimers should NOT be called
+      expect(mockLaneB.setRequiredDisclaimers).not.toHaveBeenCalled();
+    });
+
+    it("L696: treats disclaimers as empty array when payload.disclaimers is missing", async () => {
+      await setupConnection();
+      const handler = getRagResultHandler();
+
+      handler!({
+        type: "rag.result",
+        session_id: "test-session-id",
+        payload: {},
+      });
+
+      expect(mockLaneB.setRequiredDisclaimers).not.toHaveBeenCalled();
+    });
+
+    it("L700: sets disclaimers on laneB when payload.disclaimers is a non-empty array", async () => {
+      await setupConnection();
+      const handler = getRagResultHandler();
+      mockLaneB.getRequiredDisclaimers.mockReturnValue([]);
+
+      handler!({
+        type: "rag.result",
+        session_id: "test-session-id",
+        payload: { disclaimers: ["disc-a", "disc-b"] },
+      });
+
+      expect(mockLaneB.setRequiredDisclaimers).toHaveBeenCalledWith(
+        expect.arrayContaining(["disc-a", "disc-b"]),
+      );
+    });
+  });
+
+  // ── session.start: memoryStore branch ────────────────────────────
+  describe("session.start with memoryStore", () => {
+    it("L782/L784: injects tenant memory context when memoryStore + tenantId + context truthy", async () => {
+      const mockMemoryStore = {
+        getContextString: jest.fn().mockReturnValue("tenant context string"),
+      };
+      const { mockWs } = await setupConnectionWithServices({ memoryStore: mockMemoryStore });
+      mockLaneB.isConnected.mockReturnValue(false);
+
+      await sendMessage(mockWs, { type: "session.start", tenantId: "org_test" });
+
+      expect(mockMemoryStore.getContextString).toHaveBeenCalledWith("org_test");
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("Injected tenant memory context"),
+      );
+    });
+
+    it("L784: skips context injection when memoryStore.getContextString returns null", async () => {
+      const mockMemoryStore = {
+        getContextString: jest.fn().mockReturnValue(null),
+      };
+      const { mockWs } = await setupConnectionWithServices({ memoryStore: mockMemoryStore });
+      mockLaneB.isConnected.mockReturnValue(false);
+
+      await sendMessage(mockWs, { type: "session.start", tenantId: "org_test" });
+
+      expect(mockMemoryStore.getContextString).toHaveBeenCalledWith("org_test");
+      // The "Injected tenant memory context" log should NOT appear
+      const logCalls: string[] = (console.log as jest.Mock).mock.calls
+        .flat()
+        .filter((v: any) => typeof v === "string");
+      expect(logCalls.some((s) => s.includes("Injected tenant memory context"))).toBe(false);
+    });
+
+    it("L782: skips memoryStore when tenantId is absent", async () => {
+      const mockMemoryStore = {
+        getContextString: jest.fn().mockReturnValue("ctx"),
+      };
+      const { mockWs } = await setupConnectionWithServices({ memoryStore: mockMemoryStore });
+      mockLaneB.isConnected.mockReturnValue(false);
+
+      await sendMessage(mockWs, { type: "session.start" });
+
+      expect(mockMemoryStore.getContextString).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── session.start: kbStore branch ────────────────────────────────
+  describe("session.start with kbStore", () => {
+    it("L791/L793: injects KB context when kbStore + tenantId + non-empty entries", async () => {
+      const mockKbStore = {
+        listEntries: jest.fn().mockReturnValue([
+          { question: "What is X?", answer: "X is Y." },
+        ]),
+      };
+      const { mockWs } = await setupConnectionWithServices({ kbStore: mockKbStore });
+      mockLaneB.isConnected.mockReturnValue(false);
+
+      await sendMessage(mockWs, { type: "session.start", tenantId: "org_test" });
+
+      expect(mockKbStore.listEntries).toHaveBeenCalledWith("org_test");
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("Injected KB context"),
+      );
+    });
+
+    it("L793: skips KB injection when listEntries returns empty array", async () => {
+      const mockKbStore = {
+        listEntries: jest.fn().mockReturnValue([]),
+      };
+      const { mockWs } = await setupConnectionWithServices({ kbStore: mockKbStore });
+      mockLaneB.isConnected.mockReturnValue(false);
+
+      await sendMessage(mockWs, { type: "session.start", tenantId: "org_test" });
+
+      expect(mockKbStore.listEntries).toHaveBeenCalledWith("org_test");
+      const logCalls: string[] = (console.log as jest.Mock).mock.calls
+        .flat()
+        .filter((v: any) => typeof v === "string");
+      expect(logCalls.some((s) => s.includes("Injected KB context"))).toBe(false);
+    });
+
+    it("L791: skips kbStore when tenantId is absent", async () => {
+      const mockKbStore = {
+        listEntries: jest.fn().mockReturnValue([{ question: "Q", answer: "A" }]),
+      };
+      const { mockWs } = await setupConnectionWithServices({ kbStore: mockKbStore });
+      mockLaneB.isConnected.mockReturnValue(false);
+
+      await sendMessage(mockWs, { type: "session.start" });
+
+      expect(mockKbStore.listEntries).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── session.start: voiceProfileStore branch ───────────────────────
+  describe("session.start with voiceProfileStore", () => {
+    it("L811/L814: logs voice profile name when profile is found", async () => {
+      const mockVoiceProfileStore = {
+        getProfile: jest.fn().mockReturnValue({ name: "Morgan" }),
+      };
+      const { mockWs } = await setupConnectionWithServices({
+        voiceProfileStore: mockVoiceProfileStore,
+      });
+      mockLaneB.isConnected.mockReturnValue(false);
+
+      await sendMessage(mockWs, { type: "session.start", voiceId: "voice-123" });
+
+      expect(mockVoiceProfileStore.getProfile).toHaveBeenCalledWith("voice-123");
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("(Morgan)"),
+      );
+    });
+
+    it("L814: logs voice profile without name when profile is not found", async () => {
+      const mockVoiceProfileStore = {
+        getProfile: jest.fn().mockReturnValue(undefined),
+      };
+      const { mockWs } = await setupConnectionWithServices({
+        voiceProfileStore: mockVoiceProfileStore,
+      });
+      mockLaneB.isConnected.mockReturnValue(false);
+
+      await sendMessage(mockWs, { type: "session.start", voiceId: "voice-999" });
+
+      expect(mockVoiceProfileStore.getProfile).toHaveBeenCalledWith("voice-999");
+      // Log should contain voiceId but no profile name parens
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining("voice-999"),
+      );
+      const logCalls: string[] = (console.log as jest.Mock).mock.calls
+        .flat()
+        .filter((v: any) => typeof v === "string");
+      expect(logCalls.some((s) => s.includes("(") && s.includes("voice-999"))).toBe(false);
+    });
+
+    it("L811: skips voiceProfileStore lookup when voiceId is absent", async () => {
+      const mockVoiceProfileStore = {
+        getProfile: jest.fn().mockReturnValue({ name: "Morgan" }),
+      };
+      const { mockWs } = await setupConnectionWithServices({
+        voiceProfileStore: mockVoiceProfileStore,
+      });
+      mockLaneB.isConnected.mockReturnValue(false);
+
+      await sendMessage(mockWs, { type: "session.start" });
+
+      expect(mockVoiceProfileStore.getProfile).not.toHaveBeenCalled();
+    });
+  });
+});
