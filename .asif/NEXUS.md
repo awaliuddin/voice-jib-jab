@@ -59,6 +59,7 @@
 | N-47 | Structured Access Logger | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-48 | Property-Based Testing (fast-check) | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-49 | Branch Coverage — VoiceTriggerService + Database | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
+| N-50 | Branch Coverage — GracefulShutdown + validate + complianceDashboard | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 
 ---
 
@@ -12570,3 +12571,16 @@ Dashboard: 48/48 SHIPPED.
 **Q43 (open)** — Pre-push lock-file sync check authorization.
 
 Dashboard: 49/49 SHIPPED.
+
+---
+
+### N-50: Branch Coverage — GracefulShutdown + validate + complianceDashboard (2026-03-21)
+
+Continued CRUCIBLE branch coverage fixes from N-49. Targeted three files with <100% branch coverage:
+
+- **GracefulShutdown.ts**: 50% → **100% branch** — 2 new tests for default constructor parameter expressions (`timeoutMs = 10_000` and `exitFn = process.exit.bind(process)`). Key fix: async/await required instead of void+runAllTimers — `exitFn(0)` is called after `await Promise.allSettled()` so the test needed to await the full shutdown.
+- **validate.ts**: 66% → **100% branch** — 2 new tests covering the try/catch error path: one with an `Error` instance (returns `err.message`) and one with a plain string rejection (covers `String(err)` branch of ternary).
+- **complianceDashboard.ts**: 66% → **100% branch** — 6 new tests covering 500 error paths in overview, tenants/:tenantId, and tenants/:tenantId/certificate endpoints, plus false branches of `err instanceof Error ? err.message : "Internal error"` ternary.
+- **Database.ts**: Added `/* istanbul ignore next */` to private `runMigrations()` guard (`if (!this.db) throw`) — legitimately unreachable via public API (database is always set before `runMigrations()` is called from `initialize()`).
+
+4,349 → **4,359 tests** (+10). All passing. Dashboard: 50/50 SHIPPED.
