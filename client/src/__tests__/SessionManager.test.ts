@@ -9,6 +9,11 @@ describe("SessionManager", () => {
   let sessionManager: SessionManager;
 
   beforeEach(() => {
+    // Pre-seed the fingerprint cache so getPersistedFingerprint() takes the
+    // fast localStorage path (1 microtask tick) rather than calling
+    // crypto.subtle.digest() which takes many ticks and races with
+    // vi.runAllTimersAsync() on a fresh jsdom environment (CI).
+    localStorage.setItem("vjj-fingerprint", "a".repeat(64));
     vi.useFakeTimers();
     sessionManager = new SessionManager("ws://localhost:3000");
   });
@@ -31,13 +36,7 @@ describe("SessionManager", () => {
 
       expect(stateChanges[0]).toBe("initializing");
 
-      // Flush timers multiple times to allow the async fingerprint generation
-      // to settle, then the WebSocket setTimeout(0) to fire, then initialize()
-      // to complete. Each advanceTimersByTimeAsync settles pending microtasks
-      // before advancing timers.
-      for (let i = 0; i < 5; i++) {
-        await vi.advanceTimersByTimeAsync(0);
-      }
+      await vi.runAllTimersAsync();
       await initPromise;
 
       expect(stateChanges).toContain("connected");
