@@ -12103,3 +12103,43 @@ Commit: `3b755df`. Dashboard: 38/38 SHIPPED.
 **Q43** — N-39 (auth endpoint rate limiting) and N-40 (CORS hardening) are both S-sized security improvements. Requesting standing auth to proceed on next "Continue roadmap" trigger, or an explicit directive if CoS wants to scope them differently.
 
 Dashboard: 38/38 SHIPPED.
+
+---
+
+### Check-in 73 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-39: Auth Endpoint Rate Limiting** — applied `authLimiter` (20 req/min per IP, 60s window) to the `/auth` route in `index.ts` using the existing `createRateLimiter` middleware. Covers all key-management operations: `POST /auth/api-keys`, `GET /auth/api-keys`, `DELETE /auth/api-keys/:id`, `POST /auth/api-keys/:id/rotate`. Returns 429 with `{ error: "Auth API rate limit exceeded" }` when budget exhausted.
+
+8 tests in `AuthRateLimit.test.ts`: requests within limit pass (201/200), 4th request blocked (429), correct error message, limit applies to GET/DELETE not just POST, window resets after expiry, per-IP isolation (IP A exhausted does not block IP B). +8 tests → 4,226 total.
+
+Commit: `e214420`. Dashboard: 39/39 SHIPPED.
+
+#### 2. What surprised me?
+
+**The "documentation test" anti-pattern is tempting but has no assertion value.** I wrote a test asserting `20 >= 10 && 20 <= 60` to document the production rate limit constant. It passes unconditionally and catches nothing. The real value would be importing the constant directly from `index.ts` and asserting it equals `20` — but `index.ts` has server startup side effects that make it untestable without a full mock. The correct solution is to extract rate limiter configs into a `constants.ts` or `config/` file so they can be imported and asserted against. Filed as technical debt — this pattern is present in several existing "documentation" tests across the suite.
+
+**`trust proxy` is required for X-Forwarded-For to populate `req.ip`.** The per-IP isolation test needed `app.set("trust proxy", true)` to make Express honour the `X-Forwarded-For` header. Without it, `req.ip` is always `127.0.0.1` regardless of the forwarded IP, making per-IP rate limiting based on the forwarded address non-functional in proxy deployments. Production deployments behind a load balancer (Kubernetes ingress, nginx) must set `trust proxy` or all clients share a single rate-limit bucket.
+
+#### 3. Cross-project signals
+
+**`trust proxy` is a silent footgun in every ASIF Express project.** Any project that does per-IP rate limiting, geo-restriction, or IP-based audit logging without `app.set("trust proxy", true)` will operate on `127.0.0.1` for all requests behind a proxy. This is especially dangerous for rate limiters — one client exhausting the budget blocks everyone. Portfolio-wide: check that all Express projects set `trust proxy` if deployed behind a reverse proxy or Kubernetes ingress.
+
+**Rate limiter configs should be constants, not inline literals.** Moving `{ windowMs, max, message }` objects to a `config/rateLimits.ts` export (a) makes them testable, (b) surfaces them for ops review without reading `index.ts`, and (c) prevents silent drift when someone tweaks a number inline. S-sized improvement applicable to any project using `createRateLimiter`.
+
+#### 4. What would I prioritize next?
+
+1. **N-40: CORS Hardening** — current config sends `Access-Control-Allow-Origin: *` unconditionally. Should read `ALLOWED_ORIGINS` env var and restrict to known origins in non-dev environments. S-sized, closes a real enterprise deployment gap.
+2. **N-41: Rate Limiter Config Constants** — extract all `createRateLimiter` call arguments to `config/rateLimits.ts` so they are importable, testable, and visible to ops. Addresses the "documentation test" anti-pattern found this session.
+3. **`trust proxy` audit** — verify `app.set("trust proxy", ...)` posture in `index.ts` and document the decision. If the server runs behind a proxy in production, this is a P0 correctness issue for rate limiting.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture. Still the only unresolved architecture question. No change without a CoS call.
+
+**Q43 resolved** — N-39 shipped.
+
+**Q44** — `trust proxy` posture: does production voice-jib-jab run behind a reverse proxy or Kubernetes ingress? If yes, `app.set("trust proxy", true)` should be added immediately — all per-IP rate limiting (including N-39, N-26) is currently operating on `127.0.0.1` for proxied requests, meaning one IP can exhaust the budget for all clients. Requesting CoS call on deployment topology.
+
+Dashboard: 39/39 SHIPPED.
