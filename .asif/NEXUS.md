@@ -12584,3 +12584,45 @@ Continued CRUCIBLE branch coverage fixes from N-49. Targeted three files with <1
 - **Database.ts**: Added `/* istanbul ignore next */` to private `runMigrations()` guard (`if (!this.db) throw`) — legitimately unreachable via public API (database is always set before `runMigrations()` is called from `initialize()`).
 
 4,349 → **4,359 tests** (+10). All passing. Dashboard: 50/50 SHIPPED.
+
+---
+
+### Check-in 83 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-50: Branch Coverage — GracefulShutdown + validate + complianceDashboard** — 10 new tests, 4,349 → 4,359 passing. Commits: `e3309be` (tests) + `e16a82d` (docs).
+
+- `GracefulShutdown.test.ts` +2 tests: 50% → 100% branch. Covered default `timeoutMs` and default `exitFn = process.exit.bind(process)` constructor parameter expressions. Key debugging: first attempt used `void shutdown() + jest.runAllTimers()` which never drained the microtask queue — `exitFn(0)` runs after `await Promise.allSettled()` so the test had to be `async`/`await`.
+- `validate-api.test.ts` +2 tests: 66% → 100% branch. Covered the try/catch error path with an `Error` instance (`err.message`) and a non-Error plain string (`String(err)`).
+- `complianceDashboard-api.test.ts` +6 tests: 66% → 100% branch. Three endpoints × two error shapes (Error instance + non-Error value). The 500 paths for overview, tenant, and certificate endpoints were previously untested — only the happy path and 404 were covered.
+- `Database.ts`: Added `/* istanbul ignore next */` to the private `runMigrations()` defensive guard (line 78). Guard is legitimately unreachable via public API — `initialize()` always sets `this.db` before calling `runMigrations()`. Annotated rather than faking the path.
+
+#### 2. What surprised me?
+
+**`void asyncFn() + jest.runAllTimers()` does not flush microtasks.** The `GracefulShutdown` default `exitFn` test was written as synchronous with `void sd.shutdown("SIGTERM"); jest.runAllTimers()`. This fails because `jest.runAllTimers()` only processes macro-tasks (setTimeout/setInterval). Async continuations queued after `await Promise.allSettled()` are microtasks — they don't run until the current synchronous call stack clears. The fix was making the test `async` and awaiting `sd.shutdown()` directly. This is a subtle Jest fake-timer trap: fake timers + async code can create assertions that pass intermittently or never.
+
+**All three error-catch branches across different API files had the same shape.** `err instanceof Error ? err.message : <fallback>` appeared in `validate.ts`, `complianceDashboard.ts` (3 endpoints), and several other API files. The `false` branch (non-Error value thrown) was 0% across all of them. The pattern was added when these files were written as a defensive catch, but the test suites only ever threw `new Error(...)` instances. A single library-level test convention change — "always test both Error and non-Error throws in catch blocks" — would close this class of coverage gap across the portfolio.
+
+#### 3. Cross-project signals
+
+**The `void asyncFn()` anti-pattern in Jest fake-timer tests is a portfolio-wide risk.** Any test that fires an async function with `void` and relies on timers to drain it may be silently not asserting what it thinks. The safe pattern is: if the function is awaitable, await it. If it must be fire-and-forget (testing that it doesn't block), use `await Promise.resolve()` to drain one microtask tick after `jest.advanceTimersByTime()`. The GracefulShutdown fix demonstrates both.
+
+**`err instanceof Error ? msg : fallback` false branches are a test debt class.** Across all ASIF API routers, catch blocks follow this pattern for safe error serialization. The `false` branch (thrown string, number, or null) is never tested. A standing test convention — when mocking `mockRejectedValue`, always add a second test throwing `"plain string"` — would close this class systematically. Applicable to: validate.ts, complianceDashboard.ts (3 endpoints), and any other router with a catch block.
+
+**Coverage threshold vs. actual gap.** Current CI thresholds (stmt 89%, branch 79%, fn 90%, lines 90%) enforce a floor but don't expose individual-file gaps. The bottom of the branch coverage distribution still has files at 33%–68%: `retrieval/index.ts` (33%), `lanes/laneC_control.ts` (44%), `insurance/audit_trail.ts` (65%), `retrieval/RetrievalService.ts` (67%), `retrieval/VectorStore.ts` (68%). The global average masks these pockets.
+
+#### 4. What would I prioritize next?
+
+1. **`retrieval/index.ts` (33% branch)** — lowest branch coverage in the real source files. Small file, likely easy wins.
+2. **`lanes/laneC_control.ts` (44% branch)** — the Lane C control engine is a governance-critical path. Low branch coverage here is a CRUCIBLE risk.
+3. **`insurance/audit_trail.ts` (65% branch)** — audit trail is the compliance backbone. Worth a targeted pass.
+4. **Pre-push `npm ci --dry-run` (Q43)** — structural CI gap, awaiting CoS auth.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture. No change.
+**Q42 (open)** — Next directive batch or maintenance mode?
+**Q43 (open)** — Pre-push lock-file sync check (`npm ci --dry-run`). The N-48 CI break class is still possible on any `npm install` without a subsequent `npm ci --dry-run` check.
+
+Dashboard: 50/50 SHIPPED.
