@@ -154,7 +154,7 @@ const requireApiKey = createApiKeyMiddleware(
   process.env.API_KEY_AUTH_ENABLED !== "false",
   auditEventLogger,
 );
-app.use("/auth", createAuthRouter(apiKeyStore));
+app.use("/auth", authLimiter, createAuthRouter(apiKeyStore));
 // Guard sensitive management routes before their handlers are registered.
 // N-29: admin/tenants/webhooks | N-32: sessions | N-33: analytics/audit/recordings/export
 // N-34: remaining enterprise routes (all config/data paths)
@@ -297,6 +297,8 @@ const adminLimiter = createRateLimiter({ windowMs: 60_000, max: 30, message: "Ad
 const voiceLimiter = createRateLimiter({ windowMs: 60_000, max: 10, message: "Voice API rate limit exceeded" });
 const analyticsLimiter = createRateLimiter({ windowMs: 60_000, max: 60, message: "Analytics API rate limit exceeded" });
 const sessionsLimiter = createRateLimiter({ windowMs: 60_000, max: 60, message: "Sessions API rate limit exceeded" });
+// N-39: Auth endpoints are key-management surfaces — tighter limit prevents brute-force key creation.
+const authLimiter = createRateLimiter({ windowMs: 60_000, max: 20, message: "Auth API rate limit exceeded" });
 
 // Mount sessions API
 app.use("/sessions", sessionsLimiter, createSessionsRouter(sessionRecorder));
