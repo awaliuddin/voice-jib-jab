@@ -208,7 +208,79 @@ describe("IntentClassifier edge cases", () => {
   });
 });
 
-// ── 3. IntentStore — log operations ──────────────────────────────────
+// ── 3. IntentClassifier — confidence arithmetic invariants ────────────
+// These verify the exact formula (highScore / totalWords, clamped [0,1])
+// and threshold behaviour. They kill arithmetic mutations that the hollow
+// toBeGreaterThanOrEqual(0) / toBeLessThanOrEqual(1) assertions cannot catch.
+
+describe("IntentClassifier — confidence arithmetic invariants", () => {
+  const classifier = new IntentClassifier();
+
+  it("confidence = highScore / totalWords exactly (1 match in 5 words = 0.2)", () => {
+    const result = classifier.classify("refund xxx xxx xxx xxx");
+    expect(result.scores.billing).toBe(1);
+    expect(result.confidence).toBeCloseTo(1 / 5, 10);
+  });
+
+  it("confidence = 2 / totalWords when 2 distinct keywords match (2 in 5 = 0.4)", () => {
+    const result = classifier.classify("bill invoice xxx xxx xxx");
+    expect(result.scores.billing).toBe(2);
+    expect(result.confidence).toBeCloseTo(2 / 5, 10);
+  });
+
+  it("confidence is clamped to 1.0 when highScore equals totalWords", () => {
+    const result = classifier.classify("refund");
+    expect(result.scores.billing).toBe(1);
+    expect(result.confidence).toBe(1.0);
+  });
+
+  it("confidence is NOT inverted (highScore/totalWords, not totalWords/highScore)", () => {
+    // Inverted formula 10/1=10 clamps to 1.0 — indistinguishable from clamped case,
+    // so use 1 keyword in 10 words: correct=0.1, inverted=10 clamped to 1.0
+    const result = classifier.classify("refund xxx xxx xxx xxx xxx xxx xxx xxx xxx");
+    expect(result.confidence).toBeCloseTo(1 / 10, 10);
+    expect(result.confidence).not.toBeCloseTo(1.0, 5);
+  });
+
+  it("fallback threshold: exactly 0.03 (3 matches in 100 words) does NOT trigger fallback", () => {
+    // "subscription" avoids the "payment"/"pay" substring overlap (both billing keywords)
+    const text = ["refund", "invoice", "subscription", ...Array(97).fill("xxx")].join(" ");
+    const result = classifier.classify(text);
+    expect(result.scores.billing).toBe(3);
+    expect(result.confidence).toBeCloseTo(3 / 100, 10);
+    expect(result.fallback).toBe(false);
+    expect(result.intent).toBe("billing");
+  });
+
+  it("fallback threshold: 0.02 (2 matches in 100 words) IS below threshold → fallback", () => {
+    const text = ["bill", "invoice", ...Array(98).fill("xxx")].join(" ");
+    const result = classifier.classify(text);
+    expect(result.scores.billing).toBe(2);
+    expect(result.confidence).toBeCloseTo(2 / 100, 10);
+    expect(result.fallback).toBe(true);
+    expect(result.intent).toBe("general");
+  });
+
+  it("winner has the highest raw score — secondary scorer does not win", () => {
+    // sales: buy, purchase, demo = 3; billing: bill = 1; 4 words total
+    const result = classifier.classify("buy purchase demo bill");
+    expect(result.scores.sales).toBe(3);
+    expect(result.scores.billing).toBe(1);
+    expect(result.intent).toBe("sales");
+    expect(result.confidence).toBeCloseTo(3 / 4, 10);
+  });
+
+  it("repeated keyword: counted once, confidence uses totalWords (1/3 not 3/3)", () => {
+    // "help help help" = 3 words, 1 distinct keyword → confidence = 1/3
+    // Bug (additive occurrences): 3 hits → confidence = 3/3 = 1.0
+    const result = classifier.classify("help help help");
+    expect(result.scores.support).toBe(1);
+    expect(result.confidence).toBeCloseTo(1 / 3, 10);
+    expect(result.confidence).not.toBeCloseTo(1.0, 5);
+  });
+});
+
+// ── 4. IntentStore — log operations ──────────────────────────────────
 
 describe("IntentStore — log operations", () => {
   let store: IntentStore;
@@ -302,7 +374,7 @@ describe("IntentStore — log operations", () => {
   });
 });
 
-// ── 4. IntentStore — mapping operations ──────────────────────────────
+// ── 5. IntentStore — mapping operations ──────────────────────────────
 
 describe("IntentStore — mapping operations", () => {
   let store: IntentStore;
@@ -379,7 +451,7 @@ describe("IntentStore — mapping operations", () => {
   });
 });
 
-// ── 5. IntentStore — singleton proxy ─────────────────────────────────
+// ── 6. IntentStore — singleton proxy ─────────────────────────────────
 
 describe("IntentStore — singleton proxy wiring", () => {
   it("initIntentStore() wires the proxy correctly", () => {
@@ -406,7 +478,7 @@ describe("IntentStore — singleton proxy wiring", () => {
   });
 });
 
-// ── 6. HTTP POST /intents/detect ─────────────────────────────────────
+// ── 7. HTTP POST /intents/detect ─────────────────────────────────────
 
 describe("HTTP POST /intents/detect", () => {
   let app: Express;
@@ -491,7 +563,7 @@ describe("HTTP POST /intents/detect", () => {
   });
 });
 
-// ── 7. HTTP GET /intents ──────────────────────────────────────────────
+// ── 8. HTTP GET /intents ──────────────────────────────────────────────
 
 describe("HTTP GET /intents", () => {
   let app: Express;
@@ -547,7 +619,7 @@ describe("HTTP GET /intents", () => {
   });
 });
 
-// ── 8. HTTP GET /intents/config ───────────────────────────────────────
+// ── 9. HTTP GET /intents/config ───────────────────────────────────────
 
 describe("HTTP GET /intents/config", () => {
   let app: Express;
@@ -590,7 +662,7 @@ describe("HTTP GET /intents/config", () => {
   });
 });
 
-// ── 9. HTTP POST /intents/config ──────────────────────────────────────
+// ── 10. HTTP POST /intents/config ─────────────────────────────────────
 
 describe("HTTP POST /intents/config", () => {
   let app: Express;
@@ -673,7 +745,7 @@ describe("HTTP POST /intents/config", () => {
   });
 });
 
-// ── 10. HTTP DELETE /intents/config/:intent ───────────────────────────
+// ── 11. HTTP DELETE /intents/config/:intent ───────────────────────────
 
 describe("HTTP DELETE /intents/config/:intent", () => {
   let app: Express;
