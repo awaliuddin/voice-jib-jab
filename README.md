@@ -2,7 +2,7 @@
 
 A production voice agent runtime that eliminates the two things that kill enterprise voice deployments: **bad latency** and **ungoverned output**. Browser-based and SIP-ready speech-to-speech assistant with three-lane orchestration, async policy enforcement, retrieval-augmented generation, and a full enterprise feature stack.
 
-**Status:** 25/25 initiatives SHIPPED | 3,920 server tests | 92%+ coverage
+**Status:** 25/25 initiatives SHIPPED | 3,928 server tests | 92%+ coverage
 
 ---
 
@@ -660,7 +660,7 @@ Useful for outbound campaign automation — CRM systems or workflow engines can 
 
 | Metric | Value |
 |--------|-------|
-| Server test suite | 3,920 tests, 0 failures |
+| Server test suite | 3,928 tests, 0 failures |
 | Test suites | 128 (unit + integration + performance + load) |
 | Statement coverage | 92.77% (floor: 89%) |
 | Branch coverage | 82.37% (floor: 79%) |

@@ -10898,6 +10898,32 @@ Executed Q11 CoS directive ("triage now"). Findings:
 
 ---
 
+**Q40 — IntentClassifier substring matching precision** _(2026-03-20)_:
+
+`IntentClassifier.classify()` uses `lower.includes(keyword)` for all keyword matching. This causes multiple keywords to fire for a single word when one keyword is a substring of another within the same intent:
+
+| Word in text | Keywords matched | Over-score |
+|---|---|---|
+| "payment" | "payment" + "pay" | +1 billing point |
+| "overcharge" | "overcharge" + "charge" | +1 billing point |
+| "pricing" | "pricing" only | ✅ no overlap |
+
+This means "my payment was wrong" (5 words, 1 billing-related word) scores `billing=2`, giving confidence=2/5=0.4 rather than 1/5=0.2. The fallback threshold check and winner selection still work correctly (the same over-scoring applies consistently), but confidence values are inflated for texts containing "payment" or "overcharge".
+
+**Impact**: Minor scoring inaccuracy, no wrong-intent classifications observed in tests. The 52 existing example-based tests all pass. The 8 new arithmetic invariant tests avoid the affected keywords.
+
+**Fix option** (S-sized, not implemented — awaiting authorization): Replace `lower.includes(keyword)` with a word-boundary check for single-word keywords:
+```typescript
+const matched = keyword.includes(" ")
+  ? lower.includes(keyword)           // multi-word: keep substring match
+  : new RegExp(`\\b${keyword}\\b`).test(lower);  // single-word: word boundary
+```
+This would require updating ~3 test fixtures that currently rely on the substring behaviour (e.g., "my credit card was charged" → "charge" matching inside "charged" via substring).
+
+**Requesting CoS call**: Fix now as S-sized correctness directive, or defer/accept as-is given the minor impact?
+
+---
+
 > Session: 2026-03-20 (check-in 59) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship since last check-in?
