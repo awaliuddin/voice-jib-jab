@@ -109,6 +109,9 @@ import { TenantQuotaService } from "./services/TenantQuotaService.js";
 import { createQuotaRouter } from "./api/quota.js";
 import { WebhookRetryQueue } from "./services/WebhookRetryQueue.js";
 import { createWebhookRetryRouter } from "./api/webhookRetry.js";
+import { ApiKeyStore } from "./services/ApiKeyStore.js";
+import { createApiKeyMiddleware } from "./middleware/apiKeyAuth.js";
+import { createAuthRouter } from "./api/auth.js";
 
 const app = express();
 const server = createServer(app);
@@ -124,10 +127,23 @@ app.use((_req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header(
     "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept",
+    "Origin, X-Requested-With, Content-Type, Accept, X-API-Key",
   );
   next();
 });
+
+// ── API Key Authentication ────────────────────────────────────────────
+// Disabled in dev by setting API_KEY_AUTH_ENABLED=false (default: enabled).
+const apiKeyStore = new ApiKeyStore(
+  resolve(dirname(config.storage.databasePath), "api-keys.json"),
+);
+const requireApiKey = createApiKeyMiddleware(
+  apiKeyStore,
+  process.env.API_KEY_AUTH_ENABLED !== "false",
+);
+app.use("/auth", createAuthRouter(apiKeyStore));
+// Guard sensitive management routes before their handlers are registered.
+app.use(["/admin", "/tenants", "/webhooks"], requireApiKey);
 
 // Health check endpoint
 app.get("/health", (_req, res) => {

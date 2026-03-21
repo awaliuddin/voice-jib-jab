@@ -38,6 +38,7 @@
 | N-26 | Per-Tenant Rate Limiting & Quota | GOVERNANCE | SHIPPED | P1 | 2026-03-21 |
 | N-27 | Webhook Retry Queue + Dead-Letter | EXTENSIBILITY | SHIPPED | P1 | 2026-03-21 |
 | N-28 | Kubernetes Readiness Probe | OBSERVABILITY | SHIPPED | P1 | 2026-03-21 |
+| N-29 | API Key Authentication | GOVERNANCE | SHIPPED | P0 | 2026-03-21 |
 
 ---
 
@@ -1229,7 +1230,7 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 | G1 | xfail Governance | ✅ PASS | Zero `.skip()`, `xit()`, `xdescribe()` in any test file. |
 | G2 | Non-Empty Result Assertions | ✅ PASS | Sample of 5 integration test files: all list/collection results have `toHaveLength(N)` or `toContain()` checks. Zero hollow `expect(result).toBeDefined()` on business-logic list returns. Empty-result assertions (`toHaveLength(0)`) are intentional empty-state tests. |
 | G3 | Mock Drift Detection | ✅ PASS | Recent commits: timer fixes + security upgrades — no implementation+mock co-modification. Integration test mocks are infrastructure-only (ws, chromadb, EventBus, OpaEvaluator, AllowedClaimsRegistry). |
-| G4 | Test Count Delta | ✅ PASS | Baseline (check-in 57): 3,894. Current: 3,940. Delta: +46 (mutation gap-fill tests). |
+| G4 | Test Count Delta | ✅ PASS | Baseline (check-in 57): 3,894. Current: 4,074. Delta: +180 (N-26/27/28/29 + mutation gap-fill). |
 | G5 | Silent Exceptions | ✅ PASS | 3 catch blocks examined: `compareAgentsDashboard.ts:437`, `onboardingWizardHtml.ts:713`, `transcriptViewer.ts:227` — all are browser-side JS inside HTML template strings (never executed in Node.js) or a date-format fallback that returns the original value. Zero CRITICAL silent exceptions in server business logic. |
 | G6 | Mutation Testing | ✅ PASS | Stryker refreshed 2026-03-21: PolicyGate 72.0% ✅, AllowedClaimsRegistry 60.0% ✅, LaneArbitrator 65.1% ✅. All 3 files exceed thresholds. |
 | G7 | Spec-Test Traceability | ⚠️ PARTIAL | Existing T-0XX markers intact. New test files (post-marathon) lack N-XX AC-Y markers. Per protocol: forward-only, no retrofit burden. No regression. |
@@ -11646,3 +11647,49 @@ Q38 still open (Stryker refresh scope + LaneArbitrator below-threshold authoriza
 ### 5. Blockers / Questions for CoS
 
 Q38 still open (Stryker refresh scope authorization). No new blockers.
+
+---
+
+> Session: 2026-03-21 (check-in 63) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship since last check-in?
+
+**N-29 — API Key Authentication** (P0, GOVERNANCE):
+- `ApiKeyStore` service: SHA-256-hashed key storage, `vjj_<64 hex>` format, file-persisted JSON, create/list/revoke/verify/touch API
+- `createApiKeyMiddleware`: Express middleware checking `X-API-Key` header; disabled via `API_KEY_AUTH_ENABLED=false` (dev bypass); attaches `req.apiKeyTenantId` on success
+- `/auth` router: `POST /auth/api-keys`, `GET /auth/api-keys?tenantId=`, `DELETE /auth/api-keys/:keyId`
+- Guards mounted pre-handler on `/admin`, `/tenants`, `/webhooks` via `app.use([...], requireApiKey)`
+- CORS updated to allow `X-API-Key` header
+- 40 new tests in `ApiKeyAuth.test.ts`
+
+**Test delta**: 4,034 → 4,074 (+40). 131 suites. Pre-push: PASSED.
+
+---
+
+### 2. What surprised me?
+
+**Zero new npm deps.** API key auth with SHA-256 hashing, 64-byte random keys, and full test coverage requires only `node:crypto` and `node:fs` — both built-in. No bcrypt, no JWT library, nothing. The pattern is: `randomBytes(32).toString("hex")` for the raw key, `createHash("sha256").update(raw).digest("hex")` for storage. Simple and auditable.
+
+**Express path array syntax works perfectly for multi-route guards.** `app.use(["/admin", "/tenants", "/webhooks"], requireApiKey)` evaluates the middleware for all three prefixes in a single mount call, registered before the actual route handlers so it fires first.
+
+---
+
+### 3. Cross-project signals
+
+**Middleware-first auth is the right pattern for Express.** Mounting the guard via `app.use([paths], mw)` before route handlers means zero risk of forgetting to add auth to a new sub-route — everything under those prefixes is automatically protected. Future ASIF Express projects should use this pattern rather than per-route auth decorators.
+
+**SHA-256 for API keys is audit-friendly.** Unlike bcrypt (slow by design, appropriate for passwords), SHA-256 is fast for API keys because: (1) keys are high-entropy random strings, not user-chosen passwords, so brute-force is infeasible regardless of hash speed; (2) fast verification means low latency on every authenticated request.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **N-30 proposal**: The `/sessions` route is unguarded — voice runtime is latency-critical but session management endpoints (list, replay, export) should also require auth for enterprise. Small addition.
+2. **Q39/Q40**: Both still pending CoS authorization (Dependabot dismissal + IntentClassifier word-boundary fix).
+3. **CRUCIBLE G4 baseline update**: Test count now 4,074 — update dashboard.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q38, Q39, Q40 remain open. No new blockers. Dashboard: 29/29 SHIPPED.
