@@ -779,4 +779,119 @@ describe("LaneArbitrator", () => {
       expect(events).toContain("response_complete");
     });
   });
+
+  // ── Mutation-killer tests (CRUCIBLE Gate 6 gap-fill, 2026-03-20) ────────
+
+  describe("TTFB arithmetic correctness", () => {
+    it("latencyMs is bReadyTime MINUS speechEndTime (not plus)", () => {
+      arbitrator.startSession();
+
+      const T1 = 1700000000000;
+      jest.setSystemTime(T1);
+      arbitrator.onUserSpeechEnded();
+
+      jest.setSystemTime(T1 + 350);
+      arbitrator.onLaneBReady();
+
+      const metrics = arbitrator.getMetrics();
+      expect(metrics.latencyMs).toBe(350); // subtraction, not addition
+    });
+
+    it("latencyMs reflects exact elapsed time between speech end and B ready", () => {
+      arbitrator.startSession();
+
+      jest.setSystemTime(2000000000000);
+      arbitrator.onUserSpeechEnded();
+
+      jest.setSystemTime(2000000001200); // 1200ms later
+      arbitrator.onLaneBReady();
+
+      expect(arbitrator.getMetrics().latencyMs).toBe(1200);
+    });
+  });
+
+  describe("FALLBACK_PLAYING state — barge-in and policy cancel", () => {
+    beforeEach(() => {
+      arbitrator.startSession();
+      // Get to B_PLAYING: speech ends → B responds immediately
+      arbitrator.onUserSpeechEnded();
+      arbitrator.onLaneBReady();
+      expect(arbitrator.getState()).toBe("B_PLAYING");
+      // Trigger policy cancel → FALLBACK_PLAYING
+      arbitrator.onPolicyCancel();
+      expect(arbitrator.getState()).toBe("FALLBACK_PLAYING");
+    });
+
+    it("barge-in from FALLBACK_PLAYING emits stop_fallback and returns to LISTENING", () => {
+      const events: string[] = [];
+      arbitrator.on("stop_fallback", () => events.push("stop_fallback"));
+
+      arbitrator.onUserBargeIn();
+
+      expect(events).toContain("stop_fallback");
+      expect(arbitrator.getState()).toBe("LISTENING");
+    });
+
+    it("barge-in from FALLBACK_PLAYING clears responseInProgress", () => {
+      arbitrator.onUserBargeIn();
+      // After barge-in, a new speech cycle should be accepted
+      arbitrator.onUserSpeechEnded();
+      expect(arbitrator.getState()).toBe("B_RESPONDING");
+    });
+
+    it("second policy cancel while FALLBACK_PLAYING is ignored (no double-fallback)", () => {
+      const playFallbackSpy = jest.fn();
+      arbitrator.on("play_fallback", playFallbackSpy);
+
+      arbitrator.onPolicyCancel(); // already in FALLBACK_PLAYING
+
+      // play_fallback must NOT fire again — guard branch prevents re-entry
+      expect(playFallbackSpy).not.toHaveBeenCalled();
+      expect(arbitrator.getState()).toBe("FALLBACK_PLAYING");
+    });
+
+    it("session end from FALLBACK_PLAYING transitions to ENDED", () => {
+      arbitrator.endSession();
+      expect(arbitrator.getState()).toBe("ENDED");
+    });
+  });
+
+  describe("ENDED state guards — barge-in and policy cancel no-op", () => {
+    beforeEach(() => {
+      arbitrator.startSession();
+      arbitrator.endSession();
+      expect(arbitrator.getState()).toBe("ENDED");
+    });
+
+    it("barge-in from ENDED does not change state", () => {
+      arbitrator.onUserBargeIn();
+      expect(arbitrator.getState()).toBe("ENDED");
+    });
+
+    it("policy cancel from ENDED does not change state", () => {
+      arbitrator.onPolicyCancel();
+      expect(arbitrator.getState()).toBe("ENDED");
+    });
+
+    it("barge-in from ENDED does not emit stop_reflex or stop_lane_b", () => {
+      const stopReflex = jest.fn();
+      const stopLaneB = jest.fn();
+      arbitrator.on("stop_reflex", stopReflex);
+      arbitrator.on("stop_lane_b", stopLaneB);
+
+      arbitrator.onUserBargeIn();
+
+      expect(stopReflex).not.toHaveBeenCalled();
+      expect(stopLaneB).not.toHaveBeenCalled();
+    });
+
+    it("policy cancel from ENDED does not emit play_fallback", () => {
+      const playFallback = jest.fn();
+      arbitrator.on("play_fallback", playFallback);
+
+      arbitrator.onPolicyCancel();
+
+      expect(playFallback).not.toHaveBeenCalled();
+    });
+  });
 });
