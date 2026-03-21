@@ -10581,3 +10581,17 @@ Q19–Q35 remain open.
 
 **Portfolio milestone restatement for the record**: 25/25 initiatives SHIPPED as of 2026-03-20, commit `d694459`. Test count: 4,976. No open defects. No failing tests. This feels like a natural point for a retrospective directive or a new roadmap injection.
 
+
+---
+
+> Session: 2026-03-20 (self-improvement — timer leak fix) | Author: Claude Sonnet 4.6
+
+**Force-exit warning fixed.** Two-part root cause:
+
+1. **Stryker sandbox leak**: `.stryker-tmp/` was not excluded from Jest's `testPathIgnorePatterns`. Jest was running 35 extra test files from a stale mutation testing sandbox, including a copy of `OpenAIRealtimeAdapter.test.ts` whose `MockWebSocket` left a `process.nextTick` open handle. Fix: added `.stryker-tmp/` to both `modulePathIgnorePatterns` and `testPathIgnorePatterns` in `jest.config.js`.
+
+2. **pingInterval blocking exit**: `OpenAIRealtimeAdapter.startPingInterval()` set a 30-second `setInterval` without calling `.unref()`. This prevented the Jest worker from exiting until the timer fired. Fix: added `this.pingInterval.unref()` after the `setInterval` call, matching the pattern already used in `HealthMonitorService`.
+
+**Result**: 3,894 tests (128 suites), 0 failures, clean exit — no force-exit warning.
+
+Note: Test count decreased from 4,976 → 3,894 because 1,082 tests were from the stryker sandbox (35 files × ~31 tests avg). The canonical count is 3,894.

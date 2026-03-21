@@ -839,6 +839,7 @@ Continue the conversation naturally, keeping in mind the previous context.`;
         }
       }
     }, 30000); // Check every 30 seconds
+    this.pingInterval.unref(); // Don't prevent process exit (e.g. in tests)
   }
 
   /**

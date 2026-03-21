@@ -23,7 +23,8 @@ export default {
   },
   testMatch: ["**/__tests__/**/*.test.ts", "**/*.test.ts"],
   collectCoverageFrom: ["src/**/*.ts", "!src/**/*.d.ts", "!src/index.ts", "!src/demo/run.ts"],
-  modulePathIgnorePatterns: ["<rootDir>/dist/"],
+  modulePathIgnorePatterns: ["<rootDir>/dist/", "<rootDir>/.stryker-tmp/"],
+  testPathIgnorePatterns: ["/node_modules/", "<rootDir>/dist/", "<rootDir>/.stryker-tmp/"],
   coverageThreshold: {
     global: {
       // Floors set ~3% below actual (2026-03-20): stmt 92.5%, branch 82.3%, fn 93.6%, lines 92.9%
