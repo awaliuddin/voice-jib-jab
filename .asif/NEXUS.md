@@ -66,6 +66,7 @@
 | N-54 | Branch Coverage — agentVersions + search + HealthMonitor + TenantMigrator | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-55 | Branch Coverage — VectorStore + KnowledgeBase + RetrievalService + training + Routing | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-56 | Branch Coverage — abtests + auditEvents + accessLogger + SessionHistory + Database | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
+| N-57 | Branch Coverage — websocket.ts optional service injection (20 branches) | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 
 ---
 
@@ -12812,6 +12813,24 @@ Dashboard: 55/55 SHIPPED.
 
 ---
 
+### N-57: Branch Coverage — websocket.ts optional service injection (2026-03-21)
+
+Single-file branch coverage pass targeting `api/websocket.ts` (81.39% → improved). All 20 uncovered branches were optional-service injection paths — only reachable when the server is constructed with non-default injected services.
+
+Four test groups added to `WebSocketMessages.test.ts`:
+
+- **STT segment callback** (+5): `enablePersistentMemory=true && isFinal=true` → `transcriptStore.save`; `isFinal=false` → skip; `userId null` → `undefined`; `sentimentTracker.shouldEscalate()=true` → escalation warning; `verificationService` injected → `scan()` called.
+- **RAG result event-bus handler** (+5): early return on wrong event type; early return on mismatched sessionId; non-array disclaimers → `[]`; missing disclaimers → `[]`; truthy array → forwarded to `laneB.setRequiredDisclaimers`.
+- **session.start memoryStore** (+3): `memoryStore + tenantId + truthy context` → injected; `getContextString=null` → skip; no `tenantId` → skip.
+- **session.start kbStore** (+3): non-empty entries → KB context injected; empty entries → skip; no `tenantId` → skip.
+- **session.start voiceProfileStore** (+4): `voiceId` + profile with name → logs with name; `getProfile` returns undefined → logs without name; no `voiceId` → `getProfile` not called.
+
+Constructor injection pattern: `new VoiceWebSocketServer({}, undefined, undefined, undefined, memoryStore, voiceProfileStore, kbStore, verificationService)`.
+
+4,646 → **4,666 tests** (+20). All passing. Dashboard: 57/57 SHIPPED.
+
+---
+
 ### Check-in 88 — 2026-03-21
 
 #### 1. What shipped since last check-in?
@@ -12848,6 +12867,44 @@ Total this session: +27 tests, 1 SHIPPED initiative.
 **Q44 (open)** — Stale plan file `keen-enchanting-yao.md` (N-12 MCP ticketing).
 
 Dashboard: 56/56 SHIPPED.
+
+---
+
+### Check-in 89 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-57** (committed `b57d030`): Branch coverage for `api/websocket.ts` — 20 new tests covering all optional service injection branches (verificationService, memoryStore, kbStore, voiceProfileStore, RAG event-bus handler, STT segment callback with shouldEscalate). +20 tests (4,646→4,666). Dashboard: 57/57 SHIPPED.
+
+#### 2. What surprised me?
+
+**Optional service branches require constructor-level injection.** The existing `setupConnection()` always creates `new VoiceWebSocketServer({})` with zero optional services. All 20 missed branches were unreachable from that default setup. A single `setupConnectionWithServices()` helper that threads optional mocks through positions 5–8 of the 9-arg constructor unlocks all of them at once. One helper, 20 branches.
+
+**`sentimentTracker.shouldEscalate()` required a prototype spy, not a constructor spy.** `SentimentTracker` is instantiated inside `VoiceWebSocketServer`'s constructor — there's no injection point. `jest.spyOn(SentimentTracker.prototype, "shouldEscalate").mockReturnValue(true)` intercepts it correctly. This is the standard Jest approach for non-injected dependencies.
+
+**RAG result handler is registered on the module-level `eventBus` during `handleConnection`.** To trigger it, you emit directly on `eventBus` after the connection is established. The early-return paths (wrong type, wrong sessionId) both need the handler to be registered first.
+
+#### 3. Cross-project signals
+
+**9-argument constructors are a test surface hazard.** When optional services are positional args (not an options object), adding a new service shifts positions and makes tests that inject at position N fragile — they must be updated every time the constructor gains a new arg. Portfolio recommendation: services injected optionally should use an options/config object (`{ memoryStore?, kbStore? }`) not positional args. This would have made the branch coverage tests simpler and more maintainable.
+
+**`setupConnectionWithServices()` pattern is reusable.** Any project with a server class that takes optional injected services can use this: create one base setup, one variant that injects mocks, test the branching behavior of the variant. Avoids duplicating the full connection handshake in every optional-service test.
+
+#### 4. What would I prioritize next?
+
+1. **Overall branch % check** — N-55/56/57 collectively added 70+ tests targeting uncovered branches. Running `--coverage` would show the actual branch % improvement. Should be approaching 88-89% from the 86.96% baseline.
+2. **`index.ts` (14.28% branch)** — the app entrypoint. Coverage here typically requires integration-level tests or direct require() calls with mocked deps. Hard but possible for the initialization branches.
+3. **`wait.ts` (25%)** — likely a tiny utility with an edge case. Quick win.
+4. **Any new CoS directives** — Q42 (next directive batch) still open.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture.
+**Q42 (open)** — Next directive batch or maintenance mode?
+**Q43 (open)** — Pre-push lock-file sync check.
+**Q44 (open)** — Stale plan file `keen-enchanting-yao.md` (N-12 MCP ticketing).
+
+Dashboard: 57/57 SHIPPED.
 
 ---
 
