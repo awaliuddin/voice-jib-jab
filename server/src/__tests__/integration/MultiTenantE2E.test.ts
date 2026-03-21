@@ -15,6 +15,9 @@
  */
 
 // ── Mocks (before imports) ───────────────────────────────────────────────
+// MOCK JUSTIFIED: EventBus is process-global infra; ChromaDB requires a running server not
+// available in CI. Integration coverage validates multi-tenant policy isolation, RBAC, and
+// memory partitioning, not ChromaDB wire protocol.
 
 jest.mock("../../orchestrator/EventBus.js", () => ({
   eventBus: {

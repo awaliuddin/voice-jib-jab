@@ -22,7 +22,12 @@ export default {
     ],
   },
   testMatch: ["**/__tests__/**/*.test.ts", "**/*.test.ts"],
-  collectCoverageFrom: ["src/**/*.ts", "!src/**/*.d.ts", "!src/index.ts", "!src/demo/run.ts"],
+  collectCoverageFrom: [
+    "src/**/*.ts",
+    "!src/**/*.d.ts",          // OMIT JUSTIFIED: type declarations, no runtime code
+    "!src/index.ts",           // OMIT JUSTIFIED: server entrypoint — app.listen() wiring only, no business logic
+    "!src/demo/run.ts",        // OMIT JUSTIFIED: demo script entrypoint, dev-only
+  ],
   modulePathIgnorePatterns: ["<rootDir>/dist/", "<rootDir>/.stryker-tmp/"],
   testPathIgnorePatterns: ["/node_modules/", "<rootDir>/dist/", "<rootDir>/.stryker-tmp/"],
   coverageThreshold: {

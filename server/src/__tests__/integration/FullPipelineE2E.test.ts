@@ -19,6 +19,9 @@
  */
 
 // ── Mocks (before imports — jest hoisting requirement) ───────────────────
+// MOCK JUSTIFIED: EventBus, AllowedClaimsRegistry (HuggingFace download), OpaEvaluator (WASM
+// file) are external infrastructure not available in CI. Integration coverage focuses on the
+// lane orchestration logic and policy gate wiring, not the infra initialization paths.
 
 jest.mock("../../orchestrator/EventBus.js", () => ({
   eventBus: {

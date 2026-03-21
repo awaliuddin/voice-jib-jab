@@ -1215,6 +1215,45 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 
 ---
 
+### CRUCIBLE Gates 1-8 Audit — 2026-03-20 (Post-Roadmap Idle)
+
+**Trigger**: Idle Time Protocol (25/25 N-initiatives SHIPPED, no pending directives).
+**Test baseline**: 3,894 server (128 suites) + 79 React SDK = **3,973 total**
+**Coverage** (server, actual): Stmts 92.77% | Branches 82.37% | Fns 94.38% | Lines 93.18% — all above thresholds ✅
+
+| Gate | Name | Result | Evidence |
+|------|------|--------|----------|
+| G1 | xfail Governance | ✅ PASS | Zero `.skip()`, `xit()`, `xdescribe()` in any test file. |
+| G2 | Non-Empty Result Assertions | ✅ PASS | Sample of 5 integration test files: all list/collection results have `toHaveLength(N)` or `toContain()` checks. Zero hollow `expect(result).toBeDefined()` on business-logic list returns. Empty-result assertions (`toHaveLength(0)`) are intentional empty-state tests. |
+| G3 | Mock Drift Detection | ✅ PASS | Recent commits: timer fixes + security upgrades — no implementation+mock co-modification. Integration test mocks are infrastructure-only (ws, chromadb, EventBus, OpaEvaluator, AllowedClaimsRegistry). |
+| G4 | Test Count Delta | ✅ PASS | Baseline (check-in 57): 3,894. Current: 3,894. Delta: 0. |
+| G5 | Silent Exceptions | ✅ PASS | 3 catch blocks examined: `compareAgentsDashboard.ts:437`, `onboardingWizardHtml.ts:713`, `transcriptViewer.ts:227` — all are browser-side JS inside HTML template strings (never executed in Node.js) or a date-format fallback that returns the original value. Zero CRITICAL silent exceptions in server business logic. |
+| G6 | Mutation Testing | ⚠️ STALE | Stryker baseline (2026-03-16): PolicyGate 70.5% ✅, LaneArbitrator 54% ⚠️ (below 60%), AllowedClaimsRegistry 36% ❌ (below 40%). Still stale — 148 new tests added since baseline, ~10 new service files unexamined. |
+| G7 | Spec-Test Traceability | ⚠️ PARTIAL | Existing T-0XX markers intact. New test files (post-marathon) lack N-XX AC-Y markers. Per protocol: forward-only, no retrofit burden. No regression. |
+
+**Gate 8 — Coverage Integrity Audit:**
+- **8.1 Omit Audit**: 3 omits in `jest.config.js`. All 3 now have inline `OMIT JUSTIFIED` comments added this session. ✅
+- **8.2 Env-Gated Tests**: `process.env` usage in tests is test-setup (setting/deleting env vars for isolation), not CI-gated skips. No dead env-gated tests. ✅
+- **8.3 Integration Mocks**: 4 integration test files with `jest.mock()`. 1 already had `MOCK JUSTIFIED` annotation (`voice-pipeline.test.ts`). Added `MOCK JUSTIFIED` comments to `FullPipelineE2E.test.ts`, `MultiTenantE2E.test.ts`, `RegressionRunner.test.ts` this session. ✅
+- **8.4 Badge Accuracy**: README was stale — claimed 3,746 tests (actual 3,894), "24/25 SHIPPED + 1 BUILDING" (actual 25/25), branch coverage 83.5% (actual 82.37%). **P1 VIOLATION — fixed this session.** README now reflects current actuals. ✅
+- **8.5 Real Coverage**: Stmts 92.77% | Branch 82.37% | Fns 94.38% | Lines 93.18%. Branch coverage was OVERCLAIMED in README (83.5% vs 82.37%). All numbers now updated and accurate. ✅
+
+**Oracle Triangulation** (STANDARD tier — minimum 2 required):
+- Example-based: ✅ (standard assertions throughout)
+- Property-based: ❌ (no fast-check/hypothesis)
+- Contract: ❌ (no schema/OpenAPI contract tests)
+- Integration: ✅ (voice-e2e, FullPipelineE2E, MultiTenantE2E, RegressionRunner)
+- **2/4 types — meets STANDARD minimum.** Gap vs preferred 3/4.
+
+**Fixes applied this session**: README accuracy (8.4), OMIT JUSTIFIED annotations (8.1), MOCK JUSTIFIED annotations (8.3). **3,894 tests green.**
+
+**Remaining gaps** (not P0, no directive required yet):
+1. G6: Fresh Stryker run needed on new service layer (IntentClassifier, TranslationService, FlowEngine, PipelineProfiler, VoiceprintStore)
+2. G6: LaneArbitrator mutation score 54% — below 60% threshold
+3. Oracle: Consider adding `fast-check` property tests for IntentClassifier (keyword scoring arithmetic) and TranslationService (language pair symmetry)
+
+---
+
 ## Team Feedback
 
 > Session: 2026-03-18 (check-in 259) | Author: Claude Sonnet 4.6

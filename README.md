@@ -2,7 +2,7 @@
 
 A production voice agent runtime that eliminates the two things that kill enterprise voice deployments: **bad latency** and **ungoverned output**. Browser-based and SIP-ready speech-to-speech assistant with three-lane orchestration, async policy enforcement, retrieval-augmented generation, and a full enterprise feature stack.
 
-**Status:** 24/25 initiatives SHIPPED + 1 BUILDING | 3,746 server tests | 92%+ coverage
+**Status:** 25/25 initiatives SHIPPED | 3,894 server tests | 92%+ coverage
 
 ---
 
@@ -660,13 +660,13 @@ Useful for outbound campaign automation — CRM systems or workflow engines can 
 
 | Metric | Value |
 |--------|-------|
-| Server test suite | 3,746 tests, 0 failures |
-| Test suites | 112 (66 unit + 6 integration + performance + load) |
-| Statement coverage | 92.53% (floor: 91%) |
-| Branch coverage | 83.5% (floor: 83%) |
-| Function coverage | 92.72% (floor: 88%) |
-| Line coverage | 92.97% (floor: 91%) |
-| React SDK tests | 39 (separate Vitest suite) |
+| Server test suite | 3,894 tests, 0 failures |
+| Test suites | 128 (unit + integration + performance + load) |
+| Statement coverage | 92.77% (floor: 89%) |
+| Branch coverage | 82.37% (floor: 79%) |
+| Function coverage | 94.38% (floor: 90%) |
+| Line coverage | 93.18% (floor: 90%) |
+| React SDK tests | 79 (separate Vitest suite) |
 | Coverage floor enforcement | jest.config.js `coverageThreshold` — CI fails on breach |
 | Mutation testing baseline | Stryker (PolicyGate 70.5%, LaneArbitrator 54%, AllowedClaimsRegistry 36%) |
 

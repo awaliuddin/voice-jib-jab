@@ -13,6 +13,9 @@
  */
 
 // ── Mocks (before imports — jest hoisting requirement) ───────────────────
+// MOCK JUSTIFIED: EventBus, AllowedClaimsRegistry (HuggingFace download), OpaEvaluator (WASM
+// file) are CI-unavailable infrastructure. Regression suite tests Lane C policy decisions
+// (moderation, OPA claims, severity routing) — not infra initialization.
 
 jest.mock("../../orchestrator/EventBus.js", () => ({
   eventBus: {
