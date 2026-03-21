@@ -1228,7 +1228,7 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 | G3 | Mock Drift Detection | ✅ PASS | Recent commits: timer fixes + security upgrades — no implementation+mock co-modification. Integration test mocks are infrastructure-only (ws, chromadb, EventBus, OpaEvaluator, AllowedClaimsRegistry). |
 | G4 | Test Count Delta | ✅ PASS | Baseline (check-in 57): 3,894. Current: 3,894. Delta: 0. |
 | G5 | Silent Exceptions | ✅ PASS | 3 catch blocks examined: `compareAgentsDashboard.ts:437`, `onboardingWizardHtml.ts:713`, `transcriptViewer.ts:227` — all are browser-side JS inside HTML template strings (never executed in Node.js) or a date-format fallback that returns the original value. Zero CRITICAL silent exceptions in server business logic. |
-| G6 | Mutation Testing | ⚠️ STALE | Stryker baseline (2026-03-16): PolicyGate 70.5% ✅, LaneArbitrator 54% ⚠️ (below 60%), AllowedClaimsRegistry 36% ❌ (below 40%). Still stale — 148 new tests added since baseline, ~10 new service files unexamined. |
+| G6 | Mutation Testing | ✅ PASS | Stryker refreshed 2026-03-21: PolicyGate 72.0% ✅, AllowedClaimsRegistry 60.0% ✅, LaneArbitrator 65.1% ✅. All 3 files exceed thresholds. |
 | G7 | Spec-Test Traceability | ⚠️ PARTIAL | Existing T-0XX markers intact. New test files (post-marathon) lack N-XX AC-Y markers. Per protocol: forward-only, no retrofit burden. No regression. |
 
 **Gate 8 — Coverage Integrity Audit:**
@@ -1294,13 +1294,16 @@ Full brief: `~/ASIF/enrichment/2026-03-04-voice-tts-sota-brief.md`
 |------|----------------------|------------------------|-----------|--------|
 | `policy_gate.ts` | 70.48% | **72.03%** | 60% | ✅ +1.6pp |
 | `allowed_claims_registry.ts` | 36.29% | **60.00%** | 40% | ✅ +23.7pp — threshold crossed |
-| `LaneArbitrator.ts` | 53.95% | **58.81%** | 60% | ⚠️ -1.2pp short — null-guard survivors |
+| `LaneArbitrator.ts` | 53.95% | **65.06%** | 60% | ✅ +11.1pp — threshold crossed |
 
-**Key finding — LaneArbitrator still below 60%**: Two surviving mutations on `LaneArbitrator.ts:560` — the `this.speechEndTime && this.bReadyTime` null-guard:
-- `&&` → `true`: computes latencyMs even when both times are null
-- `&&` → `||`: computes latencyMs when only one time is set
+**LaneArbitrator 65.06% — threshold crossed**: 10 targeted tests added 2026-03-21 (batch 2) covering:
+- `lane.b_ready` eventBus `latency_ms` arithmetic (line 213 ArithmeticOperator)
+- `endSession()` from FALLBACK_PLAYING emits `stop_fallback` (line 131 EqualityOperator)
+- `onLaneBDone()` from B_RESPONDING state (line 289 LogicalOperator — kills `||→&&`)
+- `onPolicyCancel()` from B_RESPONDING and A_PLAYING emits `stop_lane_b` (lines 412-413)
+- `onFallbackComplete()` owner reset and ENDED guard (lines 434, 438)
 
-Added 2 targeted tests: `latencyMs is null before either time recorded` and `latencyMs is null after only speechEndTime set`. These kill both mutations. A second Stryker run would be needed to confirm the score crosses 60%. Deferring second run — gap-fill tests are committed; standing auth covers verification.
+Verification Stryker run confirmed: 218 killed, 11 timeout, 111 survived, 12 no-cov = 229/352 = **65.06%**. Q38 fully resolved.
 
 **AllowedClaimsRegistry gap fully closed**: 36% → 60% (+23.7pp). The 16 direct unit tests from 2026-03-20 converted 130 "no-coverage" mutants into testable (killed/survived) mutants, dramatically improving the score.
 
@@ -1582,10 +1585,12 @@ Idle Time Protocol — all 5 items completed across this session. No new feature
 | `b2e0e11` | AllowedClaimsRegistry mutation gap-fill (+16 tests: dense embedding paths, file-loading variants) | 3,904 → 3,920 |
 | `9c22d12` | Research docs: jest-timer-leak-analysis, stryker-related-test-discovery, test-arithmetic-assertion-pattern | — |
 | `978ff1f` | README sync (3,894→3,920), NEXUS Self-Improvement Log entry | — |
+| (prior session) | Stryker refresh: `ignoreStatic: true` config, LaneArbitrator null-guard tests (+2) | 3,928 → 3,930 |
+| (this session) | LaneArbitrator mutation gap-fill batch 2 (+10 tests: eventBus arithmetic, endSession/stop_fallback, onLaneBDone/B_RESPONDING, onPolicyCancel/stop_lane_b, onFallbackComplete owner+state guards) | 3,930 → 3,940 |
 
 Also resolved from prior session (committed `e18725d`): Jest force-exit warning — `process.nextTick` → `setImmediate + .unref()` in MockWebSocket; `doNotFake: ["setImmediate"]` added to OpenAIRealtimeAdapter fake-timer blocks.
 
-**Final state**: 3,920 tests, 128 suites, 0 failures.
+**Final state**: 3,940 tests, 128 suites, 0 failures. All 3 Stryker targets exceed thresholds: PolicyGate 72.0%, AllowedClaimsRegistry 60.0%, LaneArbitrator 65.1%.
 
 ---
 

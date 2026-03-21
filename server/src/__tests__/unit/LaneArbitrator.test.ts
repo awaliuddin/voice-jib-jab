@@ -15,6 +15,7 @@
  */
 
 import { LaneArbitrator } from "../../orchestrator/LaneArbitrator.js";
+import { eventBus } from "../../orchestrator/EventBus.js";
 
 // Use fake timers for testing setTimeout/setInterval
 jest.useFakeTimers();
@@ -906,6 +907,169 @@ describe("LaneArbitrator", () => {
       arbitrator.onPolicyCancel();
 
       expect(playFallback).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Mutation-killer tests (CRUCIBLE Gate 6 gap-fill, 2026-03-21 batch 2) ──
+
+  describe("lane.b_ready event arithmetic correctness (line 213)", () => {
+    it("emitted latency_ms equals bReadyTime MINUS speechEndTime (not plus)", () => {
+      arbitrator.startSession();
+
+      const captured: number[] = [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const handler = (ev: any) => { captured.push(ev.payload.latency_ms); };
+      eventBus.on("lane.b_ready", handler);
+
+      const T1 = 1700000100000;
+      jest.setSystemTime(T1);
+      arbitrator.onUserSpeechEnded();
+
+      jest.setSystemTime(T1 + 500);
+      arbitrator.onLaneBReady();
+
+      // Clean up before asserting
+      eventBus["emitter"].off("lane.b_ready", handler);
+
+      expect(captured).toHaveLength(1);
+      expect(captured[0]).toBe(500); // 500ms, not T1*2+500
+    });
+
+    it("emitted latency_ms is 0 when no speechEndTime recorded", () => {
+      arbitrator.startSession();
+
+      const captured: number[] = [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const handler = (ev: any) => { captured.push(ev.payload.latency_ms); };
+      eventBus.on("lane.b_ready", handler);
+
+      // onLaneBReady() without prior onUserSpeechEnded
+      arbitrator.onLaneBReady();
+
+      eventBus["emitter"].off("lane.b_ready", handler);
+
+      expect(captured).toHaveLength(1);
+      expect(captured[0]).toBe(0);
+    });
+  });
+
+  describe("endSession() from FALLBACK_PLAYING emits stop_fallback (line 131)", () => {
+    it("stop_fallback is emitted when endSession called from FALLBACK_PLAYING", () => {
+      arbitrator.startSession();
+      arbitrator.onUserSpeechEnded();
+      arbitrator.onLaneBReady();
+      expect(arbitrator.getState()).toBe("B_PLAYING");
+      arbitrator.onPolicyCancel();
+      expect(arbitrator.getState()).toBe("FALLBACK_PLAYING");
+
+      const stopFallback = jest.fn();
+      arbitrator.on("stop_fallback", stopFallback);
+
+      arbitrator.endSession();
+
+      expect(stopFallback).toHaveBeenCalledTimes(1);
+      expect(arbitrator.getState()).toBe("ENDED");
+    });
+
+    it("stop_fallback is NOT emitted when endSession called from LISTENING (not FALLBACK_PLAYING)", () => {
+      arbitrator.startSession();
+      expect(arbitrator.getState()).toBe("LISTENING");
+
+      const stopFallback = jest.fn();
+      arbitrator.on("stop_fallback", stopFallback);
+
+      arbitrator.endSession();
+
+      expect(stopFallback).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("onLaneBDone() from B_RESPONDING state (line 289 LogicalOperator)", () => {
+    it("onLaneBDone() from B_RESPONDING transitions to LISTENING and emits response_complete", () => {
+      // State: LISTENING → onUserSpeechEnded → B_RESPONDING (no onLaneBReady yet)
+      arbitrator.startSession();
+      arbitrator.onUserSpeechEnded();
+      expect(arbitrator.getState()).toBe("B_RESPONDING");
+
+      const events: string[] = [];
+      arbitrator.on("response_complete", () => events.push("response_complete"));
+
+      arbitrator.onLaneBDone();
+
+      expect(arbitrator.getState()).toBe("LISTENING");
+      expect(events).toContain("response_complete");
+    });
+
+    it("onLaneBDone() from B_RESPONDING clears responseInProgress", () => {
+      arbitrator.startSession();
+      arbitrator.onUserSpeechEnded();
+      expect(arbitrator.getState()).toBe("B_RESPONDING");
+
+      arbitrator.onLaneBDone();
+
+      // responseInProgress cleared — next speech cycle accepted
+      arbitrator.onUserSpeechEnded();
+      expect(arbitrator.getState()).toBe("B_RESPONDING");
+    });
+  });
+
+  describe("onPolicyCancel() stop_lane_b in B_RESPONDING state (lines 412-413)", () => {
+    it("stop_lane_b is emitted when onPolicyCancel called from B_RESPONDING", () => {
+      arbitrator.startSession();
+      arbitrator.onUserSpeechEnded();
+      expect(arbitrator.getState()).toBe("B_RESPONDING");
+
+      const stopLaneB = jest.fn();
+      arbitrator.on("stop_lane_b", stopLaneB);
+
+      arbitrator.onPolicyCancel();
+
+      expect(stopLaneB).toHaveBeenCalledTimes(1);
+    });
+
+    it("stop_lane_b is emitted when onPolicyCancel called from A_PLAYING", () => {
+      arbitrator.startSession();
+      arbitrator.onUserSpeechEnded();
+      // Advance timer past minDelayBeforeReflexMs to trigger Lane A reflex
+      jest.advanceTimersByTime(150);
+      expect(arbitrator.getState()).toBe("A_PLAYING");
+
+      const stopLaneB = jest.fn();
+      const stopReflex = jest.fn();
+      arbitrator.on("stop_lane_b", stopLaneB);
+      arbitrator.on("stop_reflex", stopReflex);
+
+      arbitrator.onPolicyCancel();
+
+      expect(stopLaneB).toHaveBeenCalledTimes(1);
+      expect(stopReflex).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("onFallbackComplete() owner and state guards (lines 434, 438)", () => {
+    it("getCurrentOwner() returns 'none' after onFallbackComplete from FALLBACK_PLAYING (line 434)", () => {
+      arbitrator.startSession();
+      arbitrator.onUserSpeechEnded();
+      arbitrator.onLaneBReady();
+      arbitrator.onPolicyCancel();
+      expect(arbitrator.getState()).toBe("FALLBACK_PLAYING");
+      expect(arbitrator.getCurrentOwner()).toBe("fallback");
+
+      arbitrator.onFallbackComplete();
+
+      expect(arbitrator.getCurrentOwner()).toBe("none");
+      expect(arbitrator.getState()).toBe("LISTENING");
+    });
+
+    it("onFallbackComplete() from ENDED state does not transition to LISTENING (line 438 &&→||)", () => {
+      arbitrator.startSession();
+      arbitrator.endSession();
+      expect(arbitrator.getState()).toBe("ENDED");
+
+      // Should be no-op — state must not become LISTENING
+      arbitrator.onFallbackComplete();
+
+      expect(arbitrator.getState()).toBe("ENDED");
     });
   });
 });
