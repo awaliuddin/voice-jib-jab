@@ -69,6 +69,7 @@
 | N-57 | Branch Coverage — websocket.ts optional service injection (20 branches) | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-58 | Branch Coverage — 7 files: ConversationAnalytics + templates + flows + onboarding + admin + IVR + training | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-59 | Branch Coverage — floor raise 79→86% + AuditReport + SessionRecorder + source annotations (14+3 dead branches) | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
+| N-60 | Branch Coverage — 9 files: Compliance + Training + Webhook + ConfigValidator + KnowledgeBase + Routing + 3 APIs | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 
 ---
 
@@ -12888,6 +12889,24 @@ Seven-file parallel branch coverage pass via 4 agents. Largest single session N-
 
 ---
 
+### N-60: Branch Coverage — 9 files, 91.10%→92.14% branch (2026-03-21)
+
+Nine-file parallel branch coverage pass via 4 agents.
+
+- **ComplianceDashboardService.test.ts** (+4 tests): L394 `passingRegs.length===0` fallback, L517/519 partial/non_compliant color tokens, L263 `policyDecisions["escalate"] ?? 0` missing-key arm.
+- **TrainingDataService.test.ts** (+6 tests): L111/112 `note`/`supervisorId` spread paths, L344/345 `to` filter accept/reject, L376/382 `findPriorUserTurn` empty-string fallback and found path.
+- **WebhookService.test.ts** (+5 tests): L124 `active ?? true` default, L177-180 all update-field undefined guards, L285 `String(err)` non-Error rejection, L314 tenantId-only `listDeliveries`, L356 proxy non-function passthrough.
+- **ConfigValidator.test.ts** (+5 tests): L84 `String(err)` storageDir non-Error, L116 `openAiBaseUrl ?? default` fallback, L140 `chromaDbUrl ?? default`, L158 fetch-throws-non-Error, L181 `opaEnabled ?? config.opa.enabled`.
+- **KnowledgeBase.test.ts** (+5 tests): L182/204/223 stale-idIndex guards (updateEntry/deleteEntry/incrementHit), L279 proxy throws before init, L285 proxy non-function passthrough.
+- **RoutingEngine.test.ts** (+6 tests): L121 `deleteRule` unknown id, L159/160 tenantId mismatch skip, L173 topic condition with no meta.topic, L192 callerType mismatch, L241 non-ENOENT rethrow from corrupt JSON.
+- **recordings-api.test.ts** (+5 tests): L35 `clampInt` negative → 0, L66/79 array query param (`?from=a&from=b`) type guards, L106/158 `String(err)` non-Error rejections.
+- **TenantQuota.test.ts** (+4 tests): L70-71 `maxConcurrentSessions` non-number → 400, L78 `monthlyMinutesQuota` non-number → 400, L88/92 absent-field ternary arms.
+- **onboarding-api.test.ts** (+5 tests): L112 empty `validationErrors` array → 400 fallback, L123/148/173/198 `e.message ?? "Unknown error"` false arms across 4 endpoints.
+
+4,850 → **4,897 tests** (+47). Branch: **91.10% → 92.14%**. Dashboard: 60/60 SHIPPED.
+
+---
+
 ### N-59: Branch Coverage — floor raise + AuditReport + SessionRecorder + source annotations (2026-03-21)
 
 Multi-file branch coverage pass + governance floor update. Four agents ran in parallel:
@@ -13086,6 +13105,47 @@ Same as check-in 92: N-60 branch coverage pass on the four remaining <85% files 
 **Q44 (open)** — Stale plan file `keen-enchanting-yao.md` (N-12 MCP ticketing).
 
 Dashboard: 59/59 SHIPPED.
+
+---
+
+### Check-in 94 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-60** (committed `de1c670`, pushed): Branch coverage for 9 files via 4 parallel agents. +47 tests (4,850→4,897). Branch: **91.10% → 92.14%**. Dashboard: 60/60 SHIPPED.
+
+Files: ComplianceDashboardService (+4), TrainingDataService (+6), WebhookService (+5), ConfigValidator (+5), KnowledgeBaseStore (+5), RoutingEngine (+6), recordings-api (+5), quota-api (+4), onboarding-api (+5).
+
+CI gate: 4,897/4,897 passed. Pre-push: PASSED. Pushed.
+
+#### 2. What surprised me?
+
+**`RoutingEngine.evaluate()` pre-filters rules by `tenantId` before calling `matchRule`**, meaning the per-rule tenantId check inside `matchRule` (L159) is never reached via the normal `evaluate()` path. It's only reachable if rules are passed directly to `matchRule` while bypassing `getRules()` pre-filtering. The branch is real (not dead) but requires casting to `any` and direct invocation to exercise it. A subtle indirect-call gap.
+
+**`ConfigValidator.test.ts` used `jest.spyOn(fsp, "access")`** to force storageDir check to throw a plain string — but the spy needs to be set up before the validator runs its checks. The ConfigValidator runs checks concurrently in `Promise.all`, so the spy must be applied before the validate call, not during. Timing-sensitive mock setup.
+
+**9 files, 47 tests, 4 agents — all passing first try.** Zero iteration needed on any agent. The pattern (exact line numbers → read source → read existing tests → write focused additions) continues to work cleanly.
+
+#### 3. Cross-project signals
+
+**Proxy singletons have a recurring untested branch.** `if (!_store) throw new Error(...)` in singleton proxies (e.g., `KnowledgeBaseStore`, `IntentStore`, `OnboardingWizardService`) is structurally the same across all stores. Portfolio pattern: after any store module is written, add one test that accesses the proxy before init and confirms the throw. This one test covers the same missed branch that otherwise appears repeatedly in coverage reports.
+
+**`String(err)` catch coercion for non-Error rejections** is a recurring 1-branch gap across all services with catch blocks. Portfolio recommendation: add `"throws non-Error value → String(err)"` as a standard catch-branch test to every service's test template. It's 3 lines and covers the `err instanceof Error ? ... : String(err)` false arm that appears in ~80% of catch blocks.
+
+#### 4. What would I prioritize next?
+
+1. **Remaining <85% files** (from new baseline): `api/auditEvents.ts` (77.8%), `services/CallQueueService.ts` (78.6%), `services/TenantRegistry.ts` (78.6%), `services/PersonaStore.ts` (80%), `services/IntentStore.ts` (81.5%). ~30 missed branches total — another N-initiative.
+2. **Any new CoS directives** — Q42 still open.
+3. **Stryker refresh** — mutation baseline was established when branch coverage was ~81%. Now at 92.14%; a re-run would show whether new tests catch mutations.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture.
+**Q42 (open)** — Next directive batch or maintenance mode?
+**Q43 (open)** — Pre-push lock-file sync check.
+**Q44 (open)** — Stale plan file `keen-enchanting-yao.md` (N-12 MCP ticketing).
+
+Dashboard: 60/60 SHIPPED.
 
 ---
 
