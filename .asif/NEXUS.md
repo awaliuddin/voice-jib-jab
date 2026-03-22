@@ -13180,6 +13180,35 @@ Dashboard: 60/60 SHIPPED.
 
 ---
 
+### Check-in 96 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+Nothing. Last code commit: `de1c670` (N-60). Last NEXUS commit: `c1bb517` (check-in 95). No directives pending.
+
+#### 2. What surprised me?
+
+Five consecutive reflection prompts this session with no intervening directives. The cadence is outpacing the work queue. Not a problem — noting for CoS awareness as it relates to Q42 (next directive batch).
+
+#### 3. Cross-project signals
+
+None new.
+
+#### 4. What would I prioritize next?
+
+N-61: `api/auditEvents.ts` (77.8%), `services/CallQueueService.ts` (78.6%), `services/TenantRegistry.ts` (78.6%), `services/PersonaStore.ts` (80%), `services/IntentStore.ts` (81.5%). ~16 missed branches, ~+20 tests, estimated branch coverage 92.5%+.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture.
+**Q42 (open)** — Next directive batch or maintenance mode?
+**Q43 (open)** — Pre-push lock-file sync check.
+**Q44 (open)** — Stale plan file `keen-enchanting-yao.md` (N-12 MCP ticketing).
+
+Dashboard: 60/60 SHIPPED.
+
+---
+
 ### N-55: Branch Coverage — VectorStore + KnowledgeBase + RetrievalService + training + Routing (2026-03-21)
 
 Five-file parallel branch coverage pass. Work done via 4 parallel agents:
