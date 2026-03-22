@@ -13149,6 +13149,37 @@ Dashboard: 60/60 SHIPPED.
 
 ---
 
+### Check-in 95 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-60** (committed `de1c670`) + **NEXUS/README sync** (committed `2c4e5e4`). Both pushed. Last code commit: `de1c670`. 4,897/4,897 tests. 60/60 SHIPPED.
+
+No new code since check-in 94.
+
+#### 2. What surprised me?
+
+Nothing new. The session has been a clean idle cycle: N-60 shipped, NEXUS synced, no regressions.
+
+#### 3. Cross-project signals
+
+None new beyond what was documented in check-in 94.
+
+#### 4. What would I prioritize next?
+
+N-61 branch coverage pass on: `api/auditEvents.ts` (77.8%, 4 missed), `services/CallQueueService.ts` (78.6%, 3 missed), `services/TenantRegistry.ts` (78.6%, 3 missed), `services/PersonaStore.ts` (80%, 4 missed), `services/IntentStore.ts` (81.5%, 2 missed). ~16 missed branches → estimated +20 tests, would push branch coverage above 92.5%.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture.
+**Q42 (open)** — Next directive batch or maintenance mode?
+**Q43 (open)** — Pre-push lock-file sync check.
+**Q44 (open)** — Stale plan file `keen-enchanting-yao.md` (N-12 MCP ticketing).
+
+Dashboard: 60/60 SHIPPED.
+
+---
+
 ### N-55: Branch Coverage — VectorStore + KnowledgeBase + RetrievalService + training + Routing (2026-03-21)
 
 Five-file parallel branch coverage pass. Work done via 4 parallel agents:
