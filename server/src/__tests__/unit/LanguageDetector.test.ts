@@ -323,6 +323,50 @@ describe("Language API Endpoints", () => {
   });
 });
 
+// ── Branch coverage ───────────────────────────────────────────────────
+
+describe("Language API — branch coverage", () => {
+  // L49 binary-expr: the `?? "builtin-customer-support"` fallback fires when
+  // result.language is not a key in LANGUAGE_TEMPLATE_MAP.  The typed
+  // LanguageDetector can never return such a value, so we mock the prototype.
+  it("GET /language/detect falls back to builtin-customer-support for unmapped language (L49 ?? branch)", async () => {
+    const { LanguageDetector } = await import("../../services/LanguageDetector.js");
+    const detectSpy = jest
+      .spyOn(LanguageDetector.prototype, "detect")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .mockReturnValueOnce({ language: "xx" as any, confidence: 0.9, fallback: false });
+
+    const { AgentTemplateStore } = await import("../../services/AgentTemplateStore.js");
+    const { createLanguageRouter } = await import("../../api/language.js");
+    const express = (await import("express")).default;
+    const { createServer } = await import("http");
+
+    const dir = mkdtempSync(join(tmpdir(), "lang-branch-"));
+    const storeFile = join(dir, "templates.json");
+    const store = new AgentTemplateStore(storeFile);
+
+    const app = express();
+    app.use(express.json());
+    app.use("/language", createLanguageRouter(store));
+
+    const server = createServer(app);
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+
+    try {
+      const res = await httpRequest(server, "GET", "/language/detect?text=sometext");
+      expect(res.status).toBe(200);
+      const data = res.json() as { templateId: string; language: string };
+      expect(data.templateId).toBe("builtin-customer-support");
+    } finally {
+      detectSpy.mockRestore();
+      await new Promise<void>((r) => server.close(() => r()));
+      if (existsSync(dir)) {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  });
+});
+
 // ── Integration Tests: AgentTemplateStore count ───────────────────────
 
 describe("AgentTemplateStore with new language templates", () => {

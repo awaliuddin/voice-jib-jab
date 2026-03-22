@@ -29,7 +29,7 @@ export default {
     "!src/demo/run.ts",        // OMIT JUSTIFIED: demo script entrypoint, dev-only
   ],
   modulePathIgnorePatterns: ["<rootDir>/dist/", "<rootDir>/.stryker-tmp/"],
-  testPathIgnorePatterns: ["/node_modules/", "<rootDir>/dist/", "<rootDir>/.stryker-tmp/"],
+  testPathIgnorePatterns: ["/node_modules/", "<rootDir>/dist/", "<rootDir>/.stryker-tmp/", "/.claude/worktrees/"],
   coverageThreshold: {
     global: {
       // Floors set ~3% below actual (2026-03-21 N-58): stmt 95.7%, branch 89.3%, fn 96.3%, lines 96.2%

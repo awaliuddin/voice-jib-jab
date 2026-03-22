@@ -866,6 +866,48 @@ describe("IntentClassifier — word-boundary matching (N-35)", () => {
   });
 });
 
+// ── Helper: send request with no body (Content-Type omitted so express.json()
+//    leaves req.body undefined, exercising the `req.body ?? {}` fallback) ────
+
+function httpRequestNoBody(
+  server: Server,
+  method: string,
+  path: string,
+): Promise<HttpResponse> {
+  return new Promise((resolve, reject) => {
+    const addr = server.address();
+    if (!addr || typeof addr === "string") {
+      return reject(new Error("Server not listening"));
+    }
+
+    import("http").then(({ default: http }) => {
+      const req = http.request(
+        {
+          hostname: "127.0.0.1",
+          port: (addr as { port: number }).port,
+          path,
+          method,
+        },
+        (res) => {
+          const chunks: Buffer[] = [];
+          res.on("data", (chunk: Buffer) => chunks.push(chunk));
+          res.on("end", () => {
+            const rawBody = Buffer.concat(chunks).toString("utf-8");
+            resolve({
+              status: res.statusCode ?? 0,
+              headers: res.headers as Record<string, string | string[] | undefined>,
+              body: rawBody,
+              json: () => JSON.parse(rawBody),
+            });
+          });
+        },
+      );
+      req.on("error", reject);
+      req.end();
+    });
+  });
+}
+
 // ── 13. IntentStore — branch coverage ────────────────────────────────
 
 describe("IntentStore — branch coverage", () => {
@@ -966,5 +1008,122 @@ describe("IntentStore — branch coverage", () => {
     ).toThrow("IntentStore not initialized");
 
     jest.resetModules();
+  });
+});
+
+// ── 14. intents API — branch coverage ────────────────────────────────
+//
+// Targets the six missed branches in server/src/api/intents.ts:
+//   L36  binary-expr  req.body ?? {}        (POST /detect, no body)
+//   L74  cond-expr    limitRaw !== undefined (GET /,      no ?limit)
+//   L91  cond-expr    tenantId query string  (GET /config, no ?tenantId)
+//   L108 binary-expr  req.body ?? {}        (POST /config, no body)
+//   L127 cond-expr    body.tenantId string   (POST /config, tenantId not a string)
+//   L145 if branch    invalid intent DELETE  (DELETE /config/:intent, bad intent)
+
+describe("intents API — branch coverage", () => {
+  let app: Express;
+  let server: Server;
+  let store: IntentStore;
+  let storageFile: string;
+
+  beforeAll((done) => {
+    storageFile = tempFile("api-branch");
+    store = new IntentStore(storageFile);
+    app = buildTestApp(new IntentClassifier(), store);
+    server = createServer(app);
+    server.listen(0, done);
+  });
+
+  afterAll((done) => {
+    server.close(() => {
+      if (existsSync(storageFile)) rmSync(storageFile);
+      done();
+    });
+  });
+
+  // L36: req.body ?? {} — right side fires when req.body is undefined.
+  // Sending a raw POST with no body and no Content-Type header leaves
+  // req.body undefined after express.json(); the ?? {} fallback is taken,
+  // body.text is undefined, and the handler returns 400.
+  it("POST /detect with no body exercises req.body ?? {} fallback (L36)", async () => {
+    const res = await httpRequestNoBody(server, "POST", "/intents/detect");
+    // body is undefined → {} → body.text is undefined → 400
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("text");
+  });
+
+  // L74: limitRaw !== undefined ternary — false branch (?: 50) fires when
+  // ?limit is absent from the query string.
+  it("GET /intents with no ?limit uses default 50 (L74 false branch)", async () => {
+    store.logDetection({
+      tenantId: "branch-t1",
+      sessionId: null,
+      text: "need support",
+      intent: "support",
+      confidence: 0.5,
+    });
+
+    const res = await httpRequest(server, "GET", "/intents?tenantId=branch-t1");
+    expect(res.status).toBe(200);
+    // Response succeeds — the default limit of 50 was applied
+    const data = res.json() as { logs: unknown[] };
+    expect(Array.isArray(data.logs)).toBe(true);
+  });
+
+  // L74 (safeLimit fallback): passing a non-numeric limit string makes
+  // parseInt return NaN, which is not finite, so safeLimit falls back to 50.
+  it("GET /intents with ?limit=nan falls back to safeLimit 50 (L74 NaN branch)", async () => {
+    const res = await httpRequest(server, "GET", "/intents?limit=notanumber");
+    expect(res.status).toBe(200);
+    const data = res.json() as { logs: unknown[] };
+    expect(Array.isArray(data.logs)).toBe(true);
+  });
+
+  // L91: typeof req.query.tenantId === "string" — false branch fires when
+  // ?tenantId is absent, so tenantId becomes undefined and all mappings are returned.
+  it("GET /config with no ?tenantId exercises tenantId undefined branch (L91)", async () => {
+    store.setMapping(null, "sales", "tmpl-sales-branch");
+
+    const res = await httpRequest(server, "GET", "/intents/config");
+    expect(res.status).toBe(200);
+    const data = res.json() as { mappings: unknown[]; count: number };
+    expect(data.count).toBeGreaterThanOrEqual(1);
+  });
+
+  // L108: req.body ?? {} — right side fires when req.body is undefined.
+  // Sending a raw POST /config with no body → {} → body.intent is undefined → 400.
+  it("POST /config with no body exercises req.body ?? {} fallback (L108)", async () => {
+    const res = await httpRequestNoBody(server, "POST", "/intents/config");
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("intent");
+  });
+
+  // L127: typeof body.tenantId === "string" — false branch fires when tenantId
+  // is a non-string value (e.g., a number). The handler coerces it to null.
+  it("POST /config with numeric tenantId stores null tenantId (L127 false branch)", async () => {
+    const res = await httpRequest(server, "POST", "/intents/config", {
+      intent: "complaint",
+      templateId: "tmpl-complaint-branch",
+      tenantId: 42, // number, not string → false branch → null
+    });
+    expect(res.status).toBe(201);
+    const data = res.json() as { tenantId: null };
+    expect(data.tenantId).toBeNull();
+  });
+
+  // L145: if (!(VALID_INTENTS).includes(intent)) — true branch fires when
+  // the :intent param is not in VALID_INTENTS. Returns 400.
+  it("DELETE /config/:intent with invalid intent returns 400 (L145 true branch)", async () => {
+    const res = await httpRequest(
+      server,
+      "DELETE",
+      "/intents/config/not_a_valid_intent",
+    );
+    expect(res.status).toBe(400);
+    const data = res.json() as { error: string };
+    expect(data.error).toContain("intent");
   });
 });

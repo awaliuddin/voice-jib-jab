@@ -312,6 +312,39 @@ describe("SlaMonitor — custom targets", () => {
   });
 });
 
+// ── branch coverage ───────────────────────────────────────────────────
+
+describe("SlaMonitor — branch coverage", () => {
+  // L146 true-branch: record() creates a new buffer for a metric not in targets.
+  // L163 true-branch: record() returns early when the metric has no SlaTarget.
+  it("record() with an unknown metric creates a buffer and does not emit events", () => {
+    const m = makeMonitor();
+    const breachSpy = jest.fn();
+    const criticalSpy = jest.fn();
+    m.on("breach", breachSpy);
+    m.on("critical", criticalSpy);
+
+    // "unknownMetric" is not in DEFAULT_SLA_TARGETS, so:
+    //   L146: buffers.has("unknownMetric") === false  → enters the if-true branch
+    //   L163: targets["unknownMetric"] is undefined   → early return (if-true branch)
+    m.record(makeSample("unknownMetric", 9999));
+
+    expect(m.getSamples("unknownMetric")).toHaveLength(1);
+    expect(breachSpy).not.toHaveBeenCalled();
+    expect(criticalSpy).not.toHaveBeenCalled();
+  });
+
+  // L239 right-hand of ?? : getSamples(metric) when metric has no buffer entry.
+  // buffers.get("noSuchKey") returns undefined, so the ?? [] fallback is taken.
+  it("getSamples() returns empty array for a metric with no buffer entry", () => {
+    const m = makeMonitor();
+    // "noSuchKey" was never recorded and is not in DEFAULT_SLA_TARGETS,
+    // so it was never pre-initialised in buffers.
+    const result = m.getSamples("noSuchKey");
+    expect(result).toEqual([]);
+  });
+});
+
 // ── webhook ───────────────────────────────────────────────────────────
 
 describe("SlaMonitor — webhook", () => {

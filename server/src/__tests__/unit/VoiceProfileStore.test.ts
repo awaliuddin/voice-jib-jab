@@ -254,3 +254,59 @@ describe("VoiceProfileStore", () => {
     });
   });
 });
+
+// ── Branch coverage ────────────────────────────────────────────────────
+
+describe("VoiceProfileStore — branch coverage", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = join(
+      tmpdir(),
+      `voice-profile-branch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    );
+  });
+
+  afterEach(() => {
+    if (existsSync(dir)) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // L93 false-branch: loadTenant re-throws non-ENOENT errors
+  it("loadTenant re-throws non-ENOENT filesystem errors (L93 false branch)", () => {
+    const { writeFileSync, mkdirSync } = require("fs") as typeof import("fs");
+    mkdirSync(join(dir, "voices"), { recursive: true });
+    mkdirSync(join(dir, "audio"), { recursive: true });
+
+    // Write a corrupt (non-JSON) file so JSON.parse throws a SyntaxError — not an ENOENT
+    writeFileSync(join(dir, "voices", "org_corrupt.json"), "{ this is not valid json }", "utf-8");
+
+    const store = new VoiceProfileStore(dir);
+    // listProfiles calls loadTenant which will read the corrupt file and fail with SyntaxError
+    expect(() => store.listProfiles("org_corrupt")).toThrow();
+  });
+
+  // L171 true-branch: deleteProfile returns false when profileId is in the index
+  // but the profile array does not contain it (stale index after manual cache mutation)
+  it("deleteProfile returns false when index entry exists but profile absent (L171 true branch)", () => {
+    const store = new VoiceProfileStore(dir);
+
+    // Create a profile so the index has an entry
+    const profile = store.createProfile({
+      tenantId: "org_stale",
+      name: "Stale",
+      audioPath: "/stale.wav",
+    });
+
+    // Reach into private internals to corrupt the cache so the profile is gone
+    // from the array while the index still points at the tenant
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const storeAny = store as any;
+    storeAny.cache.set("org_stale", []); // empty the tenant's profile list
+
+    // The index still maps profileId → "org_stale", but the array is empty
+    const result = store.deleteProfile(profile.profileId);
+    expect(result).toBe(false);
+  });
+});

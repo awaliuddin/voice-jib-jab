@@ -173,6 +173,46 @@ describe("Auth rate limiting (N-39)", () => {
   });
 });
 
+describe("createRateLimiter — branch coverage", () => {
+  // L29 binary-expr: `req.ip ?? "unknown"` — the "unknown" fallback fires when
+  // req.ip is undefined.  We exercise this by calling the middleware directly
+  // with a mock request that has no ip property.
+  it('uses "unknown" key when req.ip is undefined (L29 ?? branch)', () => {
+    const { createRateLimiter } = require("../../middleware/rateLimiter.js") as typeof import("../../middleware/rateLimiter.js");
+    const limiter = createRateLimiter({ windowMs: 60_000, max: 5, message: "rate limit exceeded" });
+
+    const next = jest.fn();
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() } as unknown as import("express").Response;
+
+    // req with ip explicitly undefined
+    const req = {} as import("express").Request; // no ip property
+
+    limiter(req, res, next);
+    expect(next).toHaveBeenCalledTimes(1);
+
+    // Second call with same undefined ip should also succeed (count 2, within max 5)
+    limiter(req, res, next);
+    expect(next).toHaveBeenCalledTimes(2);
+  });
+
+  it('requests without ip are rate-limited together under "unknown" key (L29 ?? branch)', () => {
+    const { createRateLimiter } = require("../../middleware/rateLimiter.js") as typeof import("../../middleware/rateLimiter.js");
+    const limiter = createRateLimiter({ windowMs: 60_000, max: 2, message: "over limit" });
+
+    const next = jest.fn();
+    const jsonMock = jest.fn();
+    const res = { status: jest.fn().mockReturnThis(), json: jsonMock } as unknown as import("express").Response;
+    const req = {} as import("express").Request;
+
+    limiter(req, res, next); // count 1 — pass
+    limiter(req, res, next); // count 2 — pass
+    limiter(req, res, next); // count 3 — blocked (> max 2)
+
+    expect(next).toHaveBeenCalledTimes(2);
+    expect(jsonMock).toHaveBeenCalledWith({ error: "over limit" });
+  });
+});
+
 describe("Auth rate limiting — per-IP isolation (N-39)", () => {
   let store: ApiKeyStore;
   let server: Server;
