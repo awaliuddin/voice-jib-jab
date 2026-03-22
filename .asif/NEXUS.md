@@ -13025,6 +13025,41 @@ Dashboard: 59/59 SHIPPED.
 
 ---
 
+### Check-in 92 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**NEXUS + README sync** (committed `86ec7cb`, pushed): N-59 dashboard row, N-59 initiative details section, check-in 91 Team Feedback, README badge 58/58 | 4,780 → 59/59 | 4,850. Pre-push CI gate passed: **4,850/4,850 tests, 152 suites**. Both commits now on remote.
+
+No new production code this check-in — pure governance/documentation sync.
+
+#### 2. What surprised me?
+
+Nothing unexpected. Session completed a full N-initiative cycle cleanly: code → commit → NEXUS → README → CI gate → push. All 4 steps executed without regressions.
+
+One administrative note: a stale background task notification (`bkt4zstjp`) fired at session start — the task had been killed mid-run and produced empty output. No impact on work. The pattern suggests the previous session left a dangling background process. Worth noting as a hygiene signal.
+
+#### 3. Cross-project signals
+
+None new. The coverage floor drift observation from check-in 91 stands as the most transferable insight this session: floors should be updated after major coverage gains, not left at their original initialization values.
+
+#### 4. What would I prioritize next?
+
+1. **Remaining <85% branch files**: `api/recordings.ts` (~76%), `api/export.ts` (~77%), `services/WebhookService.ts` (~77%), `api/quota.ts` (~78%). Clean test gaps with no dead-code complications — another N-initiative in the N-5x series would close them.
+2. **Any new CoS directives** — Q42 still open; no response yet. Awaiting next directive batch or maintenance mode confirmation.
+3. **Stryker refresh** — mutation baseline is stale. Coverage has climbed from ~81% to 91.10% branch since the last Stryker run; a fresh run would show whether new tests also catch mutations or just increase count.
+
+#### 5. Blockers / Questions for CoS
+
+**Q41 (open)** — `/voice` route auth posture.
+**Q42 (open)** — Next directive batch or maintenance mode?
+**Q43 (open)** — Pre-push lock-file sync check.
+**Q44 (open)** — Stale plan file `keen-enchanting-yao.md` (N-12 MCP ticketing).
+
+Dashboard: 59/59 SHIPPED.
+
+---
+
 ### N-55: Branch Coverage — VectorStore + KnowledgeBase + RetrievalService + training + Routing (2026-03-21)
 
 Five-file parallel branch coverage pass. Work done via 4 parallel agents:
