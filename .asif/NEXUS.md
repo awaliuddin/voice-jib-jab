@@ -70,6 +70,7 @@
 | N-58 | Branch Coverage — 7 files: ConversationAnalytics + templates + flows + onboarding + admin + IVR + training | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-59 | Branch Coverage — floor raise 79→86% + AuditReport + SessionRecorder + source annotations (14+3 dead branches) | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-60 | Branch Coverage — 9 files: Compliance + Training + Webhook + ConfigValidator + KnowledgeBase + Routing + 3 APIs | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
+| N-61 | Branch Coverage — 5 files: auditEvents + CallQueue + TenantRegistry + PersonaStore + IntentStore | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 
 ---
 
@@ -12907,6 +12908,22 @@ Nine-file parallel branch coverage pass via 4 agents.
 
 ---
 
+### N-61: Branch Coverage — 5 files, 92.14%→92.54% branch (2026-03-21)
+
+Five-file parallel branch coverage pass via 3 agents. CoS-authorized via Q42 response.
+
+- **AuditEventLogger.test.ts** (+2 tests): L37/38 `typeof from/to === "string"` false branches — array query params (`?from[]=a&from[]=b`) trigger both `if` and `binary-expr` missed sides.
+- **RoutingEngine.test.ts** (+3 tests for CallQueueService): L79 `!queue` true (stale meta entry, no matching queue), L84 `indexOf === -1` ternary null arm, L89 `?? []` fallback for unknown tenant.
+- **AdminApi.test.ts** (+3 tests for TenantRegistry): L76/77 `claims ?? []` + `disallowedPatterns ?? []` nullish defaults, L138 proxy pre-init throw via `jest.isolateModules`.
+- **Personas.test.ts** (+4 tests for PersonaStore): L139/143 `personas ?? []` + `tenantAssignments ?? {}` missing-key fallbacks from JSON file, L147 non-ENOENT rethrow (SyntaxError from corrupt file), L307 proxy pre-init throw.
+- **IntentDetection.test.ts** (+5 tests for IntentStore): L65/66 `logs/mappings ?? []` non-array fallbacks, L68 non-ENOENT rethrow (SyntaxError), L125 `?? 0` unknown intent value, L250 proxy pre-init throw.
+
+Also executed: Q43 (lock file — `package-lock.json` already tracked at root, `nxtg-forge/` gitignored by design — no action needed). Q44 (stale plan file `keen-enchanting-yao.md` — deleted).
+
+4,897 → **4,914 tests** (+17). Branch: **92.14% → 92.54%**. Dashboard: 61/61 SHIPPED.
+
+---
+
 ### N-59: Branch Coverage — floor raise + AuditReport + SessionRecorder + source annotations (2026-03-21)
 
 Multi-file branch coverage pass + governance floor update. Four agents ran in parallel:
@@ -13146,6 +13163,40 @@ CI gate: 4,897/4,897 passed. Pre-push: PASSED. Pushed.
 **Q44 (open)** — Stale plan file `keen-enchanting-yao.md` (N-12 MCP ticketing).
 
 Dashboard: 60/60 SHIPPED.
+
+---
+
+### Check-in 97 — 2026-03-21
+
+#### 1. What shipped since last check-in?
+
+**N-61** (committed `d0702fb`, pushed): Branch coverage for 5 files via 3 parallel agents. +17 tests (4,897→4,914). Branch: **92.14% → 92.54%**. Dashboard: 61/61 SHIPPED.
+
+**CoS Q42–Q44 responses executed**:
+- Q42 (next directive batch → N-61): executed immediately
+- Q43 (lock file): verified `package-lock.json` already tracked at root; `nxtg-forge/` gitignored by design — no action needed
+- Q44 (stale plan file): `keen-enchanting-yao.md` deleted
+
+#### 2. What surprised me?
+
+**All 5 files share the same three branch patterns**: `?? fallback` nullish coalescing, non-ENOENT rethrow, and proxy pre-init throw. Every service store in this codebase has these three structural gaps. The proxy pre-init branch alone appeared in CallQueueService, TenantRegistry, PersonaStore, and IntentStore — four separate files, identical code, identical test fix (`jest.isolateModules` + proxy access before init). The pattern is thoroughly systemic.
+
+**`jest.isolateModules` is the only reliable way to test singleton proxy pre-init throws.** Once a module is loaded and `init` has been called (as it is in every other test), the proxy guard is permanently bypassed for that module instance. Isolation resets the module registry so `_store` is `undefined` again.
+
+#### 3. Cross-project signals
+
+**Singleton proxy stores have a universal three-branch gap.** Every `initXxxStore()` / proxy pattern (present in ~15 stores in this codebase) has: (a) `?? fallback` in deserialization, (b) non-ENOENT rethrow in `loadFromDisk`, (c) proxy pre-init throw. Portfolio recommendation: add these three as a standard checklist to every store module's test file at creation time. They take <10 lines each and close a recurring coverage gap.
+
+#### 4. What would I prioritize next?
+
+1. **Remaining <85% files**: `services/SlaMonitor.ts` (82.6%), `api/intents.ts` (82.8%), `api/language.ts` (83.3%), `middleware/rateLimiter.ts` (83.3%), `services/VoiceProfileStore.ts` (83.3%) — ~20 missed branches for an N-62 pass.
+2. **Any new CoS directives** — Q41 answered (keep auth), Q42 answered (coverage). No open questions requiring response.
+
+#### 5. Blockers / Questions for CoS
+
+No open questions. Q41–Q44 all resolved this session. Clean state.
+
+Dashboard: 61/61 SHIPPED.
 
 ---
 
