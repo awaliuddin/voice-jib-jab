@@ -72,6 +72,7 @@
 | N-60 | Branch Coverage — 9 files: Compliance + Training + Webhook + ConfigValidator + KnowledgeBase + Routing + 3 APIs | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-61 | Branch Coverage — 5 files: auditEvents + CallQueue + TenantRegistry + PersonaStore + IntentStore | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-62 | Branch Coverage — 5 files: intents + SlaMonitor + VoiceProfileStore + language + rateLimiter | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
+| N-63 | Production Hardening — liveness probe + RequestTracker drain + Artillery load tests | OBSERVABILITY | SHIPPED | P1 | 2026-03-22 |
 
 ---
 
@@ -12940,6 +12941,42 @@ Five-file parallel branch coverage pass via 3 agents. Bonus: worktree isolation 
 
 ---
 
+### N-63: Production Hardening — Liveness Probe + Request Drain + Load Tests (2026-03-22)
+
+Full production hardening pass via 4 parallel agents. Shifts VJJ from "tests pass" to "ready for real traffic".
+
+**`RequestTracker` middleware (new — `src/middleware/requestTracker.ts`)**
+Tracks in-flight HTTP request count. `middleware()` increments on request, decrements on `finish`/`close` (double-decrement guard prevents count going negative on keep-alive). `waitForDrain(timeoutMs=5000)` polls until count reaches 0 or deadline. 12 tests.
+
+**`GracefulShutdown` enhancement (`src/services/GracefulShutdown.ts`)**
+Added optional `DrainableTracker` parameter (structural interface — no concrete import, no circular dep). `shutdown()` now: (1) logs drain start, (2) awaits `requestTracker.waitForDrain(5000)`, (3) logs timeout if drain returns false, (4) closes targets. Drain always happens before target close. 9 new tests; full backward compat.
+
+**`health.ts` — two new K8s-grade probes (`src/api/health.ts`)**
+- `GET /health/live` — liveness probe, always 200 (never checks dependencies). Returns `{ live, uptime, pid, timestamp }`. 5 tests.
+- `GET /health/ready` — deep readiness via `HealthMonitorService.getOverallStatus()`. Returns 503 only when `overall === "down"`; `"degraded"` stays 200 (keep-alive in LB). 8 tests.
+
+**`index.ts` wiring**
+- `RequestTracker` mounted immediately after `requestIdMiddleware` (before auth/routes so all requests are counted)
+- `GracefulShutdown` receives `requestTracker` — drain-before-close on SIGTERM/SIGINT
+- Startup log updated: `/health/live` and `/health/ready` URLs printed
+
+**Artillery load test scripts (`server/load-tests/`)**
+- `health.yml`: 3-phase (10/50/10 req/s, 120s total), p95 < 200ms, maxErrorRate 0.1%
+- `api.yml`: 4-phase ramp (5→25→50→5 req/s, 150s total), weighted scenarios (core 70% + tenant 30%), p95 < 500ms
+- `graceful-shutdown.sh`: starts server, fires burst, sends SIGTERM, asserts exit 0
+- `npm scripts`: `test:load`, `test:load:health`, `test:load:shutdown`
+
+**K8s probe topology after N-63:**
+```
+liveness:  GET /health/live     — restart if 200 stops (process dead/deadlocked)
+readiness: GET /health/ready    — remove from LB if 503 (subsystems down)
+startup:   GET /ready           — 503 until serverReady=true (prevent premature traffic)
+```
+
+4,928 → **4,963 tests** (+35). Dashboard: 63/63 SHIPPED.
+
+---
+
 ### N-59: Branch Coverage — floor raise + AuditReport + SessionRecorder + source annotations (2026-03-21)
 
 Multi-file branch coverage pass + governance floor update. Four agents ran in parallel:
@@ -13246,6 +13283,49 @@ Note: N-61 was already shipped before this session's "Execute N-61" prompt arriv
 No open questions. Clean state.
 
 Dashboard: 62/62 SHIPPED.
+
+---
+
+### Check-in 99 — 2026-03-22
+
+#### 1. What shipped since last check-in?
+
+**N-63** (committed `d4f6f3c`, pushed): Production hardening — liveness probe, in-flight request drain, enhanced graceful shutdown, Artillery load tests. +35 tests (4,928→4,963). Dashboard: 63/63 SHIPPED. P1 initiative.
+
+Key deliverables:
+- `RequestTracker` middleware: tracks in-flight count, `waitForDrain()` for clean shutdown
+- `GracefulShutdown` now drains requests before closing targets
+- `/health/live` liveness + `/health/ready` deep readiness probes
+- Artillery YAML load tests + graceful-shutdown shell verification script
+- K8s probe topology complete: liveness + readiness + startup all wired
+
+#### 2. What surprised me?
+
+**The worktree bug from N-62 was a harbinger.** The `/.claude/worktrees/` exclusion added in N-62 paid off immediately in N-63 — agent 3 ran in isolation without contaminating the test suite. The fix was exactly right.
+
+**GracefulShutdown drain ordering is non-trivial.** The naive implementation closes targets while requests are still in-flight — a SIGTERM during an active API call would drop the response. The `waitForDrain` step ensures all responses are sent before the HTTP server closes. Under real traffic this is the difference between a graceful 0-error deploy and dropped connections.
+
+**Three distinct K8s probes serve different purposes.** Before N-63, VJJ had one `/ready` route that mixed startup-gate semantics with health semantics. Now: `/ready` = startup probe (one-shot flag), `/health/ready` = readiness probe (live HealthMonitor query), `/health/live` = liveness probe (process-alive only). This is the correct K8s topology.
+
+#### 3. Cross-project signals
+
+**`RequestTracker` is a reusable middleware pattern.** Any Express/Node.js service that does graceful shutdown should track in-flight requests. The pattern (middleware + `waitForDrain`) is 40 lines and completely generic. Portfolio recommendation: add to the standard ASIF server template alongside `requestIdMiddleware` and `accessLogger`.
+
+**Three-probe K8s topology is the standard.** Liveness (restart), readiness (LB), startup (one-shot). All three serve different failure modes. Any project with K8s deployment should have all three. Currently only voice-jib-jab has all three wired correctly post-N-63.
+
+**Artillery YAML load tests are zero-install for CI.** `npm install -g artillery` + `npm run test:load` is the entire setup. The YAML format is readable and version-controllable. Portfolio recommendation: add to every project with an HTTP API before the first customer deployment.
+
+#### 4. What would I prioritize next?
+
+1. **Connection draining verification under load** — run `npm run test:load:shutdown` to confirm the graceful-shutdown script works with the new drain logic. Requires Artillery installed.
+2. **N-64 branch coverage** — SlaMonitor L262 was marked unreachable; other files still below 90% (translation 83.9%, AgentTemplateStore 84.6%, voice API 81.8%).
+3. **Rate-limit header surfacing** — currently rate limit headers (X-RateLimit-Remaining) are not set on responses. Under load testing, operators can't see how close they are to limits.
+
+#### 5. Blockers / Questions for CoS
+
+No open questions. All Q41–Q44 resolved last session.
+
+Dashboard: 63/63 SHIPPED.
 
 ---
 
