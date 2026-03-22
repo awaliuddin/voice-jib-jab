@@ -104,6 +104,99 @@ describe("Health Monitor API", () => {
     mockMonitor.getStatus.mockReturnValue(MOCK_SUBSYSTEMS);
   });
 
+  // ── GET /health/live ──────────────────────────────────────────────
+
+  describe("GET /health/live", () => {
+    it("returns 200", async () => {
+      const res = await httpRequest(server, "GET", "/health/live");
+      expect(res.status).toBe(200);
+    });
+
+    it("response has live: true", async () => {
+      const res = await httpRequest(server, "GET", "/health/live");
+      const data = res.json() as { live: boolean };
+      expect(data.live).toBe(true);
+    });
+
+    it("response includes uptime as a number", async () => {
+      const res = await httpRequest(server, "GET", "/health/live");
+      const data = res.json() as { uptime: unknown };
+      expect(typeof data.uptime).toBe("number");
+    });
+
+    it("response includes pid as a number", async () => {
+      const res = await httpRequest(server, "GET", "/health/live");
+      const data = res.json() as { pid: unknown };
+      expect(typeof data.pid).toBe("number");
+    });
+
+    it("response includes a valid timestamp", async () => {
+      const res = await httpRequest(server, "GET", "/health/live");
+      const data = res.json() as { timestamp: string };
+      expect(typeof data.timestamp).toBe("string");
+      expect(new Date(data.timestamp).getTime()).toBeGreaterThan(0);
+    });
+  });
+
+  // ── GET /health/ready ─────────────────────────────────────────────
+
+  describe("GET /health/ready", () => {
+    it("returns 200 when overall is 'healthy'", async () => {
+      mockMonitor.getOverallStatus.mockReturnValue("healthy");
+      const res = await httpRequest(server, "GET", "/health/ready");
+      expect(res.status).toBe(200);
+    });
+
+    it("response has ready: true when overall is 'healthy'", async () => {
+      mockMonitor.getOverallStatus.mockReturnValue("healthy");
+      const res = await httpRequest(server, "GET", "/health/ready");
+      const data = res.json() as { ready: boolean };
+      expect(data.ready).toBe(true);
+    });
+
+    it("returns 200 when overall is 'degraded'", async () => {
+      mockMonitor.getOverallStatus.mockReturnValue("degraded");
+      const res = await httpRequest(server, "GET", "/health/ready");
+      expect(res.status).toBe(200);
+    });
+
+    it("response has ready: true when overall is 'degraded'", async () => {
+      mockMonitor.getOverallStatus.mockReturnValue("degraded");
+      const res = await httpRequest(server, "GET", "/health/ready");
+      const data = res.json() as { ready: boolean };
+      expect(data.ready).toBe(true);
+    });
+
+    it("returns 503 when overall is 'down'", async () => {
+      mockMonitor.getOverallStatus.mockReturnValue("down");
+      const res = await httpRequest(server, "GET", "/health/ready");
+      expect(res.status).toBe(503);
+    });
+
+    it("response has ready: false when overall is 'down'", async () => {
+      mockMonitor.getOverallStatus.mockReturnValue("down");
+      const res = await httpRequest(server, "GET", "/health/ready");
+      const data = res.json() as { ready: boolean };
+      expect(data.ready).toBe(false);
+    });
+
+    it("response includes overall field in all cases", async () => {
+      for (const status of ["healthy", "degraded", "down"] as const) {
+        mockMonitor.getOverallStatus.mockReturnValue(status);
+        const res = await httpRequest(server, "GET", "/health/ready");
+        const data = res.json() as { overall: string };
+        expect(data.overall).toBe(status);
+      }
+    });
+
+    it("response includes a valid timestamp", async () => {
+      const res = await httpRequest(server, "GET", "/health/ready");
+      const data = res.json() as { timestamp: string };
+      expect(typeof data.timestamp).toBe("string");
+      expect(new Date(data.timestamp).getTime()).toBeGreaterThan(0);
+    });
+  });
+
   // ── GET /health/subsystems ────────────────────────────────────────
 
   describe("GET /health/subsystems", () => {

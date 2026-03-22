@@ -116,6 +116,7 @@ import { AuditEventLogger } from "./services/AuditEventLogger.js";
 import { createAuditEventsRouter } from "./api/auditEvents.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
 import { GracefulShutdown } from "./services/GracefulShutdown.js";
+import { RequestTracker } from "./middleware/requestTracker.js";
 import { createCorsMiddleware } from "./middleware/cors.js";
 import { RATE_LIMITS } from "./config/rateLimits.js";
 import { jsonErrorHandler } from "./middleware/errorHandler.js";
@@ -140,6 +141,10 @@ app.use(express.json({ limit: "256kb" }));
 
 // Request correlation ID — must be first so all subsequent handlers have req.requestId
 app.use(requestIdMiddleware);
+
+// N-63: In-flight request tracker — mounted early so all requests are counted for drain.
+const requestTracker = new RequestTracker();
+app.use(requestTracker.middleware());
 
 // N-47: Structured access logger — mounted after requestId so every log line carries the ID.
 // Skips /health to prevent K8s probe spam. Output: JSON lines to stderr.
@@ -592,8 +597,10 @@ async function startServer(): Promise<VoiceWebSocketServer> {
     console.log(`[Server] Listening on port ${config.port}`);
     console.log(`[Server] Environment: ${config.nodeEnv}`);
     console.log(`[Server] WebSocket: ws://localhost:${config.port}`);
-    console.log(`[Server] Health: http://localhost:${config.port}/health`);
-    console.log(`[Server] Status: http://localhost:${config.port}/status`);
+    console.log(`[Server] Health:    http://localhost:${config.port}/health`);
+    console.log(`[Server] Liveness:  http://localhost:${config.port}/health/live`);
+    console.log(`[Server] Readiness: http://localhost:${config.port}/health/ready`);
+    console.log(`[Server] Status:    http://localhost:${config.port}/status`);
     console.log(`[Server] Metrics: http://localhost:${config.port}/metrics`);
     console.log(`[Server] Dashboard: http://localhost:${config.port}/dashboard`);
     console.log(`[Server] Sessions: http://localhost:${config.port}/sessions`);
@@ -661,8 +668,8 @@ async function startServer(): Promise<VoiceWebSocketServer> {
 }
 
 startServer().then((voiceWss) => {
-  // N-38: Graceful shutdown — close WS servers then HTTP server, with 10s force-exit fallback.
-  new GracefulShutdown([voiceWss, supervisorWsServer, server]).register();
+  // N-63: Graceful shutdown — drain in-flight requests first, then close WS + HTTP, 10s fallback.
+  new GracefulShutdown([voiceWss, supervisorWsServer, server], 10_000, undefined, requestTracker).register();
 }).catch((error) => {
   console.error("[Server] Fatal startup error:", error);
   process.exit(1);

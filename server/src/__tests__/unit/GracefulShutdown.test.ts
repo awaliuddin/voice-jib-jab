@@ -5,7 +5,7 @@
  * force-exit on timeout, error resilience, and signal registration.
  */
 
-import { GracefulShutdown, type ShutdownTarget } from "../../services/GracefulShutdown.js";
+import { GracefulShutdown, type ShutdownTarget, type DrainableTracker } from "../../services/GracefulShutdown.js";
 
 function makeTarget(
   behaviour: "immediate" | "error" | "throw" | "never" = "immediate",
@@ -140,6 +140,111 @@ describe("GracefulShutdown", () => {
       expect(order.indexOf("t2-start")).toBeLessThan(order.indexOf("t2-end"));
       expect(order.slice(0, 2)).toContain("t1-start");
       expect(order.slice(0, 2)).toContain("t2-start");
+    });
+  });
+
+  describe("requestTracker drain support", () => {
+    function makeTracker(resolvesWith: boolean): jest.Mocked<DrainableTracker> {
+      return {
+        waitForDrain: jest.fn().mockResolvedValue(resolvesWith),
+      };
+    }
+
+    it("calls waitForDrain() when a tracker is provided", async () => {
+      const tracker = makeTracker(true);
+      const sd = new GracefulShutdown([makeTarget()], 10_000, exitFn, tracker);
+      await sd.shutdown("SIGTERM");
+      expect(tracker.waitForDrain).toHaveBeenCalledTimes(1);
+    });
+
+    it("passes drainTimeoutMs to waitForDrain()", async () => {
+      const tracker = makeTracker(true);
+      const sd = new GracefulShutdown([makeTarget()], 10_000, exitFn, tracker, 3_000);
+      await sd.shutdown("SIGTERM");
+      expect(tracker.waitForDrain).toHaveBeenCalledWith(3_000);
+    });
+
+    it("uses default drainTimeoutMs of 5000 when not specified", async () => {
+      const tracker = makeTracker(true);
+      const sd = new GracefulShutdown([makeTarget()], 10_000, exitFn, tracker);
+      await sd.shutdown("SIGTERM");
+      expect(tracker.waitForDrain).toHaveBeenCalledWith(5_000);
+    });
+
+    it("logs drain timeout message when waitForDrain returns false", async () => {
+      const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+      const tracker = makeTracker(false);
+      const sd = new GracefulShutdown([makeTarget()], 10_000, exitFn, tracker);
+      await sd.shutdown("SIGTERM");
+      expect(logSpy).toHaveBeenCalledWith("[Server] Drain timeout — proceeding with shutdown");
+      logSpy.mockRestore();
+    });
+
+    it("does NOT log drain timeout message when waitForDrain returns true", async () => {
+      const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+      const tracker = makeTracker(true);
+      const sd = new GracefulShutdown([makeTarget()], 10_000, exitFn, tracker);
+      await sd.shutdown("SIGTERM");
+      expect(logSpy).not.toHaveBeenCalledWith("[Server] Drain timeout — proceeding with shutdown");
+      logSpy.mockRestore();
+    });
+
+    it("proceeds to close targets after drain completes (returns true)", async () => {
+      const target = { close: jest.fn((cb?: (err?: Error) => void) => cb?.()) };
+      const tracker = makeTracker(true);
+      const sd = new GracefulShutdown([target], 10_000, exitFn, tracker);
+      await sd.shutdown("SIGTERM");
+      expect(target.close).toHaveBeenCalledTimes(1);
+      expect(exitFn).toHaveBeenCalledWith(0);
+    });
+
+    it("proceeds to close targets after drain timeout (returns false)", async () => {
+      const target = { close: jest.fn((cb?: (err?: Error) => void) => cb?.()) };
+      const tracker = makeTracker(false);
+      const sd = new GracefulShutdown([target], 10_000, exitFn, tracker);
+      await sd.shutdown("SIGTERM");
+      expect(target.close).toHaveBeenCalledTimes(1);
+      expect(exitFn).toHaveBeenCalledWith(0);
+    });
+
+    it("drain happens BEFORE targets are closed", async () => {
+      const order: string[] = [];
+      const tracker: DrainableTracker = {
+        waitForDrain: jest.fn().mockImplementation(() => {
+          order.push("drain");
+          return Promise.resolve(true);
+        }),
+      };
+      const target: ShutdownTarget = {
+        close(cb?: (err?: Error) => void) {
+          order.push("close");
+          cb?.();
+        },
+      };
+      const sd = new GracefulShutdown([target], 10_000, exitFn, tracker);
+      await sd.shutdown("SIGTERM");
+      expect(order.indexOf("drain")).toBeLessThan(order.indexOf("close"));
+    });
+
+    it("works correctly when no requestTracker is provided (backward compat)", async () => {
+      const target = { close: jest.fn((cb?: (err?: Error) => void) => cb?.()) };
+      const sd = new GracefulShutdown([target], 10_000, exitFn);
+      await sd.shutdown("SIGTERM");
+      expect(target.close).toHaveBeenCalledTimes(1);
+      expect(exitFn).toHaveBeenCalledWith(0);
+    });
+
+    it("does not log drain messages when no requestTracker is provided", async () => {
+      const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+      const sd = new GracefulShutdown([makeTarget()], 10_000, exitFn);
+      await sd.shutdown("SIGTERM");
+      expect(logSpy).not.toHaveBeenCalledWith(
+        "[Server] Waiting for in-flight requests to drain...",
+      );
+      expect(logSpy).not.toHaveBeenCalledWith(
+        "[Server] Drain timeout — proceeding with shutdown",
+      );
+      logSpy.mockRestore();
     });
   });
 

@@ -18,7 +18,10 @@
     "demo:play:compliance": "tsx src/demo/run.ts compliance",
     "demo:play:sales": "tsx src/demo/run.ts sales",
     "load-test": "npx tsx ../tests/load/advanced-load-test.ts",
-    "load-test:full": "npx tsx ../tests/load/advanced-load-test.ts --concurrency 5,10,25,50,100,200,300,500"
+    "load-test:full": "npx tsx ../tests/load/advanced-load-test.ts --concurrency 5,10,25,50,100,200,300,500",
+    "test:load": "artillery run load-tests/api.yml",
+    "test:load:health": "artillery run load-tests/health.yml",
+    "test:load:shutdown": "bash load-tests/graceful-shutdown.sh"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",

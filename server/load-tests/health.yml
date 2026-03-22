@@ -1,0 +1,25 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 30
+      arrivalRate: 10
+      name: "Warm up"
+    - duration: 60
+      arrivalRate: 50
+      name: "Load"
+    - duration: 30
+      arrivalRate: 10
+      name: "Cool down"
+  ensure:
+    p95: 200
+    maxErrorRate: 0.1
+
+scenarios:
+  - name: "Health probes"
+    flow:
+      - get:
+          url: "/health"
+      - get:
+          url: "/health/live"
+      - get:
+          url: "/ready"

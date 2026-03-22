@@ -1,0 +1,48 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 30
+      arrivalRate: 5
+      name: "Warm up"
+    - duration: 60
+      arrivalRate: 25
+      name: "Sustained load"
+    - duration: 30
+      arrivalRate: 50
+      name: "Peak load"
+    - duration: 30
+      arrivalRate: 5
+      name: "Cool down"
+  ensure:
+    p95: 500
+    maxErrorRate: 1
+  http:
+    timeout: 10
+  defaults:
+    headers:
+      x-api-key: "{{ $processEnvironment.VJJ_LOAD_TEST_API_KEY }}"
+      content-type: "application/json"
+
+scenarios:
+  - name: "Core API flows"
+    weight: 70
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200
+      - get:
+          url: "/status"
+      - get:
+          url: "/health/live"
+          expect:
+            - statusCode: 200
+            - hasProperty: "live"
+
+  - name: "Tenant API"
+    weight: 30
+    flow:
+      - get:
+          url: "/admin/tenants"
+          expect:
+            - statusCode: [200, 401, 403]
