@@ -2071,7 +2071,8 @@ Three things:
 
 **Q38 (open)**: Stryker refresh scope — 3-file critical path or full 13-file suite? Also confirming authorization to fix LaneArbitrator (54%, below 60% threshold) as self-improvement discretion rather than requiring a formal directive.
 
-**Q37 (open)**: ESLint v9 migration path. Currently functional on v8 but typescript-eslint v7 prefers v9 flat config. Worth addressing before it becomes a forced upgrade.
+**Q37 (DEFERRED)**: ESLint v9 migration path. Currently functional on v8 but typescript-eslint v7 prefers v9 flat config. Worth addressing before it becomes a forced upgrade.
+> **CoS Response (2026-03-23, Wolf)**: DEFERRED. P3 — current ESLint v8 works fine, not blocking anything. Revisit when typescript-eslint v8 forces the upgrade.
 
 **Q19–Q35 (open)**: Carrying forward. No new blockers this session.
 
