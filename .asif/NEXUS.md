@@ -74,6 +74,7 @@
 | N-62 | Branch Coverage — 5 files: intents + SlaMonitor + VoiceProfileStore + language + rateLimiter | OBSERVABILITY | SHIPPED | P2 | 2026-03-21 |
 | N-63 | Production Hardening — liveness probe + RequestTracker drain + Artillery load tests | OBSERVABILITY | SHIPPED | P1 | 2026-03-22 |
 | N-64 | Production Hardening — WebSocket health check + registerCheck() + enhanced /health | OBSERVABILITY | SHIPPED | P1 | 2026-03-22 |
+| N-65 | Production Hardening — Graceful WebSocket drain on SIGTERM (notify + wait + close) | OBSERVABILITY | SHIPPED | P0 | 2026-03-22 |
 
 ---
 
@@ -1525,6 +1526,18 @@ The CoS had 25 idle-cycle triggers to work with but the actual enterprise gaps w
 ### 5. Blockers / questions for CoS?
 
 None on N-26/N-27/N-28 — all shipped clean. Q39/Q40 still pending. Ready for next directive.
+
+---
+
+> Session: 2026-03-22 (check-in 103) | Author: Claude Sonnet 4.6
+
+**N-65 SHIPPED**: Graceful WebSocket drain on SIGTERM. 4,976 → 4,996 tests (+20). 65/65 SHIPPED. VJJ is production-deployable.
+
+**Shutdown sequence now**: drain HTTP (5s) → send server.shutdown to WS clients → wait up to 5s for voluntary disconnect → force-close any remaining → exit 0. Hard timeout: 10s → exit 1.
+
+**draining flag** rejects new WS connections immediately when shutdown starts — no new sessions can begin during the drain window.
+
+**Why P0**: Hard-killing active voice sessions was the single most disruptive failure mode for enterprise deployment. A SIGTERM during a call previously caused: lost audio, broken client state, missing recording finalization. Now clients get a graceful notification and time to wrap up.
 
 ---
 
@@ -13018,6 +13031,47 @@ startup:   GET /ready              — 503 until serverReady=true (prevent prema
 **All 6 subsystems now monitored**: stt, tts, opa, chromadb, database, websocket.
 
 4,963 → **4,976 tests** (+13). Dashboard: 64/64 SHIPPED.
+
+---
+
+### N-65: Production Hardening — Graceful WebSocket Drain on SIGTERM (2026-03-22)
+
+Final production hardening item. Eliminates the hard-kill of active voice sessions on SIGTERM.
+
+**Problem**: On SIGTERM, `VoiceWebSocketServer.close()` immediately sent WebSocket close code 1001 to all clients — mid-conversation callers were rudely disconnected with no warning, losing any in-flight audio or state.
+
+**`VoiceWebSocketServer.drain()` (websocket.ts)**
+- Sets `this.draining = true` → rejects all new connections with 1001 immediately
+- Sends `{ type: "server.shutdown", reason: "maintenance", timestamp }` to every OPEN client so they can save state and disconnect gracefully
+- Polls `this.connections.size` every 100ms; resolves `true` when all sessions clear, `false` on timeout
+- Send errors (client already closing) swallowed — never blocks drain
+
+**`handleConnection()` drain guard (websocket.ts)**
+- Added at the very top: `if (this.draining) { ws.close(1001, "Server shutting down"); return; }`
+- Ensures no new sessions start during the drain window
+
+**`GracefulShutdown` — `DrainableWss` interface (GracefulShutdown.ts)**
+- New exported interface: `{ drain(timeoutMs?: number): Promise<boolean> }`
+- New optional 6th constructor parameter: `wssTargets?: DrainableWss[]`
+- `shutdown()` sequence: drain HTTP (requestTracker) → drain WS (wssTargets) → close targets → exit 0
+- Reuses same `drainTimeoutMs` (default 5s) for both HTTP and WS drain
+
+**`index.ts` wiring**
+- `voiceWss` passed as `wssTargets: [voiceWss]` — it acts as both ShutdownTarget (for force-close) and DrainableWss (for graceful drain)
+
+**Complete SIGTERM sequence after N-65:**
+```
+SIGTERM
+  → [5s] drain in-flight HTTP requests (RequestTracker.waitForDrain)
+  → [5s] drain WS sessions: send server.shutdown, wait for voluntary disconnect
+  → close voiceWss (force 1001 any remaining)
+  → close supervisorWss
+  → close httpServer
+  → exit 0
+  [10s hard timeout → exit 1 if anything hangs]
+```
+
+4,976 → **4,996 tests** (+20). Dashboard: 65/65 SHIPPED. **VJJ is production-deployable.**
 
 ---
 
