@@ -5,7 +5,7 @@
  * force-exit on timeout, error resilience, and signal registration.
  */
 
-import { GracefulShutdown, type ShutdownTarget, type DrainableTracker } from "../../services/GracefulShutdown.js";
+import { GracefulShutdown, type ShutdownTarget, type DrainableTracker, type DrainableWss } from "../../services/GracefulShutdown.js";
 
 function makeTarget(
   behaviour: "immediate" | "error" | "throw" | "never" = "immediate",
@@ -244,6 +244,147 @@ describe("GracefulShutdown", () => {
       expect(logSpy).not.toHaveBeenCalledWith(
         "[Server] Drain timeout — proceeding with shutdown",
       );
+      logSpy.mockRestore();
+    });
+  });
+
+  describe("wss drain support", () => {
+    function makeDrainableWss(resolvesWith: boolean): jest.Mocked<DrainableWss> {
+      return {
+        drain: jest.fn().mockResolvedValue(resolvesWith),
+      };
+    }
+
+    it("calls wss.drain() when wssTargets is provided", async () => {
+      const wss = makeDrainableWss(true);
+      const sd = new GracefulShutdown([makeTarget()], 10_000, exitFn, undefined, 5_000, [wss]);
+      await sd.shutdown("SIGTERM");
+      expect(wss.drain).toHaveBeenCalledTimes(1);
+    });
+
+    it("passes drainTimeoutMs to wss.drain()", async () => {
+      const wss = makeDrainableWss(true);
+      const sd = new GracefulShutdown([makeTarget()], 10_000, exitFn, undefined, 3_000, [wss]);
+      await sd.shutdown("SIGTERM");
+      expect(wss.drain).toHaveBeenCalledWith(3_000);
+    });
+
+    it("uses default drainTimeoutMs of 5000 for wss drain", async () => {
+      const wss = makeDrainableWss(true);
+      const sd = new GracefulShutdown([makeTarget()], 10_000, exitFn, undefined, undefined, [wss]);
+      await sd.shutdown("SIGTERM");
+      expect(wss.drain).toHaveBeenCalledWith(5_000);
+    });
+
+    it("wss drain happens AFTER HTTP request drain and BEFORE targets are closed", async () => {
+      const order: string[] = [];
+      const tracker: DrainableTracker = {
+        waitForDrain: jest.fn().mockImplementation(() => {
+          order.push("http-drain");
+          return Promise.resolve(true);
+        }),
+      };
+      const wss: DrainableWss = {
+        drain: jest.fn().mockImplementation(() => {
+          order.push("wss-drain");
+          return Promise.resolve(true);
+        }),
+      };
+      const target: ShutdownTarget = {
+        close(cb?: (err?: Error) => void) {
+          order.push("close");
+          cb?.();
+        },
+      };
+      const sd = new GracefulShutdown([target], 10_000, exitFn, tracker, 5_000, [wss]);
+      await sd.shutdown("SIGTERM");
+      expect(order[0]).toBe("http-drain");
+      expect(order[1]).toBe("wss-drain");
+      expect(order[2]).toBe("close");
+    });
+
+    it("wss drain happens BEFORE targets are closed", async () => {
+      const order: string[] = [];
+      const wss: DrainableWss = {
+        drain: jest.fn().mockImplementation(() => {
+          order.push("wss-drain");
+          return Promise.resolve(true);
+        }),
+      };
+      const target: ShutdownTarget = {
+        close(cb?: (err?: Error) => void) {
+          order.push("close");
+          cb?.();
+        },
+      };
+      const sd = new GracefulShutdown([target], 10_000, exitFn, undefined, 5_000, [wss]);
+      await sd.shutdown("SIGTERM");
+      expect(order.indexOf("wss-drain")).toBeLessThan(order.indexOf("close"));
+    });
+
+    it("logs start message before draining", async () => {
+      const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+      const wss = makeDrainableWss(true);
+      const sd = new GracefulShutdown([makeTarget()], 10_000, exitFn, undefined, 5_000, [wss]);
+      await sd.shutdown("SIGTERM");
+      expect(logSpy).toHaveBeenCalledWith("[Server] Waiting for WebSocket connections to drain...");
+      logSpy.mockRestore();
+    });
+
+    it("logs timeout message when wss.drain() returns false", async () => {
+      const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+      const wss = makeDrainableWss(false);
+      const sd = new GracefulShutdown([makeTarget()], 10_000, exitFn, undefined, 5_000, [wss]);
+      await sd.shutdown("SIGTERM");
+      expect(logSpy).toHaveBeenCalledWith("[Server] WebSocket drain timeout — proceeding with shutdown");
+      logSpy.mockRestore();
+    });
+
+    it("does NOT log timeout message when wss.drain() returns true", async () => {
+      const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+      const wss = makeDrainableWss(true);
+      const sd = new GracefulShutdown([makeTarget()], 10_000, exitFn, undefined, 5_000, [wss]);
+      await sd.shutdown("SIGTERM");
+      expect(logSpy).not.toHaveBeenCalledWith("[Server] WebSocket drain timeout — proceeding with shutdown");
+      logSpy.mockRestore();
+    });
+
+    it("proceeds to close targets after wss drain returns false", async () => {
+      const target = { close: jest.fn((cb?: (err?: Error) => void) => cb?.()) };
+      const wss = makeDrainableWss(false);
+      const sd = new GracefulShutdown([target], 10_000, exitFn, undefined, 5_000, [wss]);
+      await sd.shutdown("SIGTERM");
+      expect(target.close).toHaveBeenCalledTimes(1);
+      expect(exitFn).toHaveBeenCalledWith(0);
+    });
+
+    it("proceeds to close targets after wss drain returns true", async () => {
+      const target = { close: jest.fn((cb?: (err?: Error) => void) => cb?.()) };
+      const wss = makeDrainableWss(true);
+      const sd = new GracefulShutdown([target], 10_000, exitFn, undefined, 5_000, [wss]);
+      await sd.shutdown("SIGTERM");
+      expect(target.close).toHaveBeenCalledTimes(1);
+      expect(exitFn).toHaveBeenCalledWith(0);
+    });
+
+    it("drains multiple wss targets sequentially", async () => {
+      const wss1 = makeDrainableWss(true);
+      const wss2 = makeDrainableWss(true);
+      const sd = new GracefulShutdown([makeTarget()], 10_000, exitFn, undefined, 5_000, [wss1, wss2]);
+      await sd.shutdown("SIGTERM");
+      expect(wss1.drain).toHaveBeenCalledTimes(1);
+      expect(wss2.drain).toHaveBeenCalledTimes(1);
+    });
+
+    it("works correctly when no wssTargets provided (backward compat)", async () => {
+      const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+      const target = { close: jest.fn((cb?: (err?: Error) => void) => cb?.()) };
+      const sd = new GracefulShutdown([target], 10_000, exitFn);
+      await sd.shutdown("SIGTERM");
+      expect(logSpy).not.toHaveBeenCalledWith("[Server] Waiting for WebSocket connections to drain...");
+      expect(logSpy).not.toHaveBeenCalledWith("[Server] WebSocket drain timeout — proceeding with shutdown");
+      expect(target.close).toHaveBeenCalledTimes(1);
+      expect(exitFn).toHaveBeenCalledWith(0);
       logSpy.mockRestore();
     });
   });

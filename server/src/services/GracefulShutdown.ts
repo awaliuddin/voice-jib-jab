@@ -19,12 +19,18 @@ export interface DrainableTracker {
   waitForDrain(timeoutMs?: number): Promise<boolean>;
 }
 
+/** Structural interface for a WebSocket server that can gracefully drain connections. */
+export interface DrainableWss {
+  drain(timeoutMs?: number): Promise<boolean>;
+}
+
 export class GracefulShutdown {
   private readonly targets: ShutdownTarget[];
   private readonly timeoutMs: number;
   private readonly exitFn: (code: number) => void;
   private readonly requestTracker?: DrainableTracker;
   private readonly drainTimeoutMs: number;
+  private readonly wssTargets?: DrainableWss[];
   private isShuttingDown = false;
 
   constructor(
@@ -33,12 +39,14 @@ export class GracefulShutdown {
     exitFn: (code: number) => void = process.exit.bind(process),
     requestTracker?: DrainableTracker,
     drainTimeoutMs = 5_000,
+    wssTargets?: DrainableWss[],
   ) {
     this.targets = targets;
     this.timeoutMs = timeoutMs;
     this.exitFn = exitFn;
     this.requestTracker = requestTracker;
     this.drainTimeoutMs = drainTimeoutMs;
+    this.wssTargets = wssTargets;
   }
 
   /**
@@ -46,8 +54,9 @@ export class GracefulShutdown {
    * 1. Set the in-progress flag (idempotency guard).
    * 2. Start a force-exit timer.
    * 3. Drain in-flight requests (if a tracker is configured).
-   * 4. Close all targets concurrently; errors are logged but do not block.
-   * 5. Cancel the timer and call exitFn(0).
+   * 4. Drain WebSocket connections (if wss targets are configured).
+   * 5. Close all targets concurrently; errors are logged but do not block.
+   * 6. Cancel the timer and call exitFn(0).
    */
   async shutdown(signal: string): Promise<void> {
     if (this.isShuttingDown) return;
@@ -65,6 +74,16 @@ export class GracefulShutdown {
       const drained = await this.requestTracker.waitForDrain(this.drainTimeoutMs);
       if (!drained) {
         console.log("[Server] Drain timeout — proceeding with shutdown");
+      }
+    }
+
+    if (this.wssTargets && this.wssTargets.length > 0) {
+      console.log("[Server] Waiting for WebSocket connections to drain...");
+      for (const wss of this.wssTargets) {
+        const drained = await wss.drain(this.drainTimeoutMs);
+        if (!drained) {
+          console.log("[Server] WebSocket drain timeout — proceeding with shutdown");
+        }
       }
     }
 

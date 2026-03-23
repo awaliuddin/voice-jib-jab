@@ -682,8 +682,9 @@ startServer().then((voiceWss) => {
     },
   });
 
-  // N-63: Graceful shutdown — drain in-flight requests first, then close WS + HTTP, 10s fallback.
-  new GracefulShutdown([voiceWss, supervisorWsServer, server], 10_000, undefined, requestTracker).register();
+  // N-65: Graceful shutdown — drain HTTP requests, then notify + drain WS connections, then close + exit.
+  // voiceWss is both a ShutdownTarget (close) and a DrainableWss (drain) — drain first, force-close second.
+  new GracefulShutdown([voiceWss, supervisorWsServer, server], 10_000, undefined, requestTracker, 5_000, [voiceWss]).register();
 }).catch((error) => {
   console.error("[Server] Fatal startup error:", error);
   process.exit(1);

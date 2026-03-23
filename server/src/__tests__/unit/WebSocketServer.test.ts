@@ -11,8 +11,10 @@ import { EventEmitter } from "events";
 
 // ── Stable mock references (before jest.mock hoisting) ──────────────
 const mockWssOn = jest.fn();
+let mockWssClients: Set<any>;
 const MockWebSocketServer = jest.fn().mockImplementation(() => ({
   on: mockWssOn,
+  get clients() { return mockWssClients; },
 }));
 
 const mockSessionManager = {
@@ -246,6 +248,8 @@ function findSentMessage(mockWs: any, type: string): any {
 describe("VoiceWebSocketServer", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
+    mockWssClients = new Set();
     mockArbitrator = createMockLaneArbitrator();
     mockLaneA = createMockLaneA();
     mockLaneB = createMockLaneB();
@@ -263,6 +267,7 @@ describe("VoiceWebSocketServer", () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
@@ -531,8 +536,10 @@ describe("VoiceWebSocketServer", () => {
         Buffer.from(JSON.stringify({ type: "audio.stop" })),
       );
 
-      // Allow async to resolve
-      await new Promise((r) => setTimeout(r, 10));
+      // Allow async to resolve (compatible with fake timers)
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
 
       // Clear previous sends to isolate this test
       mockWs.send.mockClear();
@@ -743,7 +750,10 @@ describe("VoiceWebSocketServer", () => {
         "message",
         Buffer.from(JSON.stringify({ type: "audio.stop" })),
       );
-      await new Promise((r) => setTimeout(r, 10));
+      // Allow async to resolve (compatible with fake timers)
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
       mockWs.send.mockClear();
 
       mockFallbackPlanner.emit("audio", {
@@ -1018,7 +1028,10 @@ describe("VoiceWebSocketServer", () => {
           }),
         ),
       );
-      await new Promise((r) => setTimeout(r, 20));
+      // Allow async to resolve (compatible with fake timers)
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
 
       // Clear mocks before close to isolate
       (getSessionHistory as jest.Mock).mockClear();
@@ -1112,6 +1125,121 @@ describe("VoiceWebSocketServer", () => {
       // Close one
       ws1.emit("close");
       expect(server.getConnectionCount()).toBe(1);
+    });
+  });
+
+  // ================================================================
+  // 12. drain()
+  // ================================================================
+  describe("drain()", () => {
+    // Note: fake timers are active (set in outer beforeEach)
+
+    it("returns true immediately when there are no active connections", async () => {
+      const server = new VoiceWebSocketServer({} as any);
+      // No connectClient() call → connections.size === 0
+      const result = await server.drain(1000);
+      expect(result).toBe(true);
+    });
+
+    it("sets the draining flag so new connections are rejected", async () => {
+      const server = new VoiceWebSocketServer({} as any);
+      const connectionHandler = mockWssOn.mock.calls.find(
+        ([event]: [string]) => event === "connection",
+      )?.[1];
+
+      await server.drain(1000);
+
+      // Any new connection attempt after drain() should be immediately closed
+      const newMockWs = createMockWs();
+      await connectionHandler(newMockWs);
+      expect(newMockWs.close).toHaveBeenCalledWith(1001, "Server shutting down");
+    });
+
+    it("sends server.shutdown to all OPEN clients", async () => {
+      const server = new VoiceWebSocketServer({} as any);
+      // Add OPEN mock clients to the wss.clients set
+      const client1 = createMockWs(); // readyState = OPEN (1)
+      const client2 = createMockWs();
+      mockWssClients.add(client1);
+      mockWssClients.add(client2);
+
+      await server.drain(1000);
+
+      // Both should receive server.shutdown message
+      const msg1 = JSON.parse(client1.send.mock.calls[0]?.[0] ?? "{}");
+      const msg2 = JSON.parse(client2.send.mock.calls[0]?.[0] ?? "{}");
+      expect(msg1.type).toBe("server.shutdown");
+      expect(msg2.type).toBe("server.shutdown");
+    });
+
+    it("does NOT send to CLOSING/CLOSED clients", async () => {
+      const server = new VoiceWebSocketServer({} as any);
+      const closingClient = createMockWs();
+      closingClient.readyState = 2; // CLOSING
+      const closedClient = createMockWs();
+      closedClient.readyState = 3; // CLOSED
+      mockWssClients.add(closingClient);
+      mockWssClients.add(closedClient);
+
+      await server.drain(1000);
+
+      expect(closingClient.send).not.toHaveBeenCalled();
+      expect(closedClient.send).not.toHaveBeenCalled();
+    });
+
+    it("returns false after timeout when connections remain", async () => {
+      // Connect a client to add to connections map
+      const { server } = await connectClient();
+
+      const drainPromise = server.drain(500);
+
+      // Advance past the timeout — interval fires multiple times
+      jest.advanceTimersByTime(600);
+
+      // Drain promise should now resolve to false
+      const result = await drainPromise;
+      expect(result).toBe(false);
+    });
+
+    it("returns true when last connection closes during drain", async () => {
+      const { server, mockWs } = await connectClient(); // adds 1 connection
+
+      const drainPromise = server.drain(1000);
+
+      // Let first interval tick fire (connection still present)
+      jest.advanceTimersByTime(100);
+      await Promise.resolve(); // flush microtasks
+
+      // Simulate client disconnect — triggers handleClose → connections.delete(ws)
+      mockWs.emit("close");
+
+      // Next interval tick finds connections.size === 0 → resolves true
+      jest.advanceTimersByTime(100);
+
+      const result = await drainPromise;
+      expect(result).toBe(true);
+    });
+
+    it("server.shutdown message includes reason and timestamp fields", async () => {
+      const server = new VoiceWebSocketServer({} as any);
+      const client = createMockWs();
+      mockWssClients.add(client);
+
+      await server.drain(1000);
+
+      const msg = JSON.parse(client.send.mock.calls[0]?.[0] ?? "{}");
+      expect(msg.reason).toBe("maintenance");
+      expect(typeof msg.timestamp).toBe("number");
+    });
+
+    it("does not throw when client.send() throws during notification", async () => {
+      const server = new VoiceWebSocketServer({} as any);
+      const badClient = createMockWs();
+      badClient.send.mockImplementation(() => { throw new Error("send failed"); });
+      mockWssClients.add(badClient);
+
+      // Should not throw — send errors are swallowed
+      await expect(server.drain(1000)).resolves.toBeDefined();
     });
   });
 });

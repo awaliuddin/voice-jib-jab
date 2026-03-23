@@ -85,6 +85,7 @@ export class VoiceWebSocketServer {
   private kbStore: KnowledgeBaseStore | undefined;
   private verificationService?: ClaimVerificationService;
   private recordingStore?: RecordingStore;
+  private draining = false;
 
   constructor(server: any, opaEvaluator?: OpaEvaluator, sessionRecorder?: SessionRecorder, voiceTriggerService?: VoiceTriggerService, memoryStore?: ConversationMemoryStore, voiceProfileStore?: VoiceProfileStore, kbStore?: KnowledgeBaseStore, verificationService?: ClaimVerificationService, recordingStore?: RecordingStore) {
     this.wss = new WebSocketServer({ server });
@@ -150,6 +151,52 @@ export class VoiceWebSocketServer {
     return (this.wss as unknown as { _server?: object })._server != null;
   }
 
+  /**
+   * Gracefully drain WebSocket connections.
+   *
+   * Sets the draining flag (rejects new connections), sends a
+   * "server.shutdown" notice to all open clients, then waits up to
+   * timeoutMs for all active sessions to disconnect voluntarily.
+   *
+   * Returns true if all connections closed within the timeout, false otherwise.
+   * After this method returns, call close() to force-terminate any remainders.
+   */
+  async drain(timeoutMs = 5_000): Promise<boolean> {
+    this.draining = true;
+
+    // Notify all open clients so they can save state and disconnect
+    for (const client of this.wss.clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        try {
+          client.send(
+            JSON.stringify({
+              type: "server.shutdown",
+              reason: "maintenance",
+              timestamp: Date.now(),
+            }),
+          );
+        } catch {
+          // Client may have already closed — safe to ignore
+        }
+      }
+    }
+
+    if (this.connections.size === 0) return true;
+
+    return new Promise<boolean>((resolve) => {
+      const deadline = Date.now() + timeoutMs;
+      const interval = setInterval(() => {
+        if (this.connections.size === 0) {
+          clearInterval(interval);
+          resolve(true);
+        } else if (Date.now() >= deadline) {
+          clearInterval(interval);
+          resolve(false);
+        }
+      }, 100);
+    });
+  }
+
   /** Close all voice WebSocket connections and shut down the server. */
   close(callback?: (err?: Error) => void): void {
     for (const client of this.wss.clients) {
@@ -159,6 +206,10 @@ export class VoiceWebSocketServer {
   }
 
   private async handleConnection(ws: WebSocket): Promise<void> {
+    if (this.draining) {
+      ws.close(1001, "Server shutting down");
+      return;
+    }
     console.log("[WebSocket] New client connected");
 
     // Create session
