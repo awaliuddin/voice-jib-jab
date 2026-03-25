@@ -13544,3 +13544,60 @@ Dead code noted: `trimToCaps` while-loops (lines 276, 284) and `if (!factsPath)`
 **Q43 (open)** — Pre-push lock-file sync check.
 
 Dashboard: 54/54 SHIPPED.
+
+---
+
+### Check-in 100 — 2026-03-24
+
+#### 1. What shipped since last check-in?
+
+**N-64** (committed `6cde232`): WebSocket health check — `registerCheck()` method on `VoiceWebSocketServer`, plugged into `HealthMonitorService`. Enhanced `/health` endpoint now includes WebSocket connection count and per-check status. Verified at the HTTP layer.
+
+**N-65** (committed `88fa41f`, NEXUS+README `285dc2b`): Graceful WebSocket drain on SIGTERM. On shutdown signal, the server: (1) broadcasts a `connection.closing` event to all active WS clients so they can clean up, (2) waits up to a configurable drain window for sessions to self-terminate, (3) force-closes any remaining connections before the HTTP server shuts down. Pairs with the N-63 in-flight HTTP drain — both layers now drain cleanly.
+
+**CoS enrichment 2026-03-23** (committed `8747d2f`): Portfolio Intelligence updated — "Production-Ready, Business Model TBD" (65/65 SHIPPED, Phase 2 plan: N-66 Prometheus metrics, N-67 RBAC, N-68 session persistence). Q37 ESLint v9 deferred (P3, committed `3b29e00`).
+
+Test count: **4,996 tests** (4,995 passing; 1 flaky — see §2).
+
+Dashboard: **65/65 SHIPPED.**
+
+---
+
+#### 2. What surprised me?
+
+**One flaky test in the full-suite run.** `OpaModeratorCheck.test.ts` has one test that fails under `npm test` (full suite) but passes in isolation. Classic test-isolation leak — a singleton or module-level spy is being set up or torn down in a way that bleeds across test files when run concurrently. The failure is non-deterministic with test ordering. This is latent since N-65 (or possibly earlier — isolated runs always showed green). Needs a `jest --runInBand` diagnostic to confirm ordering dependency.
+
+**Graceful WebSocket drain is harder than HTTP drain.** HTTP in-flight tracking (`RequestTracker`) is deterministic: increment on request entry, decrement on response send. WebSocket sessions are long-lived and stateful — you can't decrement on "response sent." The drain requires broadcasting a close intent *and* waiting for `connection.close` events back from clients, which don't always arrive within the window. The implementation uses a `setTimeout` fallback to force-close stragglers, which is correct but means the drain window is a tunable tradeoff between clean shutdown and deploy velocity.
+
+**PI note re: Fish Speech v1.5 / Qwen3-TTS**: The PI-007 injection (via the 2026-03-23 enrichment) is the most actionable PI received so far. The current OpenAI Realtime API dependency is the single largest latency and cost variable in the architecture. A Fish Speech v1.5 or Qwen3-TTS path would eliminate it. Not in scope now, but Phase 2 should include a spike.
+
+---
+
+#### 3. Cross-project signals
+
+**Graceful WS drain pattern is reusable.** The `broadcastClosing()` + `drainAndForceClose()` + `setTimeout` fallback pattern is generic. Any ASIF project with persistent WebSocket connections (Forge Infinity Terminal, FamilyMind real-time, SynApps collaboration) should use this pattern for zero-dropped-connection deploys. Portfolio recommendation: extract to `@asif/graceful-shutdown` shared utility alongside `RequestTracker`.
+
+**Test-isolation flake pattern**: module-level mocks and spies (`jest.spyOn` at describe/file scope) that aren't restored in `afterEach` are the primary cause of inter-file ordering failures. Any project with Jest parallel mode (`--maxWorkers > 1`) that sees inconsistent test results should audit `jest.spyOn` and `jest.mock` cleanup patterns. Portfolio signal: standardize on `jest.restoreAllMocks()` in `afterEach` as a CI-floor rule.
+
+---
+
+#### 4. What I'd prioritize next
+
+Phase 2 directives based on the enrichment and the current production-ready state:
+
+1. **N-66 — Prometheus metrics endpoint** (`/metrics`) — operators need instrumentation before running this in production. `prom-client` integration, counter + histogram for lane decisions, WS session lifecycle events. Estimated: M.
+2. **N-67 — RBAC** — the `/supervisor` WebSocket path (D-28) still has no auth (Q19, open since 2026-03-19). A role-based auth layer on that path is the highest-priority security item before customer deployment.
+3. **Flaky test fix** — `OpaModeratorCheck.test.ts` isolation leak. `jest --runInBand` diagnostic, `afterEach` cleanup fix. Small but should be clean before N-66.
+4. **N-68 — Session persistence** — in-memory sessions are lost on restart. A Redis or SQLite session store would make graceful shutdown truly seamless (reconnecting clients resume instead of re-handshaking). Estimated: L.
+
+---
+
+#### 5. Blockers / Questions for CoS
+
+**Q37 deferred (acknowledged)** — ESLint v9 migration deferred to P3. Noted. No action.
+
+**Q19 (open, raised 2026-03-19)** — Supervisor WS auth: `/supervisor` WebSocket upgrade has no authentication. Production blocker. Still awaiting posture decision: shared-secret header, JWT, or internal-only assumption?
+
+**Q45** — The full-suite run shows 1 flaky failure in `OpaModeratorCheck.test.ts` (passes in isolation). Do I fix this now as a P0 quality gate issue, or defer until N-66? The test count is officially 4,996 and all pass in isolation — the CI gate only runs `jest` which shows 1 failure. Recommend: fix before N-66 to keep CI clean.
+
+Dashboard: **65/65 SHIPPED.**
