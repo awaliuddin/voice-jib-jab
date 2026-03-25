@@ -299,6 +299,28 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260324-01 — P1: N-66 Prometheus Metrics Endpoint
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P1
+**Injected**: 2026-03-24 21:45 | **Estimate**: S | **Status**: PENDING
+
+**Context**: VJJ is production-ready (65/65 shipped, 4,996 tests). Phase 2 enterprise features start with observability.
+
+**Action Items**:
+1. [ ] Install prom-client: `npm install prom-client`
+2. [ ] Create GET /metrics endpoint that exports Prometheus format
+3. [ ] Metrics to export: httpRequestsTotal (counter), httpRequestDurationMs (histogram), wsConnectionsActive (gauge), ttsProcessingDurationMs (histogram)
+4. [ ] Register metrics in app startup, increment in middleware
+5. [ ] Tests for /metrics endpoint (returns text/plain, contains expected metric names)
+
+**Constraints**:
+- Standard Prometheus exposition format
+- No auth required on /metrics (Prometheus scrapes it)
+- Run bash .git/hooks/pre-push before pushing
+
+**Response** (filled by team):
+
+---
+
 ### DIRECTIVE-NXTG-20260319-212 — P1: Intent Detection — Smart Caller Routing
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-19 18:40 | **Estimate**: M | **Status**: DONE
