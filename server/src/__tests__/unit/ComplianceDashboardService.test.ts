@@ -117,6 +117,7 @@ describe("ComplianceDashboardService", () => {
       const report = await svc.evaluateTenant("tenant-a");
       // Only sessions belonging to tenant-a counted
       expect(report.complianceScorePct).toBeGreaterThanOrEqual(0);
+      expect(report.complianceScorePct).toBeLessThanOrEqual(100);
       // Indirectly verify by checking gaps — with 2 sessions we can check behavior
       // We verify sessionCount by checking HIPAA-3 (passes when sessionCount===0 or score>=60)
       // Since sessions exist (count=2) and avgQuality=0, HIPAA-3 fails

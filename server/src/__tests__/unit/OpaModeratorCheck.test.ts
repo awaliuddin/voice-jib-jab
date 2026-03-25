@@ -366,10 +366,12 @@ describe("OpaModeratorCheck — ControlEngine integration", () => {
   test("ControlEngine.initialize() calls OpaEvaluator.initialize() when not initialized", async () => {
     const ev = makeEvaluator();
     const initSpy = jest.spyOn(ev, "initialize").mockResolvedValue(undefined);
+    const registry = makeRegistry();
+    jest.spyOn(registry, "initialize").mockResolvedValue(undefined);
 
     const engine = new ControlEngine("test-session", {
       opaEvaluator: ev,
-      claimsRegistry: makeRegistry(),
+      claimsRegistry: registry,
       enabled: false,
     });
 
@@ -382,10 +384,12 @@ describe("OpaModeratorCheck — ControlEngine integration", () => {
     const mockPolicy = makeModeratorPolicy({ decision: "allow", severity: 0, reason_code: null });
     ev._injectPolicy(mockPolicy); // sets isInitialized = true
     const initSpy = jest.spyOn(ev, "initialize").mockResolvedValue(undefined);
+    const registry = makeRegistry();
+    jest.spyOn(registry, "initialize").mockResolvedValue(undefined);
 
     const engine = new ControlEngine("test-session", {
       opaEvaluator: ev,
-      claimsRegistry: makeRegistry(),
+      claimsRegistry: registry,
       enabled: false,
     });
 

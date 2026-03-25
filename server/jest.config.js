@@ -32,11 +32,11 @@ export default {
   testPathIgnorePatterns: ["/node_modules/", "<rootDir>/dist/", "<rootDir>/.stryker-tmp/", "/.claude/worktrees/"],
   coverageThreshold: {
     global: {
-      // Floors set ~3% below actual (2026-03-21 N-58): stmt 95.7%, branch 89.3%, fn 96.3%, lines 96.2%
-      statements: 92,
-      branches: 86,
+      // Floors set ~3% below actual (2026-03-25 CRUCIBLE): stmt 97.25%, branch 92.62%, fn 96.65%, lines 97.49%
+      statements: 94,
+      branches: 90,
       functions: 93,
-      lines: 93,
+      lines: 94,
     },
   },
 };

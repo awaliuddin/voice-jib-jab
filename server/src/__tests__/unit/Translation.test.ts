@@ -274,6 +274,7 @@ describe("TranslationService.translate()", () => {
     const result = await service.translate("Hello", "en", "es");
     expect(typeof result.latencyMs).toBe("number");
     expect(result.latencyMs).toBeGreaterThanOrEqual(0);
+    expect(result.latencyMs).toBeLessThan(1000);
   });
 
   it("provider name is 'stub'", async () => {
@@ -391,6 +392,7 @@ describe("TranslationService.runPipeline()", () => {
     const result = await service.runPipeline("Hello", "Response", "en", "en");
     expect(typeof result.pipelineLatencyMs).toBe("number");
     expect(result.pipelineLatencyMs).toBeGreaterThanOrEqual(0);
+    expect(result.pipelineLatencyMs).toBeLessThan(1000);
   });
 
   it("detectionConfidence is 1.0 when callerLanguage is explicitly provided", async () => {

@@ -264,7 +264,7 @@ describe("TrainingDataService", () => {
       // The annotations on svc are already loaded with current timestamps,
       // so filtering by from= "now-ish" should include both (created just now).
       // Verify the filter mechanism works: create a fresh svc, mutate internally.
-      expect(ds.exampleCount).toBeGreaterThanOrEqual(0);
+      expect(ds.exampleCount).toBe(2);
 
       // Concrete filter test: build dataset only using from/to that matches nothing
       const dsEmpty = svc.buildDataset("Empty", {
