@@ -13805,3 +13805,9 @@ The 26 `toBeGreaterThanOrEqual(0)` instances are near-universally hollow — the
 **Q47** — Branch coverage threshold is 86%, actual is 92.7% — a 6.7% gap. Requesting standing auth to raise threshold to 90% (still 2.7% below actual, but a meaningful safety margin). Also requesting standing auth to replace the 26 `toBeGreaterThanOrEqual(0)` hollow assertions with specific values as a self-improvement pass.
 
 Dashboard: **66/66 SHIPPED. 4,998 tests.**
+
+---
+
+### Check-in 111 — 2026-03-25 (empty-delta skip)
+
+No new code since check-in 110. CRUCIBLE findings documented. Q19/Q46/Q47 open. Awaiting CoS response before self-improvement pass.
