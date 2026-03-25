@@ -13619,3 +13619,9 @@ No new code this session. Blocked: received M-2 directive (FlowAnalyticsStore, E
 ### Check-in 103 — 2026-03-24 (empty-delta skip)
 
 No new code. Blocked awaiting CoS direction: M-2 directive names (FlowAnalyticsStore, ExecutionMetricsStore, FlowTestRunStore) don't exist in synapps — correct project confirmed but store names don't match. NEXUS cycle 101 recommends PluginRegistry, CreditLedger, RatingStore/ReviewStore as next batch. Awaiting resolution before proceeding.
+
+---
+
+### Check-in 104 — 2026-03-24 (empty-delta skip)
+
+No new code. Same blocker as check-in 103. Awaiting CoS store name clarification for M-2e.
