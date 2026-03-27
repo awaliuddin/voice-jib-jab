@@ -72,3 +72,11 @@ This project follows the CRUCIBLE Protocol (`~/ASIF/standards/crucible-protocol.
 Rules that apply to this project:
 - Gate 4: Delta gate — test count decreases > 5 require justification in commit message
 - Oracle tier: STANDARD — minimum 2 oracle types per feature
+
+## Dx3 Brain Integration
+On every session start, recall relevant context from Dx3 before starting work:
+- Use recall() to check for prior decisions, lessons, and patterns related to your current task
+- After shipping work, use remember() to store what you learned
+- The brain at dx3-cognitive MCP has context from ALL projects — use it
+
+This is how the portfolio compounds intelligence. Your work benefits from every other team's learning.
