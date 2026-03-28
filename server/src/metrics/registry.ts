@@ -17,12 +17,14 @@
 
 import { Counter, Histogram, Gauge, Registry } from "prom-client";
 
+/** Non-default Prometheus registry scoped to the voice-jib-jab service. */
 export const register = new Registry();
 
 register.setDefaultLabels({ service: "voice-jib-jab" });
 
 // ── HTTP request counter ────────────────────────────────────────────────────
 
+/** Counter: total HTTP requests by method, route, and status code. */
 export const httpRequestsTotal = new Counter({
   name: "http_requests_total",
   help: "Total number of HTTP requests received",
@@ -33,6 +35,7 @@ export const httpRequestsTotal = new Counter({
 // ── HTTP request duration histogram ────────────────────────────────────────
 // Buckets chosen for sub-400ms latency target: granular below 400ms, coarser above.
 
+/** Histogram: HTTP request duration in milliseconds with sub-400ms granularity. */
 export const httpRequestDurationMs = new Histogram({
   name: "http_request_duration_ms",
   help: "HTTP request duration in milliseconds",
@@ -46,10 +49,12 @@ export const httpRequestDurationMs = new Histogram({
 
 let _getWsCount: (() => number) | null = null;
 
+/** Inject a getter for the active WebSocket count, called at scrape time. */
 export function setWsConnectionGetter(fn: () => number): void {
   _getWsCount = fn;
 }
 
+/** Gauge: number of active WebSocket connections, populated via lazy getter. */
 export const wsConnectionsActive = new Gauge({
   name: "ws_connections_active",
   help: "Number of active WebSocket connections",
@@ -62,6 +67,7 @@ export const wsConnectionsActive = new Gauge({
 // ── TTS processing duration histogram ──────────────────────────────────────
 // Buckets cover the expected 50–2000ms range for OpenAI TTS API calls.
 
+/** Histogram: TTS speech generation latency in milliseconds. */
 export const ttsProcessingDurationMs = new Histogram({
   name: "tts_processing_duration_ms",
   help: "TTS speech generation duration in milliseconds",

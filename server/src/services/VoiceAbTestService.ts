@@ -19,6 +19,7 @@ import { v4 as uuidv4 } from "uuid";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/** Configuration for a voice A/B test experiment. */
 export interface VoiceAbTestConfig {
   testId: string;
   tenantId: string;
@@ -31,6 +32,7 @@ export interface VoiceAbTestConfig {
   createdAt: string;
 }
 
+/** Per-session A/B test assignment with optional quality score. */
 export interface VoiceAbTestResult {
   testId: string;
   sessionId: string;
@@ -47,6 +49,7 @@ interface StorageFormat {
 
 // ── VoiceAbTestService ────────────────────────────────────────────────
 
+/** Manages voice A/B test experiments with deterministic session assignment. */
 export class VoiceAbTestService {
   private storageFile: string;
   private data: StorageFormat;

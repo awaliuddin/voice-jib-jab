@@ -6,8 +6,10 @@
  * words to DTMF digits.
  */
 
+/** Valid DTMF digits: 0-9, *, #. */
 export type DtmfDigit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "*" | "#";
 
+/** Result of DTMF detection: whether a digit was found and at what confidence. */
 export interface DtmfDetectionResult {
   detected: boolean;
   digit?: DtmfDigit;
@@ -40,6 +42,7 @@ const PHRASE_PREFIXES = ["press", "option", "number", "choose", "select"];
 
 // ── DtmfDetector ──────────────────────────────────────────────────────
 
+/** Detects DTMF key presses from spoken voice transcript text (e.g. "press 1", "option three"). */
 export class DtmfDetector {
   /**
    * Detect a DTMF digit from a voice transcript string.

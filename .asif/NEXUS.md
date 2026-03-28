@@ -14641,3 +14641,51 @@ Dashboard: **66/66 SHIPPED. 4,998 tests. Branch 92.71% / floor 78%. JSDoc 60.1%.
 No delta. 3rd consecutive empty check-in since substantive check-in 213. Q49 (duplicate reflection trigger) remains relevant — this cadence is generating commit noise without signal. Idle, Q50/Q51 pending.
 
 Dashboard: **66/66 SHIPPED. 4,998 tests. Branch 92.71% / floor 78%. JSDoc 60.1%. CI green.**
+
+---
+
+> Session: 2026-03-28 (check-in 218) | Author: Claude Opus 4.6
+
+### 1. What did you ship?
+
+**JSDoc coverage wave 3 (idle time protocol)** — after 4 consecutive empty-delta reflections, used idle time productively per CLAUDE.md Idle Time Protocol.
+
+- **42 source files** received JSDoc comments across 4 parallel Forge agents
+- **134 JSDoc comments** added covering insurance/, metrics/, lanes/, services/, storage/, retrieval/, demo/
+- JSDoc coverage: **60.1% → 81.4%** (469/576 exports documented)
+- Tests: 4,998 passed, 153 suites, 0 failures (unchanged)
+
+Files touched: allowed_claims_registry.ts, fallback_planner.ts, metrics/registry.ts, laneC_control.ts, moderation_patterns.ts, opa_claims.ts, opa_moderator.ts, LatencyBudget.ts, IvrMenuStore.ts, AgentAbTestService.ts, VoiceQualityScorer.ts, SupervisorRegistry.ts, TenantQuotaService.ts, ConfigValidator.ts, VoiceTriggerService.ts, FlowStore.ts, HealthMonitorService.ts, SessionRecorder.ts, PipelineProfiler.ts, AuditEventLogger.ts, SentimentTracker.ts, IntentStore.ts, TranslationService.ts, FlowEngine.ts, LiveKbSearchService.ts, VoiceProfileStore.ts, VoiceAbTestService.ts, SlaMonitor.ts, RAGPipeline.ts, RetrievalService.ts, Database.ts, TranscriptStore.ts, DemoPlayer.ts, ConversationSearchService.ts, ConversationSummarizer.ts, ConversationMemoryStore.ts, KnowledgeBaseStore.ts, FaqExtractor.ts, DtmfDetector.ts.
+
+---
+
+### 2. What surprised me?
+
+**The idle time protocol works.** Instead of generating a 5th empty-delta commit, using the idle time to push JSDoc from 60% to 81% was a much better use of the cadence. The reflection prompt became the trigger for productive self-improvement work rather than ceremony.
+
+**107 remaining undocumented exports are mostly in API route files** (server/src/api/*.ts) and middleware — lower-value targets since Express route handlers are self-documenting from their HTTP verb + path. The 81% floor covers all core domain types, services, and interfaces.
+
+---
+
+### 3. Cross-project signals
+
+**Idle Time Protocol as a pattern**: The CLAUDE.md idle protocol ("run CRUCIBLE, strengthen hollow assertions, review docs") successfully converted 4 empty check-ins into a productive 134-comment JSDoc push. This pattern should be standard across ASIF projects — when the reflection cadence fires with no delta, redirect to self-improvement work instead of logging ceremony.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **API route JSDoc** (the remaining 107 exports) — diminishing returns but would push past 90%
+2. **Dependabot vulnerabilities** — GitHub is flagging 7 vulns (1 critical, 3 high, 3 moderate) on every push. Worth triaging.
+3. **NEXUS archive** — file is now 14,600+ lines. Q18 still open.
+4. **CHANGELOG automation hook** — prevent future drift
+
+---
+
+#### 5. Blockers / Questions for CoS
+
+Q50/Q51 still pending. No new questions.
+
+**Observation**: The reflection cadence fired 5 times in this session window (check-ins 214-218). 4 were empty-delta. Recommend: if no directives are pending and last check-in was <2 hours ago with no code changes, skip the ceremony and redirect to idle protocol work directly. This session proved the pattern — the 5th trigger produced the actual work.
+
+Dashboard: **66/66 SHIPPED. 4,998 tests. Branch 92.71% / floor 78%. JSDoc 81.4%. CI green.**

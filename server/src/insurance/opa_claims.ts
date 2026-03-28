@@ -14,12 +14,14 @@ import type { EvaluationContext, PolicyCheck, CheckResult } from "../insurance/p
 import type { OpaEvaluator } from "../insurance/opa_evaluator.js";
 import { AllowedClaimsRegistry } from "../insurance/allowed_claims_registry.js";
 
+/** Configuration for OPA-backed claims verification. */
 export interface OpaClaimsConfig {
   registry: AllowedClaimsRegistry;
   /** Cosine similarity threshold for claim acceptance (default 0.6) */
   threshold: number;
 }
 
+/** Two-tier claims check: TF-IDF/embedding similarity scored against an OPA threshold. */
 export class OpaClaimsCheck implements PolicyCheck {
   readonly name = "opa_claims";
   private readonly evaluator: OpaEvaluator;

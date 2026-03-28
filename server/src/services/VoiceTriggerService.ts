@@ -14,6 +14,7 @@ import { randomUUID } from "crypto";
 
 // ── Public Types ──────────────────────────────────────────────────────────
 
+/** Inbound request to programmatically initiate a voice session. */
 export interface TriggerRequest {
   tenantId: string;
   callbackUrl: string;
@@ -22,6 +23,7 @@ export interface TriggerRequest {
   metadata?: Record<string, string>;
 }
 
+/** Persistent record tracking a triggered session's lifecycle and connection details. */
 export interface TriggerRecord {
   triggerId: string;
   sessionId: string;
@@ -36,6 +38,7 @@ export interface TriggerRecord {
   sipTrunk: string | null;
 }
 
+/** Payload POSTed to the callbackUrl when a triggered session completes or fails. */
 export interface SessionCallbackPayload {
   triggerId: string;
   sessionId: string;
@@ -53,6 +56,7 @@ export interface SessionCallbackPayload {
 
 // ── Service ───────────────────────────────────────────────────────────────
 
+/** Manages webhook-driven voice session triggers with fire-and-forget callbacks. */
 export class VoiceTriggerService {
   private triggers = new Map<string, TriggerRecord>();
   private pendingBySession = new Map<string, string>();

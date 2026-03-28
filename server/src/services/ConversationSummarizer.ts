@@ -8,12 +8,14 @@
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/** A single conversation turn with role, text, and optional timestamp. */
 export interface TranscriptTurn {
   role: "user" | "assistant";
   text: string;
   timestampMs?: number;
 }
 
+/** Structured summary: topics, decisions, action items, sentiment arc, escalation, and key quotes. */
 export interface ConversationSummary {
   sessionId: string;
   generatedAt: string;
@@ -31,6 +33,7 @@ export interface ConversationSummary {
   keyQuotes: string[];
 }
 
+/** Optional inputs for summarization: session duration and pre-computed sentiment readings. */
 export interface SummarizeOptions {
   durationMs?: number;
   sentimentReadings?: Array<{ sentiment: string; score: number }>;
@@ -162,6 +165,7 @@ function classifyText(text: string): string {
 
 // ── ConversationSummarizer ────────────────────────────────────────────
 
+/** Generates structured conversation summaries with topic extraction and sentiment analysis. */
 export class ConversationSummarizer {
   /**
    * Generate a structured summary from a conversation transcript.

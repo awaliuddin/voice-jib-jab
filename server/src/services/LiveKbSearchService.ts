@@ -14,6 +14,7 @@ import type { KnowledgeBaseStore } from "./KnowledgeBaseStore.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+/** A single knowledge base search hit with relevance score. */
 export interface KbSearchResult {
   entryId: string;
   title: string;
@@ -22,6 +23,7 @@ export interface KbSearchResult {
   category?: string;
 }
 
+/** Complete search response including results, timing, and query metadata. */
 export interface KbSearchResponse {
   query: string;
   tenantId: string;
@@ -42,6 +44,7 @@ const STOP_WORDS = new Set([
 
 // ── LiveKbSearchService ────────────────────────────────────────────────
 
+/** Token-overlap search engine for tenant knowledge bases with title weighting. */
 export class LiveKbSearchService {
   private maxResults: number;
   private minScore: number;

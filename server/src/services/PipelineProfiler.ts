@@ -17,6 +17,7 @@ export const BOTTLENECK_THRESHOLD_MS = 200;
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+/** Pipeline stage identifier for timing instrumentation. */
 export type PipelineStage =
   | "stt"          // Speech-to-text
   | "lane_a"       // Lane A reflex
@@ -26,6 +27,7 @@ export type PipelineStage =
   | "tts"          // Text-to-speech
   | "total";       // End-to-end roundtrip
 
+/** A single recorded timing measurement for one pipeline stage. */
 export interface StageTimingRecord {
   stage: PipelineStage;
   startMs: number;
@@ -34,6 +36,7 @@ export interface StageTimingRecord {
   isBottleneck: boolean;
 }
 
+/** Aggregated timing profile for a session across all recorded stages. */
 export interface PipelineProfile {
   sessionId: string;
   stages: StageTimingRecord[];
@@ -47,6 +50,7 @@ export interface PipelineProfile {
 
 // ── Valid stage set (for runtime validation) ───────────────────────────
 
+/** Set of valid pipeline stage names for runtime validation. */
 export const VALID_PIPELINE_STAGES: ReadonlySet<string> = new Set<PipelineStage>([
   "stt",
   "lane_a",
@@ -59,6 +63,7 @@ export const VALID_PIPELINE_STAGES: ReadonlySet<string> = new Set<PipelineStage>
 
 // ── PipelineProfiler ───────────────────────────────────────────────────
 
+/** In-memory per-session pipeline stage profiler with bottleneck detection. */
 export class PipelineProfiler {
   /**
    * Raw records stored per session. The profile shape is computed on demand

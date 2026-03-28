@@ -17,6 +17,7 @@ import { v4 as uuidv4 } from "uuid";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/** Metadata for a custom TTS voice profile. */
 export interface VoiceProfile {
   profileId: string;
   tenantId: string;
@@ -27,6 +28,7 @@ export interface VoiceProfile {
   engineData?: Record<string, unknown>;
 }
 
+/** Options for creating a new voice profile (profileId and createdAt are generated). */
 export interface CreateProfileOptions {
   tenantId: string;
   name: string;
@@ -37,6 +39,7 @@ export interface CreateProfileOptions {
 
 // ── VoiceProfileStore ─────────────────────────────────────────────────
 
+/** Per-tenant voice profile metadata store with JSON file persistence. */
 export class VoiceProfileStore {
   private storageDir: string;
   private cache = new Map<string, VoiceProfile[]>();

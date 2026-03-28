@@ -28,15 +28,19 @@ interface CachedAudio {
   durationMs: number;
 }
 
+/** Output modality for a fallback response. */
 export type FallbackOutput = "audio" | "text";
+/** Concrete fallback mode after "auto" has been resolved. */
 export type ResolvedFallbackMode = Exclude<FallbackMode, "auto">;
 
+/** Resolved plan describing what fallback to play and how. */
 export interface FallbackPlan {
   mode: ResolvedFallbackMode;
   utterance: string;
   output: FallbackOutput;
 }
 
+/** Configuration for FallbackPlanner including phrases and mode selection. */
 export interface FallbackPlannerConfig {
   enabled: boolean;
   mode: FallbackMode;
@@ -79,6 +83,7 @@ const DEFAULT_CONFIG: FallbackPlannerConfig = {
 const MAX_CACHE_SIZE = 50;
 const TTS_TIMEOUT_MS = 5000;
 
+/** Generates and streams fallback audio/text when Lane C blocks the primary response. */
 export class FallbackPlanner extends EventEmitter {
   private sessionId: string;
   private config: FallbackPlannerConfig;

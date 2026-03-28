@@ -12,6 +12,7 @@ import type { SessionRecorder } from "./SessionRecorder.js";
 // Public types
 // ---------------------------------------------------------------------------
 
+/** Query filters for searching session transcripts (keyword, speaker, date range, sentiment). */
 export interface SearchFilters {
   /** Substring match on transcript text (case-insensitive). */
   keyword?: string;
@@ -33,6 +34,7 @@ export interface SearchFilters {
   offset?: number;
 }
 
+/** A single transcript match with session context and optional keyword highlight. */
 export interface TranscriptHit {
   sessionId: string;
   tenantId?: string;
@@ -48,6 +50,7 @@ export interface TranscriptHit {
   matchedKeyword?: string;
 }
 
+/** Paginated search result containing total count and matching transcript hits. */
 export interface ConversationSearchResult {
   total: number;
   limit: number;
@@ -55,6 +58,7 @@ export interface ConversationSearchResult {
   hits: TranscriptHit[];
 }
 
+/** High-level summary of a session: turn count, sentiment, policy decisions, and preview. */
 export interface SessionSummary {
   sessionId: string;
   tenantId?: string;
@@ -72,6 +76,7 @@ export interface SessionSummary {
 // ConversationSearchService
 // ---------------------------------------------------------------------------
 
+/** In-memory full-text search over SessionRecorder transcripts with filtering and pagination. */
 export class ConversationSearchService {
   constructor(private readonly recorder: SessionRecorder) {}
 

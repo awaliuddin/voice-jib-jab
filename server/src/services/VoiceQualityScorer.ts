@@ -15,6 +15,7 @@ import type { SessionRecording } from "./SessionRecorder.js";
 // Public types
 // ---------------------------------------------------------------------------
 
+/** Score and rationale for a single quality dimension (0-20 points). */
 export interface QualityDimension {
   name: string;
   score: number;   // 0-20
@@ -22,6 +23,7 @@ export interface QualityDimension {
   rationale: string;
 }
 
+/** Complete session quality report with 5-dimension breakdown and letter grade. */
 export interface QualityScorecard {
   sessionId: string;
   totalScore: number;  // 0-100
@@ -37,6 +39,7 @@ export interface QualityScorecard {
   computedAt: string;
 }
 
+/** Configuration for quality threshold and optional webhook alerting. */
 export interface QualityScorerConfig {
   qualityThreshold: number;  // default 70
   webhookUrl?: string;       // POST here when threshold breached
@@ -136,6 +139,7 @@ function computeGrade(totalScore: number): "A" | "B" | "C" | "D" | "F" {
 // VoiceQualityScorer
 // ---------------------------------------------------------------------------
 
+/** Grades sessions 0-100 across 5 quality dimensions with optional webhook alerts. */
 export class VoiceQualityScorer {
   constructor(public config: QualityScorerConfig = { qualityThreshold: 70 }) {}
 

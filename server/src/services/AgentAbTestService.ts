@@ -27,6 +27,7 @@ export interface AgentVariantConfig {
   tags?: Record<string, string>;    // Arbitrary metadata
 }
 
+/** Persistent record of an A/B test between two agent configurations. */
 export interface AgentAbTest {
   testId: string;
   name: string;
@@ -43,6 +44,7 @@ export interface AgentAbTest {
   concludedAt?: string;
 }
 
+/** A session's variant assignment and optional post-session metrics. */
 export interface AgentAbTestSession {
   testId: string;
   sessionId: string;
@@ -58,6 +60,7 @@ export interface AgentAbTestSession {
   recordedAt?: string;              // ISO 8601 when metrics were last updated
 }
 
+/** Aggregated quality and engagement statistics for one test variant. */
 export interface VariantStats {
   variant: "A" | "B";
   name: string;
@@ -69,6 +72,7 @@ export interface VariantStats {
   escalationRate: number | null;    // 0–1
 }
 
+/** Live report comparing variant stats with a computed winner suggestion. */
 export interface AgentAbTestReport {
   test: AgentAbTest;
   variantA: VariantStats;
@@ -86,6 +90,7 @@ interface StorageFormat {
 
 // ── AgentAbTestService ────────────────────────────────────────────────
 
+/** Manages A/B tests across agent configurations with deterministic session assignment. */
 export class AgentAbTestService {
   private storageFile: string;
   private data: StorageFormat;

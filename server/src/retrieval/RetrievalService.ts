@@ -8,6 +8,7 @@ import { resolve } from "path";
 import { KnowledgePack, KnowledgeFact, DisclaimerEntry } from "./KnowledgePack.js";
 import { VectorStore, VectorDocument } from "./VectorStore.js";
 
+/** Compact bundle of retrieved facts and disclaimers for a given topic. */
 export interface FactsPack {
   topic: string;
   facts: Array<{
@@ -19,6 +20,7 @@ export interface FactsPack {
   disclaimers: string[];
 }
 
+/** Configuration for retrieval: knowledge paths, topK, and size caps. */
 export interface RetrievalServiceOptions {
   knowledgeDir?: string;
   factsPath?: string;
@@ -33,6 +35,7 @@ const DEFAULT_MAX_TOKENS = 600;
 const DEFAULT_MAX_BYTES = 4000;
 const MAX_TOPIC_CHARS = 120;
 
+/** Loads JSONL knowledge facts, indexes them via VectorStore, and returns capped facts packs. */
 export class RetrievalService {
   private readonly vectorStore = new VectorStore<KnowledgeFact>();
   private knowledgePack: KnowledgePack | null = null;

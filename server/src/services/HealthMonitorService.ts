@@ -17,6 +17,7 @@ import { EventEmitter } from "events";
 
 // ── Public types ──────────────────────────────────────────────────────
 
+/** Outcome of a single health check including status, latency, and failure count. */
 export interface HealthCheckResult {
   name: string;
   status: "healthy" | "unhealthy" | "unknown";
@@ -26,11 +27,13 @@ export interface HealthCheckResult {
   consecutiveFailures: number;
 }
 
+/** Named async check function to register with the health monitor. */
 export interface HealthCheckDefinition {
   name: string;
   check(): Promise<void>;
 }
 
+/** Configuration for check interval, webhook alerting, and failure thresholds. */
 export interface HealthMonitorConfig {
   /** Interval between check runs in milliseconds. Default 10000. */
   intervalMs?: number;
@@ -40,10 +43,12 @@ export interface HealthMonitorConfig {
   failureThreshold?: number;
 }
 
+/** Aggregate health status across all registered subsystem checks. */
 export type OverallStatus = "healthy" | "degraded" | "down";
 
 // ── HealthMonitorService ──────────────────────────────────────────────
 
+/** Periodic health check runner with degraded/recovered events and webhook alerts. */
 export class HealthMonitorService extends EventEmitter {
   private readonly checks: HealthCheckDefinition[];
   private readonly results: Map<string, HealthCheckResult>;

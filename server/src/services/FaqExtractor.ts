@@ -11,6 +11,7 @@
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/** A question/answer pair extracted from a conversation transcript. */
 export interface ExtractedFaq {
   question: string;
   context: string;
@@ -29,6 +30,7 @@ const MAX_RESULTS = 10;
 
 // ── FaqExtractor ──────────────────────────────────────────────────────
 
+/** Extracts FAQ-style question/answer pairs from user-assistant conversation turns. */
 export class FaqExtractor {
   /**
    * Extract question/answer pairs from a conversation transcript.

@@ -16,6 +16,7 @@ import { randomUUID } from "node:crypto";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+/** Discriminator for conversation flow node behavior. */
 export type FlowNodeType =
   | "greeting"
   | "intent_detection"
@@ -24,12 +25,14 @@ export type FlowNodeType =
   | "follow_up"
   | "end";
 
+/** Conditional edge between flow nodes, matched against caller input. */
 export interface FlowTransition {
   /** Keyword/pattern to match in caller input (substring, case-insensitive). */
   condition: string;
   nextNodeId: string;
 }
 
+/** A single node in a conversation flow with prompt text and transitions. */
 export interface FlowNode {
   nodeId: string;
   type: FlowNodeType;
@@ -39,6 +42,7 @@ export interface FlowNode {
   // If transitions is empty and type !== "end", it auto-advances (no input needed).
 }
 
+/** A complete conversation flow definition with its directed graph of nodes. */
 export interface ConversationFlow {
   flowId: string;
   name: string;
@@ -52,6 +56,7 @@ export interface ConversationFlow {
 
 // ── FlowStore ──────────────────────────────────────────────────────────
 
+/** JSON-persisted CRUD store for conversation flow definitions. */
 export class FlowStore {
   private flows: Map<string, ConversationFlow> = new Map();
   private storageFile: string;

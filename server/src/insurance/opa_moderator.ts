@@ -20,6 +20,7 @@ import type { ModerationCategory } from "./moderation_patterns.js";
 
 // ── Config ─────────────────────────────────────────────────────────────
 
+/** Configuration for OPA-backed moderation with per-category thresholds. */
 export interface OpaModeratorConfig {
   /** Moderation categories with patterns, severity, and decision. */
   categories: ModerationCategory[];
@@ -34,6 +35,7 @@ export interface OpaModeratorConfig {
 
 // ── OpaModeratorCheck ──────────────────────────────────────────────────
 
+/** Pattern-match + OPA threshold moderation check with declarative Rego rules. */
 export class OpaModeratorCheck implements PolicyCheck {
   readonly name = "opa_moderator";
 

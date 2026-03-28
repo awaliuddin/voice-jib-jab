@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from "uuid";
 
 // -- Types ------------------------------------------------------------------
 
+/** Metadata for a connected supervisor including their active watch subscription. */
 export interface SupervisorInfo {
   ws: WebSocket;
   supervisorId: string;
@@ -19,10 +20,12 @@ export interface SupervisorInfo {
   connectedAt: string;
 }
 
+/** Callback that injects a whisper message into an active voice session. */
 export type WhisperHandler = (sessionId: string, message: string) => boolean;
 
 // -- SupervisorRegistry -----------------------------------------------------
 
+/** Manages supervisor WebSocket connections and session watch subscriptions. */
 export class SupervisorRegistry {
   private supervisors = new Map<WebSocket, SupervisorInfo>();
   private sessionWatchers = new Map<string, Set<WebSocket>>();
@@ -141,5 +144,5 @@ export class SupervisorRegistry {
   }
 }
 
-// Module-level singleton
+/** Module-level singleton shared across the application. */
 export const supervisorRegistry = new SupervisorRegistry();

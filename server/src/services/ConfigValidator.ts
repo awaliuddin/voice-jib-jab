@@ -21,6 +21,7 @@ import type { ServerConfig } from "../config/index.js";
 
 // ── Public types ───────────────────────────────────────────────────────
 
+/** Result of a single validation check with pass/fail, message, and timing. */
 export interface ValidationResult {
   check: string;
   passed: boolean;
@@ -28,6 +29,7 @@ export interface ValidationResult {
   durationMs: number;
 }
 
+/** Caller-supplied overrides and runtime values to validate before session start. */
 export interface ConfigValidationRequest {
   tenantId?: string;
   tenantConfig?: Record<string, unknown>;
@@ -40,6 +42,7 @@ export interface ConfigValidationRequest {
   chromaDbUrl?: string;
 }
 
+/** Consolidated validation report with per-check results and overall validity. */
 export interface ConfigValidationResponse {
   /** true only if ALL checks passed */
   valid: boolean;
@@ -50,6 +53,7 @@ export interface ConfigValidationResponse {
 
 // ── ConfigValidator ────────────────────────────────────────────────────
 
+/** Pre-session configuration and reachability validator running checks concurrently. */
 export class ConfigValidator {
   constructor(private readonly config: ServerConfig) {}
 

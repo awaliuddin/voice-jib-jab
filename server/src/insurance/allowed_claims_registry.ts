@@ -52,6 +52,7 @@ interface AllowedClaimsCatalog {
   disallowed_patterns?: unknown;
 }
 
+/** A single approved factual claim with provenance metadata. */
 export interface ApprovedClaim {
   id: string;
   text: string;
@@ -63,11 +64,13 @@ export interface ApprovedClaim {
   metadata?: Record<string, unknown>;
 }
 
+/** Result of checking text against disallowed claim patterns. */
 export interface DisallowedPatternMatch {
   matched: boolean;
   patterns: string[];
 }
 
+/** Result of matching proposed text against the approved claims corpus. */
 export interface ClaimMatchResult {
   matched: boolean;
   claimId: string | null;
@@ -76,6 +79,7 @@ export interface ClaimMatchResult {
   matchType: "exact" | "partial" | "none";
 }
 
+/** Configuration for AllowedClaimsRegistry including claims, patterns, and thresholds. */
 export interface AllowedClaimsRegistryConfig {
   claims?: ApprovedClaim[];
   disallowedPatterns?: string[];
@@ -92,6 +96,7 @@ const DEFAULT_CONFIG: AllowedClaimsRegistryConfig = {
   enableFileLoad: true,
 };
 
+/** Registry of tenant-approved factual claims with similarity-scored matching. */
 export class AllowedClaimsRegistry {
   private claims: Map<string, ApprovedClaim>;
   private claimTexts: ApprovedClaim[]; // ordered list for text search

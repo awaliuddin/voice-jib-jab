@@ -267,6 +267,7 @@ const defaultDbPath = resolve(process.cwd(), "..", "data", "voice-jib-jab.db");
 // Singleton instance with lazy initialization
 let instance: DatabaseAdapter | null = null;
 
+/** Get or create the singleton DatabaseAdapter instance, initializing on first call. */
 export function getDatabase(config?: Partial<DatabaseConfig>): DatabaseAdapter {
   if (!instance) {
     instance = new DatabaseAdapter({
@@ -279,6 +280,7 @@ export function getDatabase(config?: Partial<DatabaseConfig>): DatabaseAdapter {
   return instance;
 }
 
+/** Close and discard the singleton database connection. */
 export function closeDatabase(): void {
   if (instance) {
     instance.close();

@@ -15,6 +15,7 @@ import { LanguageDetector, type LanguageDetectionResult } from "./LanguageDetect
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+/** Supported language codes for translation. */
 export type TranslationLanguage = "en" | "es" | "fr" | "de";
 
 /** Supported translation pairs (both directions). */
@@ -24,6 +25,7 @@ export const SUPPORTED_PAIRS = [
   ["en", "de"],
 ] as const;
 
+/** Result of a single text translation including latency metadata. */
 export interface TranslationResult {
   originalText: string;
   translatedText: string;
@@ -35,6 +37,7 @@ export interface TranslationResult {
   latencyMs: number;
 }
 
+/** Full caller-to-agent translation pipeline result with detection metadata. */
 export interface PipelineResult {
   callerInput: string;
   /** Detected or assumed caller language. */
@@ -137,6 +140,7 @@ function toTranslationLanguage(lang: string): TranslationLanguage {
 
 // ── TranslationService ────────────────────────────────────────────────
 
+/** Cross-language translation pipeline with automatic language detection. */
 export class TranslationService {
   private readonly detector = new LanguageDetector();
 

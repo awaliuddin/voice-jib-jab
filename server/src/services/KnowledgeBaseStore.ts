@@ -17,6 +17,7 @@ import { randomUUID } from "node:crypto";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/** A knowledge base FAQ entry with question, answer, tags, and hit-count tracking. */
 export interface KbEntry {
   id: string;
   tenantId: string;
@@ -56,6 +57,7 @@ function tokenize(text: string): string[] {
 
 // ── KnowledgeBaseStore ────────────────────────────────────────────────
 
+/** Per-tenant FAQ knowledge base with text similarity search and hit-count ranking. */
 export class KnowledgeBaseStore {
   /** In-memory cache: tenantId -> KbEntry[] */
   private cache: Map<string, KbEntry[]> = new Map();

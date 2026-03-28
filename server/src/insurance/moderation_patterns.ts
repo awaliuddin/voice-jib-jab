@@ -15,6 +15,7 @@
 
 import type { PolicyDecision } from "../schemas/events.js";
 
+/** A categorized set of moderation regex patterns with severity and decision. */
 export interface ModerationCategory {
   /** Machine-readable category name (used in reason codes as MODERATION:<NAME>) */
   name: string;
@@ -125,6 +126,7 @@ const HARASSMENT_PATTERNS: RegExp[] = [
 
 // ── Default Categories ──────────────────────────────────────────────────
 
+/** Built-in moderation categories covering jailbreak, violence, self-harm, hate speech, etc. */
 export const DEFAULT_MODERATION_CATEGORIES: ModerationCategory[] = [
   {
     name: "JAILBREAK",

@@ -16,6 +16,7 @@ import { randomUUID } from "node:crypto";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/** A persisted cross-session memory fact for a tenant. */
 export interface MemoryEntry {
   id: string;
   tenantId: string;
@@ -31,6 +32,7 @@ export type NewMemoryEntry = Omit<MemoryEntry, "id" | "createdAt">;
 
 // ── ConversationMemoryStore ───────────────────────────────────────────
 
+/** Per-tenant cross-session memory store backed by JSON files on disk. */
 export class ConversationMemoryStore {
   private storageDir: string;
 

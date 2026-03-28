@@ -10,6 +10,7 @@ import type { SentimentLabel, SentimentResult } from "./SentimentAnalyzer.js";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/** A single timestamped sentiment measurement within a session. */
 export interface SentimentReading {
   timestamp: string;
   sentiment: SentimentLabel;
@@ -17,6 +18,7 @@ export interface SentimentReading {
   turnIndex: number;
 }
 
+/** Aggregated sentiment summary for an entire session. */
 export interface SessionSentimentSummary {
   sessionId: string;
   readingCount: number;
@@ -37,6 +39,7 @@ const TIE_BREAK_PRIORITY: Record<SentimentLabel, number> = {
 
 // ── SentimentTracker ──────────────────────────────────────────────────
 
+/** Per-session sentiment trajectory tracker with escalation detection. */
 export class SentimentTracker {
   private sessions = new Map<string, SentimentReading[]>();
 

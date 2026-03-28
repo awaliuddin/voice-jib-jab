@@ -18,6 +18,7 @@ import type { CallerIntent } from "./IntentClassifier.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+/** Persisted record of a single intent detection event. */
 export interface IntentLogEntry {
   entryId: string;
   tenantId: string | null;
@@ -28,6 +29,7 @@ export interface IntentLogEntry {
   detectedAt: string;   // ISO timestamp
 }
 
+/** Maps a caller intent to an agent template for routing. */
 export interface IntentTemplateMapping {
   intent: CallerIntent;
   templateId: string;   // AgentTemplate id to route to
@@ -42,6 +44,7 @@ interface StorageShape {
 
 // ── IntentStore ────────────────────────────────────────────────────────
 
+/** JSON-persisted store for intent detection logs and intent-to-template mappings. */
 export class IntentStore {
   private logs: IntentLogEntry[] = [];
   private mappings: IntentTemplateMapping[] = [];

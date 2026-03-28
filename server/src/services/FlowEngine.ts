@@ -16,6 +16,7 @@ import type { FlowStore, FlowNode } from "./FlowStore.js";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+/** Mutable state of an active conversation flow session. */
 export interface FlowSessionState {
   sessionToken: string;
   flowId: string;
@@ -27,6 +28,7 @@ export interface FlowSessionState {
   ended: boolean;
 }
 
+/** Result of a flow step including current node, prompt, and transition info. */
 export interface FlowStepResult {
   sessionToken: string;
   currentNode: FlowNode;
@@ -39,6 +41,7 @@ export interface FlowStepResult {
 
 // ── FlowEngine ─────────────────────────────────────────────────────────
 
+/** In-memory conversation flow execution engine with session state tracking. */
 export class FlowEngine {
   private sessions: Map<string, FlowSessionState> = new Map();
 

@@ -2,6 +2,7 @@ import { EventEmitter } from "events";
 import { appendFileSync, readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 
+/** Categorized audit event types for SOC 2 compliance logging. */
 export type AuditEventType =
   | "api_key_created"
   | "api_key_revoked"
@@ -13,6 +14,7 @@ export type AuditEventType =
   | "rate_limit_exceeded"
   | "escalation_triggered";
 
+/** Immutable audit event record with unique ID and ISO timestamp. */
 export interface AuditEvent {
   eventId: string;
   timestamp: string;
@@ -22,6 +24,7 @@ export interface AuditEvent {
   detail: Record<string, unknown>;
 }
 
+/** Filter criteria for querying the audit event buffer. */
 export interface AuditQueryFilters {
   tenantId?: string;
   type?: AuditEventType;
@@ -32,6 +35,7 @@ export interface AuditQueryFilters {
 
 const RING_BUFFER_MAX = 500;
 
+/** File-backed ring-buffer audit logger with real-time SSE event emission. */
 export class AuditEventLogger {
   private readonly filePath: string;
   private readonly emitter = new EventEmitter();

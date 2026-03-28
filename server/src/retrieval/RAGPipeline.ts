@@ -14,17 +14,20 @@ import {
 import { PIIRedactor } from "../insurance/policy_gate.js";
 import { RetrievalService, FactsPack } from "./RetrievalService.js";
 
+/** Configuration options for the RAG pipeline (topK, PII redaction). */
 export interface RAGPipelineOptions {
   topK?: number;
   piiRedactor?: PIIRedactor | null;
   redactToolCalls?: boolean;
 }
 
+/** Result of a RAG query: formatted instructions and the underlying facts pack. */
 export interface RAGResponseContext {
   instructions: string | null;
   factsPack: FactsPack | null;
 }
 
+/** Retrieval-augmented generation pipeline: query, retrieve facts, and inject into Lane B context. */
 export class RAGPipeline {
   private static readonly RETRIEVAL_TOOL_NAME = "retrieve_nxtg_facts";
   private piiRedactor: PIIRedactor | null;

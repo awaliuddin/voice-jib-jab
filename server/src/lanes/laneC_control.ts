@@ -96,6 +96,7 @@ import { tenantClaimsLoader } from "../services/TenantClaimsLoader.js";
 
 // ── Configuration ──────────────────────────────────────────────────────
 
+/** Configuration for the Lane C ControlEngine policy pipeline. */
 export interface ControlEngineConfig {
   enabled: boolean;
   /** Deny-list regex patterns for the Moderator (legacy, used when moderationCategories is empty) */
@@ -174,6 +175,7 @@ function resolveFallbackMode(
 
 // ── Audit event payload ────────────────────────────────────────────────
 
+/** Payload emitted on control.audit events for each policy evaluation. */
 export interface AuditEventPayload {
   evaluationId: string;
   role: "user" | "assistant";
@@ -187,6 +189,7 @@ export interface AuditEventPayload {
 
 // ── Metrics event payload ──────────────────────────────────────────────
 
+/** Accumulated session-scoped policy evaluation metrics. */
 export interface MetricsEventPayload {
   evaluationCount: number;
   allowCount: number;
@@ -290,6 +293,7 @@ class OverrideController {
 
 // ── ControlEngine (Lane C) ─────────────────────────────────────────────
 
+/** Lane C control plane: orchestrates policy checks, audit, and override actions. */
 export class ControlEngine extends EventEmitter {
   private sessionId: string;
   private config: ControlEngineConfig;

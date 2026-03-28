@@ -17,6 +17,7 @@ import { getDemoScript } from "./script.js";
 
 // ── Public types ──────────────────────────────────────────────────────────
 
+/** Structured event emitted during demo playback (turns, policy, sentiment, session lifecycle). */
 export interface DemoPlaybackEvent {
   type:
     | "turn"
@@ -42,6 +43,7 @@ export interface DemoPlaybackEvent {
   finalSentiment?: string;
 }
 
+/** Configuration for DemoPlayer speed and scenario selection. */
 export interface DemoPlayerConfig {
   /** 1.0 = realtime, 0 = instant (for tests), 2.0 = 2x speed */
   speedMultiplier?: number;
@@ -50,6 +52,7 @@ export interface DemoPlayerConfig {
 
 // ── DemoPlayer ────────────────────────────────────────────────────────────
 
+/** Replays scripted voice agent demos turn-by-turn, emitting playback events. */
 export class DemoPlayer extends EventEmitter {
   private readonly speedMultiplier: number;
   /** All events ever emitted, keyed by sessionId. */

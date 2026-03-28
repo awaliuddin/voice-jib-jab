@@ -13,6 +13,7 @@ import { dirname } from "path";
 
 // ── Types ───────────────────────────────────────────────────────────────
 
+/** Per-tenant rate limit and monthly usage quota configuration. */
 export interface TenantQuotaConfig {
   tenantId: string;
   requestsPerMinute: number;
@@ -21,6 +22,7 @@ export interface TenantQuotaConfig {
   updatedAt: string;
 }
 
+/** Monthly usage counters for a tenant (minutes consumed and sessions started). */
 export interface TenantUsageRecord {
   tenantId: string;
   monthKey: string;
@@ -29,6 +31,7 @@ export interface TenantUsageRecord {
   updatedAt: string;
 }
 
+/** Outcome of a rate-limit check including remaining budget and reset time. */
 export interface RateLimitResult {
   allowed: boolean;
   remaining: number;
@@ -55,6 +58,7 @@ const WINDOW_MS = 60_000;
 
 // ── TenantQuotaService ──────────────────────────────────────────────────
 
+/** Per-tenant rate limiting (sliding window) and monthly audio-minutes quota enforcement. */
 export class TenantQuotaService {
   private storageFile: string;
   private data: StorageFormat;

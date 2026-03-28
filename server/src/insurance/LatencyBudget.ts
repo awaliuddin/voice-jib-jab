@@ -3,12 +3,14 @@
  * Captures and computes latency metrics
  */
 
+/** Per-session latency sample arrays for TTFB, turn, and barge-in metrics. */
 export interface LatencyMetrics {
   ttfb: number[]; // Time to first byte
   turnLatency: number[]; // End-to-end turn latency
   bargeInStop: number[]; // Barge-in stop time
 }
 
+/** Computed percentile and summary statistics for a latency metric. */
 export interface LatencyStats {
   p50: number;
   p95: number;
@@ -19,6 +21,7 @@ export interface LatencyStats {
   count: number;
 }
 
+/** Tracks and computes latency statistics across sessions. */
 export class LatencyBudget {
   private metrics: Map<string, LatencyMetrics>;
   private sessionMarkers: Map<string, Map<string, number>>;
@@ -178,5 +181,5 @@ export class LatencyBudget {
   }
 }
 
-// Singleton instance
+/** Singleton LatencyBudget instance shared across the process. */
 export const latencyBudget = new LatencyBudget();

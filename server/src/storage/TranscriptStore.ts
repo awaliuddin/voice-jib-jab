@@ -7,6 +7,7 @@
 
 import { getDatabase } from "./Database.js";
 
+/** A single transcript row with session, role, content, and streaming metadata. */
 export interface TranscriptEntry {
   id?: number;
   sessionId: string;
@@ -18,6 +19,7 @@ export interface TranscriptEntry {
   isFinal: boolean;
 }
 
+/** Minimal turn representation used for conversation history retrieval. */
 export interface TranscriptTurn {
   role: "user" | "assistant";
   content: string;
@@ -237,6 +239,7 @@ export class TranscriptStore {
 // Singleton instance
 let instance: TranscriptStore | null = null;
 
+/** Get or create the singleton TranscriptStore instance. */
 export function getTranscriptStore(): TranscriptStore {
   if (!instance) {
     instance = new TranscriptStore();

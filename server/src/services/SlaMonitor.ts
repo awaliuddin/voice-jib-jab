@@ -16,6 +16,7 @@ import { EventEmitter } from "events";
 
 // ── SLA target definitions ────────────────────────────────────────────
 
+/** Threshold configuration for a single SLA metric. */
 export interface SlaTarget {
   name: string;
   /** SLA target threshold — breach at this level emits "breach" event. */
@@ -25,6 +26,7 @@ export interface SlaTarget {
   description: string;
 }
 
+/** Default SLA targets for core voice pipeline metrics. */
 export const DEFAULT_SLA_TARGETS: Record<string, SlaTarget> = {
   ttfb: {
     name: "Time to First Byte",
@@ -54,6 +56,7 @@ export const DEFAULT_SLA_TARGETS: Record<string, SlaTarget> = {
 
 // ── Sample and stats types ────────────────────────────────────────────
 
+/** A single latency measurement for a named metric. */
 export interface LatencySample {
   metric: string;
   valueMs: number;
@@ -62,6 +65,7 @@ export interface LatencySample {
   timestamp: number;
 }
 
+/** Computed statistics for a single SLA metric within the rolling window. */
 export interface SlaMetricStats {
   metric: string;
   target: SlaTarget;
@@ -81,6 +85,7 @@ export interface SlaMetricStats {
   windowStartedAt: string;
 }
 
+/** Overall SLA health status across all monitored metrics. */
 export interface SlaStatus {
   overall: "ok" | "warning" | "critical";
   metrics: SlaMetricStats[];
@@ -88,6 +93,7 @@ export interface SlaStatus {
   evaluatedAt: string;
 }
 
+/** Event payload emitted when a latency sample breaches an SLA threshold. */
 export interface SlaBreachEvent {
   metric: string;
   valueMs: number;

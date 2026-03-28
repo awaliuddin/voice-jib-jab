@@ -17,12 +17,14 @@ import type { SessionSentimentSummary } from "./SentimentTracker.js";
 // Public types
 // ---------------------------------------------------------------------------
 
+/** A single timestamped event in the session recording timeline. */
 export interface RecordingEntry {
   t_ms: number;
   type: string;
   payload?: Record<string, unknown>;
 }
 
+/** Complete session recording with timeline, summary stats, and sentiment data. */
 export interface SessionRecording {
   sessionId: string;
   startedAt: string;
@@ -44,6 +46,7 @@ export interface SessionRecording {
   };
 }
 
+/** Configuration for recording storage, raw audio inclusion, and retention policy. */
 export interface SessionRecorderConfig {
   recordingsDir: string;
   storeRawAudio?: boolean;
@@ -85,6 +88,7 @@ const TIMELINE_EVENT_TYPES = new Set<string>([
 // SessionRecorder
 // ---------------------------------------------------------------------------
 
+/** Captures session events in memory and flushes to disk for replay and compliance. */
 export class SessionRecorder {
   private sessions = new Map<string, RecordingBuffer>();
   private readonly storeRawAudio: boolean;

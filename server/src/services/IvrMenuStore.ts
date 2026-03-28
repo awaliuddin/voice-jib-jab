@@ -18,8 +18,10 @@ import { randomUUID } from "node:crypto";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+/** Discriminator for IVR tree node behavior. */
 export type IvrNodeType = "menu" | "transfer" | "message";
 
+/** A single node in an IVR phone tree with prompt text and DTMF options. */
 export interface IvrNode {
   nodeId: string;
   type: IvrNodeType;
@@ -29,11 +31,13 @@ export interface IvrNode {
   tenantId: string | null;
 }
 
+/** Lightweight reference from a DTMF option to its target node. */
 export interface IvrNodeRef {
   nodeId: string;
   label: string;
 }
 
+/** Top-level IVR menu containing a directed tree of IvrNodes. */
 export interface IvrMenu {
   menuId: string;
   name: string;
@@ -46,6 +50,7 @@ export interface IvrMenu {
 
 // ── IvrMenuStore ───────────────────────────────────────────────────────
 
+/** JSON-persisted CRUD store for IVR phone-tree menus with DTMF navigation. */
 export class IvrMenuStore {
   private menus: Map<string, IvrMenu> = new Map();
   private storageFile: string;
