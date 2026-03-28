@@ -37,6 +37,7 @@ function requireString(value: unknown, field: string): { value: string } | { err
 
 // ── Router factory ─────────────────────────────────────────────────────
 
+/** Router for /training — annotation CRUD, dataset building, and JSONL export. */
 export function createTrainingRouter(service: TrainingDataService): Router {
   const router = Router();
 

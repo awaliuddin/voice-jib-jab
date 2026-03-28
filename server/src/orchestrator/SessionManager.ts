@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { eventBus } from './EventBus.js';
 import { Event } from '../schemas/events.js';
 
+/** Voice session state and metadata. */
 export interface Session {
   id: string;
   createdAt: number;
@@ -14,6 +15,7 @@ export interface Session {
   metadata: Record<string, unknown>;
 }
 
+/** Manages session lifecycle, idle timeouts, and state transitions. */
 export class SessionManager {
   private sessions: Map<string, Session>;
   private sessionTimeouts: Map<string, NodeJS.Timeout>;
@@ -159,5 +161,5 @@ export class SessionManager {
   }
 }
 
-// Singleton instance
+/** Singleton SessionManager instance shared across the application. */
 export const sessionManager = new SessionManager();

@@ -45,6 +45,7 @@ function isValidTtsEngine(value: unknown): boolean {
 
 // ── Router factory ────────────────────────────────────────────────────
 
+/** Router for /admin — tenant CRUD and mutable system configuration management. */
 export function createAdminRouter(
   tenantRegistry: TenantRegistry,
   systemConfigStore: SystemConfigStore,

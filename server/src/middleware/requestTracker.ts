@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 
+/** Tracks in-flight HTTP requests for graceful shutdown draining. */
 export class RequestTracker {
   private count = 0;
 

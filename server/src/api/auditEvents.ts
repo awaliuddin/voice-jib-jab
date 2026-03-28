@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { AuditEventLogger, AuditEventType } from "../services/AuditEventLogger.js";
 
+/** Router for /audit — SSE live-tail stream and queryable audit event log. */
 export function createAuditEventsRouter(logger: AuditEventLogger): Router {
   const router = Router();
 

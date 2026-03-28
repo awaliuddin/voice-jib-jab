@@ -38,6 +38,7 @@ function clampInt(raw: unknown, defaultVal: number, max: number): number {
 
 // ── Router factory ────────────────────────────────────────────────────
 
+/** Router for /recordings — list, download, and delete WAV audio recordings. */
 export function createRecordingsRouter(store: RecordingStore): Router {
   const router = Router();
 

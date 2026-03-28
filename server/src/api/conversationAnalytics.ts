@@ -10,6 +10,7 @@ import { Router } from "express";
 import type { ConversationAnalyticsService } from "../services/ConversationAnalyticsService.js";
 import { conversationAnalyticsDashboardHtml } from "./conversationAnalyticsDashboard.js";
 
+/** Router for /analytics/conversations — conversation insights report and HTML dashboard. */
 export function createConversationAnalyticsRouter(
   service: ConversationAnalyticsService,
 ): Router {

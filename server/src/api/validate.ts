@@ -14,6 +14,7 @@ import type { ConfigValidator, ConfigValidationRequest } from "../services/Confi
 
 // ── Router factory ────────────────────────────────────────────────────
 
+/** Router for /validate — pre-session voice agent configuration validation. */
 export function createValidateRouter(validator: ConfigValidator): Router {
   const router = Router();
 

@@ -24,6 +24,7 @@ const VALID_SPEAKERS = new Set(["user", "assistant", "both"]);
 // Router factory
 // ---------------------------------------------------------------------------
 
+/** Router for /search — full-text conversation transcript search and session summaries. */
 export function createSearchRouter(searchService: ConversationSearchService): Router {
   const router = Router();
 

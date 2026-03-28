@@ -17,6 +17,7 @@ import type { AnalyticsService } from "../services/AnalyticsService.js";
 // Public types
 // ---------------------------------------------------------------------------
 
+/** Per-session compliance data included in a tenant compliance report. */
 export interface ComplianceSessionEntry {
   sessionId: string;
   startedAt: string;
@@ -27,6 +28,7 @@ export interface ComplianceSessionEntry {
   complianceRate: number;
 }
 
+/** Aggregated compliance report for a tenant, with optional date-range filtering. */
 export interface ComplianceReport {
   tenantId: string;
   generatedAt: string;

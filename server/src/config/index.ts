@@ -37,6 +37,7 @@ if (!envLoaded) {
   console.warn("Continuing with environment variables from shell/system...");
 }
 
+/** Full server configuration covering features, latency targets, safety, and storage. */
 export interface ServerConfig {
   port: number;
   nodeEnv: string;
@@ -134,6 +135,7 @@ function getEnvFallbackMode(
   return defaultValue;
 }
 
+/** Resolved server configuration loaded from environment variables. */
 export const config: ServerConfig = {
   port: getEnvNumber("PORT", 3000),
   nodeEnv: getEnvVar("NODE_ENV", "development"),

@@ -43,6 +43,7 @@ function validateSplitRatio(raw: unknown): string | null {
 
 // ── Router factory ─────────────────────────────────────────────────────
 
+/** Router for /abtests — A/B test lifecycle (create, assign, metrics, conclude, pause, resume, delete). */
 export function createAbTestsRouter(svc: AgentAbTestService): Router {
   const router = Router();
 

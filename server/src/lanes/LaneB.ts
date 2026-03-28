@@ -28,6 +28,7 @@ export interface LaneBConfig {
   };
 }
 
+/** Reasoning engine wrapping OpenAI Realtime for substantive voice responses. */
 export class LaneB extends EventEmitter {
   private sessionId: string;
   private adapter: OpenAIRealtimeAdapter;

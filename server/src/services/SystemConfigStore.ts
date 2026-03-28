@@ -11,6 +11,7 @@
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/** Runtime-mutable system settings adjustable via the Admin API. */
 export interface MutableSystemConfig {
   moderationSensitivity: "low" | "medium" | "high";
   sipTrunk: string | null;
@@ -33,6 +34,7 @@ function defaultConfig(): MutableSystemConfig {
 
 // ── SystemConfigStore ─────────────────────────────────────────────────
 
+/** In-memory writable store for runtime system configuration. */
 export class SystemConfigStore {
   private current: MutableSystemConfig = defaultConfig();
 
@@ -55,4 +57,5 @@ export class SystemConfigStore {
 
 // ── Module-level singleton ────────────────────────────────────────────
 
+/** Module-level singleton for runtime config access. */
 export const systemConfigStore = new SystemConfigStore();

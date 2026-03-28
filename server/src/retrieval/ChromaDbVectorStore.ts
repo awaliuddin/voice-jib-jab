@@ -16,6 +16,7 @@ export interface AsyncVectorStore<TMeta> {
   close(): Promise<void>;
 }
 
+/** Configuration for connecting to a ChromaDB instance. */
 export interface ChromaDbVectorStoreConfig {
   /** ChromaDB server URL. Default: http://localhost:8000 */
   url?: string;
@@ -23,6 +24,7 @@ export interface ChromaDbVectorStoreConfig {
   collectionName: string;
 }
 
+/** ChromaDB-backed persistent vector store with tenant-isolated collections. */
 export class ChromaDbVectorStore<TMeta> implements AsyncVectorStore<TMeta> {
   readonly collectionName: string;
   private client: ChromaClient;

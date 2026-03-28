@@ -212,6 +212,7 @@ function extractStepData(
 
 // ── OnboardingWizardService ───────────────────────────────────────────
 
+/** Step-by-step tenant onboarding wizard with validation and JSON persistence. */
 export class OnboardingWizardService {
   private storageFile: string;
   private data: StorageFormat;

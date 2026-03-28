@@ -67,6 +67,7 @@ interface StorageFormat {
 
 // ── AgentVersionStore ──────────────────────────────────────────────────
 
+/** Versioned agent configuration store with deployment, canary, and rollback support. */
 export class AgentVersionStore {
   private storageFile: string;
   private data: StorageFormat;

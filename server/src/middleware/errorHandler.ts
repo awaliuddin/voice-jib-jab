@@ -22,11 +22,13 @@
 
 import type { Request, Response, NextFunction } from "express";
 
+/** An Error with optional HTTP status code fields. */
 export interface HttpError extends Error {
   status?: number;
   statusCode?: number;
 }
 
+/** Express error middleware that returns structured JSON and logs 5xx errors to stderr. */
 export function jsonErrorHandler(
   err: HttpError,
   req: Request,

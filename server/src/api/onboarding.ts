@@ -17,6 +17,7 @@ import { onboardingWizardHtml } from "./onboardingWizardHtml.js";
 
 // ── Router factory ─────────────────────────────────────────────────────
 
+/** Router for /onboarding — wizard session lifecycle (start, advance, skip, back, reset) and HTML UI. */
 export function createOnboardingRouter(service: OnboardingWizardService): Router {
   const router = Router();
 

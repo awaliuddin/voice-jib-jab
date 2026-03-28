@@ -24,6 +24,7 @@ export interface CorsOptions {
 const ALLOWED_HEADERS = "Origin, X-Requested-With, Content-Type, Accept, X-API-Key, X-Request-ID";
 const ALLOWED_METHODS = "GET, POST, PUT, DELETE, OPTIONS";
 
+/** Create Express middleware that enforces CORS origin allowlist or wildcard mode. */
 export function createCorsMiddleware(options: CorsOptions) {
   const raw = options.allowedOrigins.trim();
   const wildcard = raw === "" || raw === "*";

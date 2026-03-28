@@ -8,6 +8,7 @@
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
+/** Events expected to fire after a demo turn (sentiment, policy, claims). */
 export interface DemoTurnEvents {
   sentiment?: "positive" | "neutral" | "negative" | "frustrated";
   policyDecision?: "allow" | "refuse" | "escalate" | "rewrite";
@@ -16,6 +17,7 @@ export interface DemoTurnEvents {
   claimMatched?: string;
 }
 
+/** A single turn in a demo script with speaker, text, delay, and optional events. */
 export interface DemoTurn {
   speaker: "agent" | "user";
   text: string;
@@ -25,6 +27,7 @@ export interface DemoTurn {
   events?: DemoTurnEvents;
 }
 
+/** A scripted sequence of demo turns for a specific scenario. */
 export interface DemoScript {
   scenarioId: string;
   turns: DemoTurn[];

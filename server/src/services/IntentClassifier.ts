@@ -9,8 +9,10 @@
  * Supported intents: "support" | "billing" | "sales" | "complaint" | "general"
  */
 
+/** Recognized caller intent categories. */
 export type CallerIntent = "support" | "billing" | "sales" | "complaint" | "general";
 
+/** Classification result with winning intent, confidence, and per-intent scores. */
 export interface IntentResult {
   intent: CallerIntent;
   confidence: number;   // 0.0–1.0, score of winning intent
@@ -125,4 +127,5 @@ export class IntentClassifier {
 
 // ── Module-level singleton ─────────────────────────────────────────────
 
+/** Pre-instantiated singleton for stateless intent classification. */
 export const intentClassifier = new IntentClassifier();

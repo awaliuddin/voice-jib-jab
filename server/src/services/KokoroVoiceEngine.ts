@@ -11,17 +11,20 @@
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/** Connection and default voice settings for a TTS engine. */
 export interface VoiceEngineConfig {
   baseUrl: string;
   timeoutMs: number;
   defaultVoice: string;
 }
 
+/** Per-call overrides for voice ID and playback speed. */
 export interface SynthesisOptions {
   voiceId?: string;
   speed?: number;
 }
 
+/** Pluggable TTS engine contract for text-to-speech synthesis. */
 export interface VoiceEngine {
   synthesize(text: string, options?: SynthesisOptions): Promise<Buffer>;
   isAvailable(): Promise<boolean>;
@@ -37,6 +40,7 @@ const DEFAULT_CONFIG: VoiceEngineConfig = {
 
 // ── KokoroVoiceEngine ─────────────────────────────────────────────────
 
+/** Local TTS engine backed by the Kokoro HTTP server (OpenAI-compatible API). */
 export class KokoroVoiceEngine implements VoiceEngine {
   private config: VoiceEngineConfig;
 

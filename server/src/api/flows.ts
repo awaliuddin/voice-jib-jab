@@ -52,6 +52,7 @@ function isValidNode(value: unknown): value is FlowNode {
 
 // ── Router factory ─────────────────────────────────────────────────────
 
+/** Router for /flows — conversation flow CRUD, session state management, and step advancement. */
 export function createFlowsRouter(store: FlowStore, engine: FlowEngine): Router {
   const router = Router();
 

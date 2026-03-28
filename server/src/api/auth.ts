@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { ApiKeyStore } from "../services/ApiKeyStore.js";
 
+/** Router for /auth — API key CRUD (create, list, rotate, revoke). */
 export function createAuthRouter(store: ApiKeyStore): Router {
   const router = Router();
 

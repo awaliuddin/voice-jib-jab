@@ -18,6 +18,7 @@ import { VALID_INTENTS } from "./intents-constants.js";
 
 // ── Router factory ─────────────────────────────────────────────────────
 
+/** Router for /intents — intent detection, frequency listing, and template mapping config. */
 export function createIntentsRouter(
   classifier: IntentClassifier,
   store: IntentStore,

@@ -10,6 +10,7 @@
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+/** Supported G.711 codec variants. */
 export type CodecType = "mulaw" | "alaw";
 
 export interface RtpCodecBridgeConfig {

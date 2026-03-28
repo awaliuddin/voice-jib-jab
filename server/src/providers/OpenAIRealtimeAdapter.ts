@@ -42,6 +42,7 @@ interface SessionConfig {
   max_response_output_tokens?: number | "inf";
 }
 
+/** Voice interaction mode: manual turn-taking or continuous listening. */
 export type VoiceMode = "push-to-talk" | "open-mic";
 
 /**
@@ -55,6 +56,7 @@ interface BufferState {
   pendingCommit: boolean; // Commit waiting for confirmation
 }
 
+/** WebSocket adapter for the OpenAI Realtime API with buffer synchronization. */
 export class OpenAIRealtimeAdapter extends ProviderAdapter {
   private ws: WebSocket | null = null;
   private connected: boolean = false;

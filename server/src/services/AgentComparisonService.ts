@@ -15,6 +15,7 @@ import type { VoiceQualityScorer } from "./VoiceQualityScorer.js";
 
 // ── Public types ──────────────────────────────────────────────────────────
 
+/** Identifies one side of an A/B comparison with its associated sessions. */
 export interface ComparisonConfig {
   /** Identifier for the config (e.g. "gpt-4o-mini", "persona-A") */
   configId: string;
@@ -24,6 +25,7 @@ export interface ComparisonConfig {
   sessionIds: string[];
 }
 
+/** Aggregated quality, latency, and sentiment metrics for one agent configuration. */
 export interface ConfigMetrics {
   configId: string;
   label: string;
@@ -44,6 +46,7 @@ export interface ConfigMetrics {
   avgTurnCount: number;
 }
 
+/** Side-by-side comparison report with per-metric winners and overall recommendation. */
 export interface ComparisonReport {
   reportId: string;
   generatedAt: string;

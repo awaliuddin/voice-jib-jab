@@ -19,6 +19,7 @@ import type { IvrMenuStore, IvrMenu } from "./IvrMenuStore.js";
 
 // ── Public types ───────────────────────────────────────────────────────
 
+/** Portable snapshot of all tenant-owned configuration data. */
 export interface TenantExport {
   version: "1.0";
   exportedAt: string;
@@ -30,6 +31,7 @@ export interface TenantExport {
   ivrMenus: IvrMenu[];
 }
 
+/** Result of importing a tenant configuration snapshot into a target tenant. */
 export interface ImportResult {
   targetTenantId: string;
   importedAt: string;
@@ -44,6 +46,7 @@ export interface ImportResult {
 
 // ── TenantConfigMigrator ───────────────────────────────────────────────
 
+/** Exports and imports full tenant configurations across environments. */
 export class TenantConfigMigrator {
   constructor(
     private tenantRegistry: TenantRegistry,

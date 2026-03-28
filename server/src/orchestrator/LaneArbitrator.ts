@@ -63,6 +63,7 @@ const DEFAULT_CONFIG: LaneArbitratorConfig = {
   transitionGapMs: 10, // Tiny gap between A stop and B start
 };
 
+/** State machine that arbitrates audio ownership between lanes A, B, and fallback. */
 export class LaneArbitrator extends EventEmitter {
   private sessionId: string;
   private state: ArbitratorState = "IDLE";

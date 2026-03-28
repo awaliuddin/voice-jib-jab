@@ -29,6 +29,7 @@ function isStringArray(value: unknown): value is string[] {
 
 // ── Router factory ────────────────────────────────────────────────────
 
+/** Router for /tenants/:tenantId/kb — knowledge base entry CRUD and text similarity search. */
 export function createKnowledgeRouter(store: KnowledgeBaseStore): Router {
   const router = Router();
 

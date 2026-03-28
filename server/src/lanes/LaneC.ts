@@ -10,6 +10,7 @@ import { eventBus } from "../orchestrator/EventBus.js";
 import { PolicyDecisionPayload, PolicyEvent } from "../schemas/events.js";
 import { lookupDisclaimer } from "../retrieval/DisclaimerLookup.js";
 
+/** Control engine that emits policy decisions and validates disclaimers. */
 export class LaneC extends EventEmitter {
   private sessionId: string;
 

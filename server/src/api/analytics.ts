@@ -27,6 +27,7 @@ interface AnalyticsRouterDeps {
   loadRecording?: (sessionId: string) => unknown | null;
 }
 
+/** Router for /analytics — session metrics, aggregate summary, dashboard, tenant comparison, and CSV export. */
 export function createAnalyticsRouter(
   analyticsService: AnalyticsService,
   loadRecording?: (sessionId: string) => unknown | null,

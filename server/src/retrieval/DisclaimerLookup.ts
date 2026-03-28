@@ -6,6 +6,7 @@
 import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 
+/** A disclaimer entry with ID, text, and optional category/trigger metadata. */
 export interface DisclaimerEntry {
   id: string;
   text: string;
@@ -108,7 +109,7 @@ export function lookupDisclaimer(disclaimerId: string): string | null {
   return entry.text;
 }
 
-// Spec-aligned alias (snake_case)
+/** Spec-aligned snake_case alias for lookupDisclaimer. */
 export function lookup_disclaimer(disclaimer_id: string): string | null {
   return lookupDisclaimer(disclaimer_id);
 }

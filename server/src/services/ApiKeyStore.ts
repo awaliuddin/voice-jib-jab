@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 
+/** Persisted API key record with SHA-256 hash (raw key is never stored). */
 export interface ApiKeyRecord {
   keyId: string;
   tenantId: string;
@@ -11,6 +12,7 @@ export interface ApiKeyRecord {
   expiresAt?: string; // ISO timestamp; absent means no expiry
 }
 
+/** Returned once at creation time; includes the raw key (shown only once). */
 export interface CreateApiKeyResult {
   keyId: string;
   rawKey: string;
@@ -20,6 +22,7 @@ export interface CreateApiKeyResult {
   expiresAt?: string;
 }
 
+/** JSON-persisted API key store with SHA-256 hashing, TTL expiry, and rotation support. */
 export class ApiKeyStore {
   private keys: ApiKeyRecord[] = [];
   private readonly filePath: string;
@@ -46,6 +49,7 @@ export class ApiKeyStore {
     return createHash("sha256").update(rawKey).digest("hex");
   }
 
+  /** Create a new API key with optional TTL. Returns the raw key (shown only once). */
   createKey(tenantId: string, description: string, ttlDays?: number): CreateApiKeyResult {
     const keyId = randomBytes(16).toString("hex");
     const rawKey = `vjj_${randomBytes(32).toString("hex")}`;
@@ -67,12 +71,14 @@ export class ApiKeyStore {
     return { keyId, rawKey, tenantId, description, createdAt, expiresAt };
   }
 
+  /** List all keys for a tenant (hash excluded). */
   listKeys(tenantId: string): Omit<ApiKeyRecord, "keyHash">[] {
     return this.keys
       .filter((k) => k.tenantId === tenantId)
       .map(({ keyHash: _h, ...rest }) => rest);
   }
 
+  /** Permanently delete a key by its ID. Returns true if found. */
   revokeKey(keyId: string): boolean {
     const before = this.keys.length;
     this.keys = this.keys.filter((k) => k.keyId !== keyId);
@@ -83,6 +89,7 @@ export class ApiKeyStore {
     return false;
   }
 
+  /** Verify a raw key by hash lookup. Returns null if invalid or expired. */
   verifyKey(rawKey: string): ApiKeyRecord | null {
     const h = this.hashKey(rawKey);
     const record = this.keys.find((k) => k.keyHash === h) ?? null;
@@ -91,6 +98,7 @@ export class ApiKeyStore {
     return record;
   }
 
+  /** Check whether a key has passed its expiry date. */
   isExpired(keyId: string): boolean {
     const record = this.keys.find((k) => k.keyId === keyId);
     if (!record || !record.expiresAt) return false;
@@ -118,6 +126,7 @@ export class ApiKeyStore {
     return rest;
   }
 
+  /** Update the lastUsedAt timestamp for a key. */
   touchKey(keyId: string): void {
     const rec = this.keys.find((k) => k.keyId === keyId);
     if (rec) {

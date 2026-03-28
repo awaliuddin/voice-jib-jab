@@ -36,6 +36,7 @@ function isStringArray(value: unknown): value is string[] {
 
 // ── Router factory ─────────────────────────────────────────────────────
 
+/** Router for /playbooks — playbook entry CRUD and auto-suggest for conversation context. */
 export function createPlaybooksRouter(store: PlaybookStore): Router {
   const router = Router();
 

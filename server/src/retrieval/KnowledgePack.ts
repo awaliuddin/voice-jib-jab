@@ -4,6 +4,7 @@
 
 import { readFileSync } from "fs";
 
+/** A single verified fact from a domain knowledge pack. */
 export interface KnowledgeFact {
   id: string;
   text: string;
@@ -12,6 +13,7 @@ export interface KnowledgeFact {
   category?: string;
 }
 
+/** A regulatory disclaimer that may be required for certain facts. */
 export interface DisclaimerEntry {
   id: string;
   text: string;
@@ -19,6 +21,7 @@ export interface DisclaimerEntry {
   required_for?: string[];
 }
 
+/** Loads and holds domain facts and disclaimers from JSON files. */
 export class KnowledgePack {
   facts: KnowledgeFact[] = [];
   disclaimers: DisclaimerEntry[] = [];

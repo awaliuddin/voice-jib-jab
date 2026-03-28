@@ -14,6 +14,7 @@ import type { TenantExport } from "../services/TenantConfigMigrator.js";
 
 // ── Router factory ────────────────────────────────────────────────────
 
+/** Router for /tenants/:tenantId — tenant config export (JSON download) and import. */
 export function createTenantMigrationRouter(
   migrator: TenantConfigMigrator,
 ): Router {

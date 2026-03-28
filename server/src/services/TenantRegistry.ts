@@ -13,6 +13,7 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/** Per-tenant configuration including policy level, claims, and moderation thresholds. */
 export interface TenantConfig {
   tenantId: string;
   name: string;
@@ -37,6 +38,7 @@ const POLICY_LEVEL_DEFAULTS: Record<TenantConfig["policyLevel"], number> = {
 
 // ── TenantRegistry ────────────────────────────────────────────────────
 
+/** In-memory tenant configuration store with JSON file persistence. */
 export class TenantRegistry {
   private tenants = new Map<string, TenantConfig>();
   private persistPath: string;

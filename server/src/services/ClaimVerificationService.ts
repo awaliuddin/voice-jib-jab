@@ -33,6 +33,7 @@ interface FpScanResponse {
   overallRisk: RiskLevel;
 }
 
+/** Aggregated claim verification counts with a TTS-ready spoken summary. */
 export interface ClaimVerificationResult {
   totalClaims: number;
   factClaims: number;      // claims where type === 'fact' and importance >= 3
@@ -46,6 +47,7 @@ export interface ClaimVerificationResult {
 
 const UNVERIFIED_STATUSES = new Set<ClaimStatus>(['unverified', 'mixed', 'skipped', 'loading']);
 
+/** Scans text for fact claims via the Faultline-Pro API and formats results for TTS. */
 export class ClaimVerificationService {
   private readonly baseUrl: string;
   private readonly apiKey: string;

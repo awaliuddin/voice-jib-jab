@@ -5,18 +5,21 @@
 
 import { EventEmitter } from 'events';
 
+/** Configuration for connecting to a voice provider. */
 export interface ProviderConfig {
   apiKey: string;
   model: string;
   systemInstructions?: string;
 }
 
+/** A chunk of audio data with format and sample rate metadata. */
 export interface AudioChunk {
   data: Buffer;
   format: 'pcm' | 'opus';
   sampleRate: number;
 }
 
+/** A segment of transcribed speech (partial or final). */
 export interface TranscriptSegment {
   text: string;
   confidence: number;

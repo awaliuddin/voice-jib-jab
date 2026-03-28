@@ -3,12 +3,14 @@
  * Designed for small knowledge packs without external dependencies.
  */
 
+/** A document with text content and typed metadata for vector indexing. */
 export interface VectorDocument<TMeta> {
   id: string;
   text: string;
   metadata: TMeta;
 }
 
+/** A search result pairing a document with its similarity score. */
 export interface VectorSearchResult<TMeta> {
   doc: VectorDocument<TMeta>;
   score: number;
@@ -74,6 +76,7 @@ function tokenize(text: string): string[] {
     .filter((token) => token.length > 1 && !STOP_WORDS.has(token));
 }
 
+/** In-memory TF-IDF vector store with cosine similarity search. */
 export class VectorStore<TMeta> {
   private documents: VectorDocument<TMeta>[] = [];
   private docVectors: Map<string, SparseVector> = new Map();

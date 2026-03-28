@@ -25,6 +25,7 @@ function isValidIso(value: string): boolean {
 // Router factory
 // ---------------------------------------------------------------------------
 
+/** Router for /export — bulk and single-session data export as streaming NDJSON. */
 export function createExportRouter(exportService: SessionExportService): Router {
   const router = Router();
 

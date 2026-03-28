@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import type { ApiKeyStore } from "../services/ApiKeyStore.js";
 import type { AuditEventLogger } from "../services/AuditEventLogger.js";
 
+/** Create Express middleware that validates the X-API-Key header against the key store. */
 export function createApiKeyMiddleware(
   store: ApiKeyStore,
   enabled: boolean,

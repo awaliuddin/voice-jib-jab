@@ -30,6 +30,7 @@ function requireString(
 
 // ── Router factory ─────────────────────────────────────────────────────
 
+/** Router for /skills — skill CRUD, auto-suggest, and invocation tracking. */
 export function createSkillsRouter(store: SkillStore): Router {
   const router = Router();
 

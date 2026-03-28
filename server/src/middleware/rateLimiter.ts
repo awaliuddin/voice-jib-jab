@@ -22,6 +22,7 @@ interface HitEntry {
   resetAt: number;
 }
 
+/** Create Express middleware that enforces per-IP request rate limits using an in-memory sliding window. */
 export function createRateLimiter(options: RateLimiterOptions) {
   const hits = new Map<string, HitEntry>();
 

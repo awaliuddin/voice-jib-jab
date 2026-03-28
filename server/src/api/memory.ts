@@ -24,6 +24,7 @@ function isStringArray(value: unknown): value is string[] {
 
 // ── Router factory ────────────────────────────────────────────────────
 
+/** Router for /tenants/:tenantId/memory — per-tenant cross-session memory CRUD. */
 export function createMemoryRouter(store: ConversationMemoryStore): Router {
   const router = Router();
 

@@ -71,6 +71,7 @@ const RESPONSE_COOLDOWN_MS = 1500;
 // but filters out reverb tails and quiet echo bleed-through.
 const MIN_AUDIO_RMS = 200;
 
+/** WebSocket server for real-time voice communication with lane arbitration and persistent memory. */
 export class VoiceWebSocketServer {
   private wss: WebSocketServer;
   private connections: Map<WebSocket, ClientConnection>;

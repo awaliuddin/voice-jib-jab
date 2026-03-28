@@ -36,6 +36,7 @@ function isStringArray(value: unknown): value is string[] {
 
 // ── Router factory ────────────────────────────────────────────────────
 
+/** Router for /templates — agent template CRUD, built-in listing, marketplace, and config generation. */
 export function createTemplatesRouter(store: AgentTemplateStore): Router {
   const router = Router();
 

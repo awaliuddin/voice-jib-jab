@@ -59,6 +59,7 @@ function isValidNodesMap(nodes: unknown): nodes is Record<string, IvrNode> {
 
 // ── Router factory ─────────────────────────────────────────────────────
 
+/** Router for /ivr — IVR menu CRUD and DTMF/voice input processing. */
 export function createIvrRouter(store: IvrMenuStore): Router {
   const router = Router();
   const detector = new DtmfDetector();

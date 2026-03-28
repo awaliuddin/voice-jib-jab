@@ -17,8 +17,10 @@ import { randomUUID } from "node:crypto";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+/** Supported conversation scenario categories for playbook entries. */
 export type PlaybookScenario = "greeting" | "escalation" | "closing" | "faq" | "custom";
 
+/** A named scripted response for a specific conversation scenario. */
 export interface PlaybookEntry {
   entryId: string;
   name: string;
@@ -32,6 +34,7 @@ export interface PlaybookEntry {
 
 // ── PlaybookStore ──────────────────────────────────────────────────────
 
+/** JSON-persisted CRUD store for conversation playbook entries with keyword-based suggestion. */
 export class PlaybookStore {
   private entries: Map<string, PlaybookEntry> = new Map();
   private storageFile: string;

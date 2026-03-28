@@ -11,6 +11,7 @@ import type { LiveKbSearchService } from "../services/LiveKbSearchService.js";
 
 // ── Router factory ────────────────────────────────────────────────────
 
+/** Router for /kb-search — live knowledge base query and article suggestion. */
 export function createKbSearchRouter(service: LiveKbSearchService): Router {
   const router = Router();
 

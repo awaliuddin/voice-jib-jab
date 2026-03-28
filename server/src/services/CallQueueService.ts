@@ -12,6 +12,7 @@
 
 // -- Types ------------------------------------------------------------------
 
+/** A single caller waiting in a tenant's call queue. */
 export interface QueueEntry {
   sessionId: string;
   tenantId: string;
@@ -19,6 +20,7 @@ export interface QueueEntry {
   position: number;
 }
 
+/** Snapshot of a tenant's queue including all entries and estimated wait time. */
 export interface QueueStatus {
   tenantId: string;
   length: number;

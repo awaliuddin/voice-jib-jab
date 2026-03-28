@@ -9,6 +9,7 @@ import Database from "better-sqlite3";
 import { resolve } from "path";
 import { existsSync, mkdirSync } from "fs";
 
+/** SQLite connection and behavior configuration. */
 export interface DatabaseConfig {
   /** Path to SQLite database file */
   path: string;

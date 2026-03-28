@@ -9,8 +9,10 @@
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/** Discrete sentiment classification labels. */
 export type SentimentLabel = "positive" | "neutral" | "negative" | "frustrated";
 
+/** Sentiment analysis output with label, score, confidence, and matched keywords. */
 export interface SentimentResult {
   sentiment: SentimentLabel;
   score: number;

@@ -12,6 +12,7 @@
 // Input / Output types
 // ---------------------------------------------------------------------------
 
+/** Input parameters describing workload characteristics for capacity planning. */
 export interface CapacityInput {
   /** Max simultaneous active calls */
   peakConcurrentSessions: number;
@@ -34,6 +35,7 @@ export interface CapacityInput {
   deploymentTarget: "single_server" | "docker" | "kubernetes";
 }
 
+/** Single resource line item with minimum and recommended sizing. */
 export interface ResourceEstimate {
   component: string;
   reason: string;
@@ -44,6 +46,7 @@ export interface ResourceEstimate {
   critical: boolean;
 }
 
+/** Breakdown of storage consumption per component. */
 export interface StorageEstimate {
   component: string;
   perSessionMb: number;
@@ -53,6 +56,7 @@ export interface StorageEstimate {
   totalGb: number;
 }
 
+/** Full capacity recommendation with CPU, RAM, storage, network, and cost estimates. */
 export interface CapacityRecommendation {
   input: CapacityInput;
   generatedAt: string;
@@ -87,6 +91,7 @@ export interface CapacityRecommendation {
 // Service
 // ---------------------------------------------------------------------------
 
+/** Pure computation service that produces infrastructure sizing recommendations. */
 export class CapacityPlannerService {
   /**
    * Calculate a capacity recommendation for the given input.

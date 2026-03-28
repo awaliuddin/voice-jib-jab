@@ -35,6 +35,7 @@ export interface AccessLoggerOptions {
 
 const DEFAULT_SKIP = (req: Request): boolean => req.path === "/health";
 
+/** Create Express middleware that emits one structured JSON log line per completed request. */
 export function createAccessLogger(options: AccessLoggerOptions = {}) {
   const skip = options.skip ?? DEFAULT_SKIP;
   const write = options.write ?? ((line: string) => process.stderr.write(line));

@@ -7,6 +7,7 @@ import { EventEmitter } from "events";
 
 type EventHandler = (event: Event) => void | Promise<void>;
 
+/** Pub/sub event bus for coordinating events across lanes and modules. */
 export class EventBus {
   private emitter: EventEmitter;
   private handlers: Map<string, Set<EventHandler>>;
@@ -113,5 +114,5 @@ export class EventBus {
   }
 }
 
-// Singleton instance
+/** Singleton EventBus instance shared across the application. */
 export const eventBus = new EventBus();

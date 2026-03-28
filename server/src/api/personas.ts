@@ -42,6 +42,7 @@ function isValidLengthPref(value: unknown): value is ResponseLengthPreference {
 
 // ── Personas CRUD router ───────────────────────────────────────────────
 
+/** Router for /personas — persona library CRUD (list, get, create, update, delete). */
 export function createPersonasRouter(store: PersonaStore): Router {
   const router = Router();
 
@@ -257,6 +258,7 @@ export function createPersonasRouter(store: PersonaStore): Router {
 
 // ── Tenant persona assignment router ──────────────────────────────────
 
+/** Router for /tenants — per-tenant persona assignment (get, assign, unassign). */
 export function createTenantPersonaRouter(store: PersonaStore): Router {
   const router = Router();
 

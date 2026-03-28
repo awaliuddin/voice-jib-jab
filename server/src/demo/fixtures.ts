@@ -9,8 +9,10 @@
  *   const s = getDemoScenario("support");
  */
 
+/** Identifier for a built-in demo scenario. */
 export type DemoScenarioId = "support" | "compliance" | "sales";
 
+/** A self-contained enterprise demo scenario with greeting, utterances, and pitch points. */
 export interface DemoScenario {
   id: DemoScenarioId;
   name: string;
@@ -23,6 +25,7 @@ export interface DemoScenario {
   pitchPoints: string[];
 }
 
+/** Registry of all built-in demo scenarios keyed by ID. */
 export const DEMO_SCENARIOS: Record<DemoScenarioId, DemoScenario> = {
   support: {
     id: "support",

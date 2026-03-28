@@ -18,6 +18,7 @@ export interface TenantVectorStoreFactoryConfig {
   collectionPrefix?: string;
 }
 
+/** Factory that provisions and caches isolated ChromaDB vector stores per tenant. */
 export class TenantVectorStoreFactory {
   private readonly stores = new Map<string, ChromaDbVectorStore<unknown>>();
   private readonly url: string;

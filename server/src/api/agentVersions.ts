@@ -22,6 +22,7 @@ import type { AgentVersionStore } from "../services/AgentVersionStore.js";
 
 // ── Router factory ─────────────────────────────────────────────────────
 
+/** Router for /agent-versions — version CRUD, deployment, canary, rollback, and session resolution. */
 export function createAgentVersionsRouter(store: AgentVersionStore): Router {
   const router = Router();
 

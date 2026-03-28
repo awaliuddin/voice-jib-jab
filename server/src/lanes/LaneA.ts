@@ -46,6 +46,7 @@ interface CachedAudio {
   durationMs: number;
 }
 
+/** Reflex engine that plays sub-50ms acknowledgement sounds while Lane B processes. */
 export class LaneA extends EventEmitter {
   private sessionId: string;
   private config: LaneAConfig;

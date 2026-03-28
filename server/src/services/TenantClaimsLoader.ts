@@ -19,6 +19,7 @@ import {
 
 // ── TenantClaimsLoader ─────────────────────────────────────────────────
 
+/** Per-tenant AllowedClaimsRegistry factory and cache for isolated policy evaluation. */
 export class TenantClaimsLoader {
   private readonly registries = new Map<string, AllowedClaimsRegistry>();
 

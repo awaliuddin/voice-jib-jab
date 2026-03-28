@@ -27,6 +27,7 @@ function isValidId(value: string): boolean {
 
 // -- Router factory ---------------------------------------------------------
 
+/** Router for /routing — call routing rules CRUD, rule evaluation, and queue management. */
 export function createRoutingRouter(engine: RoutingEngine, queue: CallQueueService): Router {
   const router = Router();
 

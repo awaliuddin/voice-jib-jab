@@ -14,6 +14,7 @@ import { ConversationSummarizer } from "../services/ConversationSummarizer.js";
 
 const summarizer = new ConversationSummarizer();
 
+/** Router for /sessions — list, get, replay, summarize, and compliance-export recorded sessions. */
 export function createSessionsRouter(recorder: SessionRecorder): Router {
   const router = Router();
 

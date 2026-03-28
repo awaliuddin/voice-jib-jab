@@ -21,11 +21,13 @@ import {
   httpRequestDurationMs as defaultHistogram,
 } from "../metrics/registry.js";
 
+/** Options for injecting custom Prometheus counter/histogram instances. */
 export interface PrometheusMiddlewareOptions {
   counter?: Counter<"method" | "route" | "status">;
   histogram?: Histogram<"method" | "route" | "status">;
 }
 
+/** Create Express middleware that records HTTP request count and duration via Prometheus. */
 export function createPrometheusMiddleware(options: PrometheusMiddlewareOptions = {}) {
   const counter = options.counter ?? defaultCounter;
   const histogram = options.histogram ?? defaultHistogram;

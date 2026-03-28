@@ -19,6 +19,7 @@ import { randomUUID } from "node:crypto";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+/** Stored speaker embedding with enrollment metadata. */
 export interface Voiceprint {
   voiceprintId: string;
   callerId: string;
@@ -30,6 +31,7 @@ export interface Voiceprint {
   sampleCount: number;
 }
 
+/** Result of a speaker identification attempt against stored voiceprints. */
 export interface IdentifyResult {
   identified: boolean;
   callerId: string | null;

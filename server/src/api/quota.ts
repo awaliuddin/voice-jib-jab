@@ -13,6 +13,7 @@ import type { TenantQuotaService } from "../services/TenantQuotaService.js";
 
 // ── Router factory ──────────────────────────────────────────────────────
 
+/** Router for /tenants/:tenantId/quota — per-tenant quota config CRUD and usage tracking. */
 export function createQuotaRouter(service: TenantQuotaService): Router {
   const router = Router({ mergeParams: true });
 

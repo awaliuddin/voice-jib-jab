@@ -16,6 +16,7 @@ import type { WebhookService, WebhookEventType } from "../services/WebhookServic
 
 // ── Router factory ─────────────────────────────────────────────────────
 
+/** Router for /webhooks — webhook CRUD, delivery history, and test delivery. */
 export function createWebhooksRouter(service: WebhookService): Router {
   const router = Router();
 

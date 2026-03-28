@@ -16,6 +16,7 @@ import { join } from "path";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+/** Metadata for a captured session recording. */
 export interface RecordingMeta {
   sessionId: string;
   tenantId: string | null;
@@ -29,6 +30,7 @@ export interface RecordingMeta {
   channels: number;          // always 1
 }
 
+/** Configuration for RecordingStore initialization. */
 export interface RecordingStoreConfig {
   audioDir: string;
   retentionDays?: number;    // default 30
@@ -42,6 +44,7 @@ interface ActiveSession {
 
 // ── RecordingStore ─────────────────────────────────────────────────────
 
+/** Captures, persists, and manages WAV recordings for voice sessions. */
 export class RecordingStore {
   private readonly audioDir: string;
   private readonly retentionDays: number;

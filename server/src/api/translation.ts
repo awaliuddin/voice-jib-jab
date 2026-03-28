@@ -22,6 +22,7 @@ function isTranslationLanguage(value: unknown): value is TranslationLanguage {
 
 // ── Router factory ─────────────────────────────────────────────────────
 
+/** Router for /translation — language detection, text translation, and caller-agent pipeline. */
 export function createTranslationRouter(service: TranslationService): Router {
   const router = Router();
 
