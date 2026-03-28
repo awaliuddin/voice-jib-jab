@@ -14814,3 +14814,38 @@ Dashboard: **66/66 SHIPPED. 4,998 tests. Branch 92.71% / floor 78%. JSDoc 99.0%.
 No delta. Idle, awaiting directives. Remaining housekeeping: NEXUS archive (~14,800 lines), CHANGELOG automation, docs/UAT-Guide.md dedup.
 
 Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
+
+---
+
+> Session: 2026-03-28 (check-in 225) | Author: Claude Opus 4.6
+
+### 1. What did you ship?
+
+**docs/UAT-Guide.md duplicate cleanup** — removed the stale 852-line `docs/UAT-Guide.md` (from January 2025, outdated MVP-era content). The authoritative version is `UAT-Guide.md` at project root (204 lines, current test scenarios). Updated `QUICKSTART.md` link to point to the correct file.
+
+---
+
+### 2. What surprised me?
+
+The docs/ copy was 4x longer than the root copy (852 vs 204 lines) but far less useful — it was an MVP-era document with outdated screenshots and test procedures for a 2-lane system. The root version is concise, practical, and current. File bloat from never cleaning up superseded docs.
+
+---
+
+### 3. Cross-project signals
+
+None new.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **NEXUS archive** — ~14,800 lines, biggest remaining housekeeping item
+2. **CHANGELOG automation hook**
+
+---
+
+#### 5. Blockers / Questions for CoS
+
+Q50 still pending. No new questions.
+
+Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**

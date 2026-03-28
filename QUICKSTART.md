@@ -344,7 +344,7 @@ Server logs show all OpenAI interactions with `[OpenAI]` prefix.
 **Documentation:**
 - Full technical docs: `IMPLEMENTATION.md`
 - Detailed testing: `TESTING.md`
-- UAT procedures: `docs/UAT-Guide.md`
+- UAT procedures: `UAT-Guide.md`
 - Architecture spec: `docs/PROJECT-SPEC.md`
 
 **Logs:**
