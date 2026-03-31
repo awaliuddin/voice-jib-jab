@@ -14926,3 +14926,62 @@ No delta since check-in 227 (local Jest diagnosis). No directives pending. Idle.
 Priorities unchanged: NEXUS archive (Q18 standing auth), N-11 Phase 2 (Q17 standing auth), local dev docs, Q50 pending.
 
 Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
+
+---
+
+> Session: 2026-03-30 (check-in 229) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+**Local Jest environment fully fixed. 4,998 / 4,998 tests passing locally.**
+
+Three root causes diagnosed and resolved in sequence:
+
+| Issue | Root cause | Fix applied |
+|-------|-----------|-------------|
+| 167 suites Babel SyntaxError | No `server/node_modules` — `npm ci` silently no-ops without a lockfile | `npm install --ignore-scripts` from project root (workspace-aware) |
+| Tests still failing after install | `npx jest` run from project root, not `server/` — root has no `jest.config.js` so Jest uses Babel instead of ts-jest | Must `cd server && npx jest` |
+| 3 suites failing (Database, TranscriptStore, SessionHistory) | `better-sqlite3` native bindings uncompiled after fresh install | `npm rebuild better-sqlite3` at project root |
+
+No code changes. No new tests. Environment-only fixes.
+
+---
+
+### 2. What surprised me?
+
+**Three separate failure modes stacked on each other, each hiding the next.** The Babel SyntaxError was the presenting symptom, but fixing it exposed the native binding failure, and understanding both required recognising that `npx jest` from the root is a fundamentally different invocation than from `server/`.
+
+**`npm ci` silently succeeds with no lockfile.** Expected it to error loudly. Instead it exits 0 and installs nothing. This is a footgun — any script that runs `npm ci` in a workspace package directory (which has no lockfile by design) will silently skip the install.
+
+**npm workspaces hoisting is invisible at the sub-package level.** From inside `server/`, `node_modules/` is intentionally empty — all deps are in the root. There's no indication of this; a developer staring at an empty `server/node_modules/` has no obvious signal that this is by design rather than a broken install.
+
+---
+
+### 3. Cross-project signals
+
+**npm workspaces + Jest requires a documented "run from sub-package" convention.** Any ASIF project using npm workspaces with Jest in a sub-package has the same risk: running `npx jest` from the root will silently use the wrong config (or no config). The fix is cheap — a `test` script at the root that `cd`s into the correct package — but it needs to be deliberate. VJJ's root `npm test` script already does this correctly (`cd server && npm test`); the gap is that bare `npx jest` from root doesn't.
+
+**`better-sqlite3` requires `npm rebuild` after any fresh install on a new machine or WSL environment.** The native `.node` binding is platform-specific and isn't shipped prebuilt for all targets. Projects using `better-sqlite3` (or any native addon) should document `npm rebuild` in their local setup guide.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **QUICKSTART.md — local setup section** (standing auth implied by check-in 227 observation): Document the three-step local dev setup (`npm install --ignore-scripts` at root → `npm rebuild better-sqlite3` → `cd server && npx jest`). Low effort, high value for any new contributor.
+2. **NEXUS archive (Q18 — standing auth granted)**: File is now ~14,930 lines. Archive check-ins 1–240 to `.asif/NEXUS-checkins-archive-2026-Q1.md`.
+3. **N-11 Phase 2 (Q17 — standing auth granted)**: Real SIP.js adapter + G.711 codec.
+4. **Q50** — CHANGELOG granularity, still pending CoS response.
+
+---
+
+### 5. Blockers / Questions for CoS
+
+**Q50** — still open (CHANGELOG granularity, check-in 213).
+
+> **CoS Response (2026-03-31, Wolf)**: **Grouped is correct.** 14 individual CHANGELOG entries for coverage campaigns would be noise. Group by outcome ("Branch coverage floor raised to 78%") not by initiative ID. The CHANGELOG serves external readers — they care about what changed, not how many internal sprints it took. Per-initiative detail stays in the NEXUS. **Status: Q50 ANSWERED.**
+
+**Q51 (new)** — QUICKSTART local setup: standing auth to add a `## Local Development` section to `QUICKSTART.md` documenting the correct install sequence? This is a one-file doc change, no code impact. Flagging rather than self-executing because it touches the public-facing developer onboarding doc.
+
+> **CoS Response (2026-03-31, Wolf)**: **GO. Standing auth granted.** Document the 3-step install (`npm install --ignore-scripts` → `npm rebuild better-sqlite3` → test command). Also self-authorize the NEXUS archive (Q18) and CHANGELOG automation hook. You have 3 clean housekeeping items — execute all of them. **Status: Q51 ANSWERED. GO.**
+
+Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
