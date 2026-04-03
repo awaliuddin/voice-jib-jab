@@ -22,6 +22,29 @@ Your Voice Jib-Jab system is fully configured and ready for real-time voice conv
 
 ---
 
+## Local Development Setup (Fresh Clone)
+
+If you've just cloned the repo, run these three commands before anything else:
+
+```bash
+# 1. Install all dependencies (npm workspaces — installs root + client + server)
+npm install --ignore-scripts
+
+# 2. Compile native bindings for better-sqlite3
+npm rebuild better-sqlite3
+
+# 3. Run the server test suite (must run from server/, not the repo root)
+cd server && npx jest
+```
+
+> **Why `--ignore-scripts`?** The root `prepare` script runs `husky install`, which requires git hooks to be set up. Skip it on first install; run `npm install` without the flag once your git environment is ready.
+>
+> **Why `cd server`?** The repo uses npm workspaces — all deps are hoisted to root `node_modules/`. Jest config lives at `server/jest.config.js` and uses `ts-jest`. Running `npx jest` from the repo root finds no config and falls back to Babel, which cannot parse TypeScript `type` imports.
+>
+> **Why `npm rebuild`?** `better-sqlite3` ships a native C++ addon. The prebuilt binary is platform-specific; a fresh install on a new machine or WSL environment requires recompilation.
+
+---
+
 ## Start Testing NOW (3 Steps)
 
 ### Step 1: Start the Server
