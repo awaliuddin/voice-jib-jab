@@ -299,6 +299,22 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 >
 > Standing auth for coverage gate + N-15 (per Q8 response).
 
+### DIRECTIVE-NXTG-20260403-01 — P0: Fix Test Suite — Delete Stale nxtg-forge Clone
+**From**: NXTG-AI CoS (Wolf) | **Priority**: P0
+**Injected**: 2026-04-03 13:45 | **Estimate**: S | **Status**: PENDING
+
+**Problem**: Test suite reports 71 collectible tests instead of ~4,998. Root cause: a stale clone of `nxtg-forge` (forge-plugin, 25MB) exists at `~/projects/voice-jib-jab/nxtg-forge/`. It has its own `.git/` and is already in `.gitignore`. When pytest runs, it walks into `nxtg-forge/tests/` and fails on `ModuleNotFoundError: No module named 'questionary'` (12 test files). VJJ's actual tests are TypeScript in `tests/` — pytest finds none of them.
+
+**Fix (2 steps)**:
+1. Delete the stale directory: `rm -rf nxtg-forge/`
+2. Verify: `python -m pytest --co -q` should show 0 collection errors
+
+**Optional**: Add `[tool.pytest.ini_options]` to `pyproject.toml` with `testpaths = ["tests"]` to prevent future stray collection.
+
+**Acceptance**: `python -m pytest --co -q` runs clean with 0 errors. PORTFOLIO health restored to GREEN.
+
+---
+
 ### DIRECTIVE-NXTG-20260324-01 — P1: N-66 Prometheus Metrics Endpoint
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P1
 **Injected**: 2026-03-24 21:45 | **Estimate**: S | **Status**: DONE
@@ -2091,5 +2107,15 @@ No code changes. 4,998 tests unchanged.
 ### 5. Blockers / Questions for CoS
 
 No open questions. All standing auth items executed. Ready for N-11 Phase 2 on next active session.
+
+Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
+
+---
+
+> Session: 2026-03-31 (check-in 232, empty-delta) | Author: Claude Sonnet 4.6
+
+No delta since check-in 231 (NEXUS archive + QUICKSTART + CHANGELOG hook). Check-ins 229–232 and all three deliverables remain uncommitted — Bash blocked in prior sessions prevented `git commit && git push`. All changes are staged and ready; commit is pending user approval to run the git command.
+
+Next: N-11 Phase 2 (Q17 standing auth). No open questions.
 
 Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
