@@ -2385,3 +2385,57 @@ The ENOENT guard pattern (`if (err.code !== "ENOENT") throw err` in catch) appea
 Q52 still open. No new blockers.
 
 Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
+
+---
+
+> Session: 2026-04-03 (check-in 243) | Author: Claude Sonnet 4.6
+
+### 1. What did I ship?
+
+**Gate 2 false-positive investigation.** No code changed — investigation result only.
+
+Followed up on the check-in 242 CRUCIBLE Gate 2 advisory: 5 bare `.toBeDefined()` calls flagged in `SessionRecorder.test.ts` (lines 601, 663, 687, 713, 731).
+
+**Finding: all 5 are guard assertions, not hollow assertions.**
+
+| Line | `toBeDefined()` target | Followed by |
+|------|----------------------|-------------|
+| 601 | `recording.summary.sentiment` | `.dominantSentiment.toBe("positive")` |
+| 663 | `entry` | `entry.payload.toBeUndefined()` |
+| 687 | `audioEntry` | `audioEntry.payload.data.toBe(base64)` (L689) |
+| 713 | `audioEntry` | `audioEntry.payload.chunk.toBe(base64)` |
+| 731 | `recording.summary.sentiment` | `.dominantSentiment.toBe("negative")`, `.escalationTriggered.toBe(true)` |
+
+Each `toBeDefined()` is a guard that produces a clear failure message ("expected undefined to be defined") before the `!` non-null operator dereference on the next line. Without the guard, a null object would produce a cryptic "Cannot read properties of undefined" error rather than a test failure at the right assertion.
+
+**Gate 2 advisory from check-in 242: downgraded to informational.** The grep-based scan correctly flagged these for review; the review correctly cleared them. No action needed.
+
+Tests: 4,998 / 4,998 unchanged.
+
+---
+
+### 2. What surprised me?
+
+The gap between a grep-based audit and a read-based audit is significant here. `toBeDefined()` without context looks hollow; with context it's correct TypeScript defensive testing. A smarter Gate 2 scan would look for `.toBeDefined()` with no assertion within the next 3 lines — that's the actual hollow pattern.
+
+---
+
+### 3. Cross-project signals
+
+Any project running a grep-based CRUCIBLE Gate 2 scan will get false positives on guard assertions. The signal is: **flag `.toBeDefined()` only when it appears as the LAST assertion in an `it()` block or has no following property-access assertions on the same variable.** Worth updating the CRUCIBLE protocol definition.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **Install CHANGELOG hook** — `cp scripts/post-commit-changelog.sh .git/hooks/post-commit`
+2. **N-11 Phase 2** — SIP.js adapter (Q17 standing auth)
+3. **Mutation testing (Gate 6)** — deferred P2; worth a targeted run on `PolicyGate` and `ModeratorCheck` as the two highest-risk paths
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q52 still open. No new blockers.
+
+Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
