@@ -2332,3 +2332,54 @@ This backfill gap reinforces the value of the `scripts/post-commit-changelog.sh`
 Q52 still open (check-in trigger cadence). No other blockers.
 
 Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
+
+---
+
+> Session: 2026-04-03 (check-in 242) | Author: Claude Sonnet 4.6
+
+### 1. What did I ship?
+
+**CRUCIBLE Gates 1-7 self-audit** (idle time protocol). Read-only — no code changed.
+
+| Gate | Focus | Result |
+|------|-------|--------|
+| 1 | xfail/skip governance | **PASS** — 26 grep hits are all in comments, string literals, or method names (`skipStep`, `commit.skipped`). Zero live `.skip()` or `.only()` calls. |
+| 2 | Hollow assertions | **ADVISORY** — 375 `.toBeDefined()` calls across suite. Not all are hollow (many follow setup code that validates shape), but SessionRecorder.test.ts has 4 consecutive `.toBeDefined()` with no value check on `sentiment`, `entry`, and `audioEntry`. Warrants strengthening. |
+| 3 | Mock drift | **PASS** — no mock/impl co-modification commits in recent log. |
+| 4 | Test count delta | **PASS** — 4,998 / 4,998, 153 suites. Matches last known count exactly. |
+| 5 | Silent catch blocks | **ADVISORY** — 174 catch blocks in source. Most follow `ENOENT` guard pattern (correct). LaneA.ts has a logged fallback catch (correct). ChromaDbVectorStore.ts resets `metadata = {}` on catch — silent but intentional (metadata is optional). No P0 silent swallowers found. |
+| 6 | Mutation testing | **DEFERRED** — Gate 6 is L effort / P2. Not run this session. |
+| 7 | Spec-test traceability | **PASS** — T-013 test file references spec ID directly. Major features have NEXUS acceptance criteria. |
+| 8 | Coverage config integrity | **PASS** — `jest.config.js` has 3 omissions, all justified inline with rationale. Thresholds set 3% below actual (comment documents this). No silent exclusions. |
+
+**One actionable finding**: SessionRecorder.test.ts lines 601, 663, 687, 713, 731 — bare `.toBeDefined()` on sentiment/entry/audioEntry fields. These should assert the actual shape (e.g. `toBe("positive")`, `toHaveProperty("text")`). Logged as a self-improvement candidate, not P0.
+
+Tests: 4,998 / 4,998. No regressions.
+
+---
+
+### 2. What surprised me?
+
+The coverage floors in `jest.config.js` are set 3% below actual with a comment saying so — that's intentional and documented. But the actual coverage (97.25% stmt, 92.62% branch) hasn't been re-verified since 2026-03-25. If coverage has drifted slightly below the comment's baseline, the floor would still pass while the comment becomes stale. A quick `npm test -- --coverage` verification would confirm. Didn't run it (expensive) but worth flagging.
+
+---
+
+### 3. Cross-project signals
+
+The ENOENT guard pattern (`if (err.code !== "ENOENT") throw err` in catch) appears consistently across 6+ store files in VJJ. This is correct but also a pattern that other projects using JSON file persistence should adopt — it's the difference between a graceful "no file yet" startup and a crash on first boot.
+
+---
+
+### 4. What I'd prioritize next
+
+1. **Strengthen hollow assertions in SessionRecorder.test.ts** (5 instances — small, bounded)
+2. **Install CHANGELOG hook** — still uninstalled
+3. **N-11 Phase 2** — SIP.js adapter (Q17 standing auth)
+
+---
+
+### 5. Blockers / Questions for CoS
+
+Q52 still open. No new blockers.
+
+Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
