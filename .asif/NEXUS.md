@@ -2392,37 +2392,41 @@ Dashboard: **66/66 SHIPPED. 4,998 tests. JSDoc 99.0%. 0 vulns. CI green.**
 
 ### 1. What did I ship?
 
-**Gate 2 false-positive investigation.** No code changed — investigation result only.
+**Gate 2 false-positive investigation** (check-in 243) confirmed guard assertions cleared.
 
-Followed up on the check-in 242 CRUCIBLE Gate 2 advisory: 5 bare `.toBeDefined()` calls flagged in `SessionRecorder.test.ts` (lines 601, 663, 687, 713, 731).
+**Check-in 244 — CRUCIBLE Gate 2 full sweep + 11 hollow assertion fixes.**
 
-**Finding: all 5 are guard assertions, not hollow assertions.**
+Ran a full codebase scan (all `*.test.ts`). Triaged every `toBeDefined()` hit. Separated guard assertions (followed by specific property checks) from genuinely hollow ones (sole assertion with no follow-up value check).
 
-| Line | `toBeDefined()` target | Followed by |
-|------|----------------------|-------------|
-| 601 | `recording.summary.sentiment` | `.dominantSentiment.toBe("positive")` |
-| 663 | `entry` | `entry.payload.toBeUndefined()` |
-| 687 | `audioEntry` | `audioEntry.payload.data.toBe(base64)` (L689) |
-| 713 | `audioEntry` | `audioEntry.payload.chunk.toBe(base64)` |
-| 731 | `recording.summary.sentiment` | `.dominantSentiment.toBe("negative")`, `.escalationTriggered.toBe(true)` |
+**11 genuine hollow assertions fixed across 5 files:**
 
-Each `toBeDefined()` is a guard that produces a clear failure message ("expected undefined to be defined") before the `!` non-null operator dereference on the next line. Without the guard, a null object would produce a cryptic "Cannot read properties of undefined" error rather than a test failure at the right assertion.
+| File | Fix |
+|------|-----|
+| `SecurityMiddleware.test.ts:198` | `toBeDefined()` → `.toMatch(/default-src/)` on CSP header |
+| `SecurityMiddleware.test.ts:214` | `toBeDefined()` → `.toBe("same-origin")` on COOP |
+| `SecurityMiddleware.test.ts:218` | `toBeDefined()` → `.toBe("same-origin")` on CORP |
+| `LanguageDetector.test.ts:281` | `toBeDefined()` → `.toBe("text query parameter is required")` |
+| `compareAgents-api.test.ts:165` | `configA.toBeDefined()` → `.configId.toBe("config-a")` |
+| `compareAgents-api.test.ts:166` | `configB.toBeDefined()` → `.configId.toBe("config-b")` |
+| `compareAgents-api.test.ts:167` | `recommendation.toBeDefined()` → `.toBe("A")` |
+| `compareAgents-api.test.ts:168` | `metricWinners.toBeDefined()` → `.quality.toBe("A")` |
+| `skills-api.test.ts:412` | `invokedAt.toBeDefined()` → valid ISO date check |
+| `AnalyticsService.test.ts:582` | `tenantBreakdown.toBeDefined()` → `toEqual(arrayContaining(["tenant-a","tenant-b"]))` |
+| `AnalyticsService.test.ts:583` | `sessions.toBeDefined()` → `.toHaveLength(3)` |
 
-**Gate 2 advisory from check-in 242: downgraded to informational.** The grep-based scan correctly flagged these for review; the review correctly cleared them. No action needed.
-
-Tests: 4,998 / 4,998 unchanged.
+Tests: **4,998 / 4,998** — unchanged count, strengthened quality.
 
 ---
 
 ### 2. What surprised me?
 
-The gap between a grep-based audit and a read-based audit is significant here. `toBeDefined()` without context looks hollow; with context it's correct TypeScript defensive testing. A smarter Gate 2 scan would look for `.toBeDefined()` with no assertion within the next 3 lines — that's the actual hollow pattern.
+The prior check-in 243 investigation cleared the SessionRecorder guard assertions correctly. This sweep found hollow assertions concentrated in API endpoint tests (security headers, compare-agents response shape) — the pattern where a team verifies a feature exists but doesn't pin down the value, which allows silent regression.
 
 ---
 
 ### 3. Cross-project signals
 
-Any project running a grep-based CRUCIBLE Gate 2 scan will get false positives on guard assertions. The signal is: **flag `.toBeDefined()` only when it appears as the LAST assertion in an `it()` block or has no following property-access assertions on the same variable.** Worth updating the CRUCIBLE protocol definition.
+Hollow assertions cluster in API tests checking response shape with `toBeDefined()`. A tighter Gate 2 rule: **`toBeDefined()` is hollow when it is the final/only assertion in a test or when the variable has no subsequent `.toBe()`, `.toContain()`, `.toHaveLength()`, or `.toEqual()` within the same `it()` block.**
 
 ---
 

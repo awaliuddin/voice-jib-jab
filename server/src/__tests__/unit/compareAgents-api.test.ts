@@ -162,10 +162,10 @@ describe("POST /compare-agents", () => {
     const res = await httpRequest(server, "POST", "/compare-agents", validBody);
     const body = res.json() as Record<string, unknown>;
 
-    expect(body.configA).toBeDefined();
-    expect(body.configB).toBeDefined();
-    expect(body.recommendation).toBeDefined();
-    expect(body.metricWinners).toBeDefined();
+    expect((body.configA as { configId: string }).configId).toBe("config-a");
+    expect((body.configB as { configId: string }).configId).toBe("config-b");
+    expect(body.recommendation).toBe("A");
+    expect((body.metricWinners as Record<string, string>).quality).toBe("A");
     expect(typeof body.reasoning).toBe("string");
   });
 

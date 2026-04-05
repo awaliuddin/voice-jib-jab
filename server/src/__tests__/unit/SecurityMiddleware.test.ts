@@ -195,7 +195,7 @@ describe("Security Headers", () => {
   });
 
   it("sets Content-Security-Policy header", () => {
-    expect(res.headers["content-security-policy"]).toBeDefined();
+    expect(res.headers["content-security-policy"] as string).toMatch(/default-src/);
   });
 
   it("sets X-DNS-Prefetch-Control to off", () => {
@@ -211,11 +211,11 @@ describe("Security Headers", () => {
   });
 
   it("sets Cross-Origin-Opener-Policy header", () => {
-    expect(res.headers["cross-origin-opener-policy"]).toBeDefined();
+    expect(res.headers["cross-origin-opener-policy"]).toBe("same-origin");
   });
 
   it("sets Cross-Origin-Resource-Policy header", () => {
-    expect(res.headers["cross-origin-resource-policy"]).toBeDefined();
+    expect(res.headers["cross-origin-resource-policy"]).toBe("same-origin");
   });
 
   // X-XSS-Protection: 0 — Helmet explicitly disables the deprecated header.

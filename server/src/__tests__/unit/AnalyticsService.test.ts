@@ -579,8 +579,8 @@ describe("Analytics API Endpoints", () => {
       expect(typeof data.avgTurnCount).toBe("number");
       expect(typeof data.avgQualityScore).toBe("number");
       expect(typeof data.avgComplianceRate).toBe("number");
-      expect(data.tenantBreakdown).toBeDefined();
-      expect(data.sessions).toBeDefined();
+      expect(Object.keys(data.tenantBreakdown)).toEqual(expect.arrayContaining(["tenant-a", "tenant-b"]));
+      expect(data.sessions).toHaveLength(3);
     });
   });
 });

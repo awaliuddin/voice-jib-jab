@@ -409,7 +409,7 @@ describe("Skills API", () => {
       };
       expect(data.skill.skillId).toBe("skill-001");
       expect(data.parameters).toEqual({ accountNumber: "ACC-123" });
-      expect(data.invokedAt).toBeDefined();
+      expect(new Date(data.invokedAt).toString()).not.toBe("Invalid Date");
     });
 
     it("returns 404 when skill not found", async () => {

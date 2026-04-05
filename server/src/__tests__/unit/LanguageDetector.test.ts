@@ -278,7 +278,7 @@ describe("Language API Endpoints", () => {
     expect(res.status).toBe(400);
 
     const data = res.json() as { error: string };
-    expect(data.error).toBeDefined();
+    expect(data.error).toBe("text query parameter is required");
   });
 
   it("GET /language/templates returns grouped object", async () => {
