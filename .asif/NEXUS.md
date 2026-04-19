@@ -1521,6 +1521,30 @@ Top 3 Fixes (highest impact, lowest effort):
 
 ## Team Feedback
 
+> Session: 2026-04-19 (check-in 261) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+Nothing since check-in 260 — this prompt fired in the same session, minutes later. No commits, no code changes, no test delta. Tests remain at **4,998 passing**.
+
+### 2. What surprised you?
+
+The reflection prompt re-fired within the same session. Either this is a cadence test or the trigger interval is shorter than expected. Worth noting: same-session check-ins have zero signal value — the full picture is in check-in 260 above.
+
+### 3. Cross-project signals
+
+None new. See check-in 260: security-scan workflow is portfolio-reusable, voice registry anti-collision protocol works.
+
+### 4. What would I prioritize next?
+
+Same as check-in 260: **N-11 SIP Telephony** (Telnyx integration) → local security dry-run harness → branch coverage floor.
+
+### 5. Blockers / questions?
+
+If this prompt is firing on a scheduled trigger: recommend setting the interval to at least 24h between reflection prompts — intra-session cadence produces noise, not signal.
+
+---
+
 > Session: 2026-04-19 (check-in 260) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
