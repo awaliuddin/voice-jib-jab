@@ -1521,6 +1521,54 @@ Top 3 Fixes (highest impact, lowest effort):
 
 ## Team Feedback
 
+> Session: 2026-04-19 (check-in 260) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+**Since last substantive check-in (2026-04-12):**
+
+| Commit | What | Notes |
+|--------|------|-------|
+| `d5ddf57` | CI: Semgrep SAST + Gitleaks secret scanning | Replaces GHAS (free for private repos). Semgrep OSS 3000+ rules, Gitleaks 222 secret patterns, SARIF output. |
+| `09bac78`–`4b38f43` | CI: security-scan v2–v5.1 (5 fix commits) | Added Bandit (Python SAST) + Bearer (data privacy), fixed YAML parse errors, guarded missing locations, `|| true` on table print |
+| `0912a0f` | DIRECTIVE-NXTG-20260418-03 partial | Voice identity: CLAUDE.md + voice-registry claim (`am_echo`) |
+| `d66050c` | voice-registry: P-07 claims am_echo | Canonical registry update |
+| `05ffdda` | DIRECTIVE-NXTG-20260418-03 DONE | `## Voice Identity` section, NEXUS Response filled |
+
+**Test count: 4,998 (unchanged — no feature work this window). All passing.**
+
+---
+
+### 2. What surprised you?
+
+**`am_onyx` collision**: Directive assigned `am_onyx` as P-07's voice, but forge-orchestrator (P-03b) had already claimed it by earliest-commit-wins before P-07 could register. The anti-collision rule in the registry worked exactly as designed — no drama, clean resolution. `am_echo` was available and fits.
+
+**Security scan iteration cost**: The CI security workflow required 5 fix commits after the initial `d5ddf57`. Root causes: private-repo SARIF upload restrictions (no GHAS = no `github/codeql-action/upload-sarif`), YAML block scalar syntax error, Bandit exiting non-zero on findings (breaking CI), and `jq` table rendering failing on empty arrays. Each fix was small but the iteration loop was expensive. A local dry-run harness would have caught all of these before push.
+
+---
+
+### 3. Cross-project signals
+
+**Security CI pattern is reusable**: The final `.github/workflows/security-scan.yml` (Semgrep + Bandit + Bearer, artifact upload, job summary, `--exit-zero` everywhere) is a clean, free-tier SAST stack for any portfolio project on private repos. Other teams should copy it rather than reinventing — especially if they want SARIF artifacts without GHAS.
+
+**Voice service anti-collision works**: PP's voice service + the canonical registry protocol handled a real collision cleanly. No manual intervention needed. Portfolio-wide pattern is sound.
+
+---
+
+### 4. What would you prioritize next if directives were fresh?
+
+1. **N-11 SIP Telephony** — marked BUILDING since 2026-03-18, interface/stub shipped, never connected to a real provider. Highest-value unfinished thread. Would start with Telnyx integration (they have a WebSocket SIP path that fits the existing adapter interface).
+2. **Security scan dry-run harness** — `scripts/security-dry-run.sh` that runs all three scanners locally before push, to avoid the 5-commit CI fix loop next time.
+3. **Coverage: branch floor** — branch coverage is 83.43% vs stmt 92%+. The gap is in complex policy and flow-engine branches. Worth targeted test-writing to close.
+
+---
+
+### 5. Blockers / questions for CoS?
+
+None blocking. One observation: the security scan still has Bearer running via `bearer/bearer-action@v2` (third-party action, pulls from Docker on every run). If CI speed becomes a concern, Semgrep covers most of what Bearer does for TS/JS. Worth swapping if pipeline time > 3 min.
+
+---
+
 > Session: 2026-03-18 (check-in 259) | Author: Claude Sonnet 4.6
 
 ### 1. What did you ship?
