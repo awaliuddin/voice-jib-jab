@@ -81,8 +81,12 @@ On every session start, recall relevant context from Dx3 before starting work:
 
 This is how the portfolio compounds intelligence. Your work benefits from every other team's learning.
 
-## Team Voice
+## Voice Identity
+**Voice**: `am_echo`
+**Service**: http://100.123.83.34:8880/v1/audio/speech
+**Registry**: ~/ASIF/standards/voice-registry.md
+**Use**: every cycle-complete, every P0/P1 completion, every directive response.
 
-Our voice is `am_echo`. Speak via:
-  ~/ASIF/scripts/cos-speak-remote --voice am_echo "text"
-Use on cycle exit, deliverable shipped, blocker, escalation.
+Speak via: `~/ASIF/scripts/cos-speak-remote --voice am_echo "text"`
+
+Note: `am_onyx` was assigned but claimed by P-03b (forge-orchestrator) first. P-07 registered `am_echo` per earliest-commit-wins anti-collision rule.

@@ -284,7 +284,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260418-03 — P2: Voice Identity Adoption
 **From**: NXTG-AI CoS (Wolf) — Asif-initiated | **Priority**: P2
-**Injected**: 2026-04-18 13:48 PDT | **Estimate**: S (under 30 min) | **Status**: PENDING
+**Injected**: 2026-04-18 13:48 PDT | **Estimate**: S (under 30 min) | **Status**: DONE
 
 **Context**: PP (P-04) just shipped the portfolio voice service (`http://100.123.83.34:8880`). Asif directive: every team picks its own voice, owns it, and uses it always — no duplicates, no silent completion, no generic TTS fallback. Voice is team identity.
 
@@ -316,6 +316,9 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 **Why P2 Saturday**: low-stakes identity work, immediate quality-of-life improvement. Won't block anything. Pick up at your next session-start.
 
+**Response** (filled by team):
+
+> **DONE 2026-04-19.** Voice identity established. `am_onyx` was claimed by P-03b (forge-orchestrator) under earliest-commit-wins anti-collision rule before P-07 could register it. P-07 registered `am_echo` instead (commit `d66050c`). CLAUDE.md updated: `## Team Voice` replaced with `## Voice Identity` block per directive format, pointing to canonical `voice-registry.md`. Voice confirmed in registry (`am_echo | P-07 voice-jib-jab`). `cos-speak-remote --voice am_echo` is the call pattern on all P-07 surfaces.
 
 > 47 completed directives archived to [NEXUS-archive.md](./NEXUS-archive.md).
 > - Batch 1: 6 directives (2026-03-08, team)
