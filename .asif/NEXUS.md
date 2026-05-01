@@ -284,7 +284,7 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 
 ### DIRECTIVE-NXTG-20260501-02 — P2: CRUCIBLE namespace-shadow spot-check
 **From**: NXTG-AI CoS (Wolf) | **Priority**: P2
-**Injected**: 2026-05-01 16:30 PDT | **Estimate**: S (under 15 min) | **Status**: PENDING
+**Injected**: 2026-05-01 16:30 PDT | **Estimate**: S (under 15 min) | **Status**: DONE
 
 **Context**: P-04 (Podcast-Pipeline) test collection regressed on 2026-05-01 because `~/projects/synapps/` ships a regular-package `__init__.py` whose `tests/` cross-shadowed P-04's namespace-package `tests/` during pytest rootdir resolution. CLX9 side audit clean (Emma 2026-05-01, HANDOFF Note 187). Wolf is propagating the spot-check to NXTG-AI projects that share the `~/projects/` parent and operate any Python test surface. voice-jib-jab is a candidate because of voice-pipeline server tests (`tests/`) under your project root.
 
@@ -304,6 +304,26 @@ IDEA ──> RESEARCHED ──> DECIDED ──> BUILDING ──> SHIPPED
 **Reference**: Dx3 record `8d9d3638-cf7a-4b1e-805b-b985fbb8c8a5` (CRUCIBLE namespace-shadow pattern). Origin: P-04 commit `4fed316`.
 
 **Response** (filled by team): inline below with **Started**, **Completed**, **Actual** path output, **Commit** sha if mitigation needed.
+
+**Started**: 2026-04-28
+**Completed**: 2026-04-28
+**Status**: DONE — MITIGATION APPLIED
+
+**Initial output** (RISK — two paths):
+```
+_NamespacePath(['/home/axw/projects/voice-jib-jab/tests', '/home/axw/miniconda3/lib/python3.13/site-packages/tests'])
+```
+
+**Root cause**: `tests/` had no `__init__.py`, making it a namespace package. Python merged it with a `tests/` package in site-packages.
+
+**Mitigation**: Added `tests/__init__.py` (empty) — converts to regular package, stops namespace merging. No test code or logic modified.
+
+**Post-fix output** (CLEAN — single path):
+```
+['/home/axw/projects/voice-jib-jab/tests']
+```
+
+**Regression check**: `npm test` — 4998 passed, 0 failed, 153 suites. DoD MET.
 
 ---
 
