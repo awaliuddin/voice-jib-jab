@@ -2714,3 +2714,47 @@ Dashboard: **66/66 SHIPPED. 4,998 tests. 0 vulns. CI green.**
 No delta. Tests: 4,998 / 4,998. Vulns: 0. Deps: unchanged. Q67 open.
 
 Dashboard: **66/66 SHIPPED. 4,998 tests. 0 vulns. CI green.**
+
+---
+
+> Session: 2026-04-28 (check-in 262 — directive response + reflection) | Author: Claude Sonnet 4.6
+
+### 1. What did you ship?
+
+**DIRECTIVE-NXTG-20260501-02** — CRUCIBLE namespace-shadow fix. Commit `c072d04`.
+- Detected: `tests/__path__` returned 2 paths — project `tests/` merging with `miniconda3/site-packages/tests/` via namespace package resolution.
+- Fix: added empty `tests/__init__.py` — converts to regular package, eliminates merge.
+- Post-fix: single path, 4,998 tests passed, 0 failures.
+
+**DIRECTIVE-NXTG-20260418-03** (prior session, check-in 260) — voice identity finalized.
+- Claimed `am_echo` (am_onyx taken by P-03b). CLAUDE.md updated. Voice registry entry committed.
+
+**CI improvements** (commits 09bac78–4b38f43): Bandit SAST + Bearer data-privacy scanner added (v4), YAML parse fix (v5), missing-location guard + `|| true` on table print (v5.1).
+
+**Tests**: 4,998 / 4,998 — unchanged floor. No regressions.
+
+### 2. What surprised you?
+
+miniconda3 ships a `tests/` namespace in `site-packages/` — not obvious, not documented anywhere. Any project in `~/projects/` with a bare `tests/` directory (no `__init__.py`) is silently shadowed. The symptom wouldn't surface in pytest (it pins `testpaths`) but *would* surface in any `import tests` path — e.g., conftest imports, dynamic fixture loading, coverage plugins that introspect the package. Wolf caught this at exactly the right layer.
+
+### 3. Cross-project signals
+
+**HIGH VALUE for all Python projects in ~/projects/**: The namespace-shadow risk is portfolio-wide. Any project without `tests/__init__.py` is exposed to the same miniconda3 merge. The check is one command:
+```
+python -c "import tests; print(tests.__path__)"
+```
+If output shows `_NamespacePath([...])` with >1 entry — RISK. Fix: `touch tests/__init__.py`. No test logic changes required.
+
+Recommend Wolf propagate this check to all remaining Python projects that haven't been audited yet.
+
+### 4. What would you prioritize next?
+
+1. **Gate 6 mutation testing** (CRUCIBLE idle protocol — flagged since check-in 252, never executed). Low risk, high signal quality value.
+2. **Q67 dep bundle** — 39 outdated packages sitting idle since early April. Needs CoS green-light on safe-update scope (patch-only vs. minor).
+3. **N-11 Phase 2** — if Q67 unblocks and CoS wants velocity on the voice pipeline.
+
+### 5. Blockers / questions for CoS
+
+**Q67 (OPEN since ~2026-04-04)**: 39 outdated npm packages. Patch-safe updates are low-risk but I haven't had a directive or explicit clearance to run them. Is this in scope for idle-time work, or hold for a dedicated dep-update directive?
+
+Dashboard: **66/66 SHIPPED. 4,998 tests. 0 vulns. CI green.**
