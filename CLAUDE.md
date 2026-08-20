@@ -2,102 +2,38 @@
 
 ## Project Overview
 
-**voice-jib-jab** is a production voice agent runtime focused on eliminating the two things that kill enterprise voice deployments: bad latency and ungoverned output.
+`voice-jib-jab` is a production voice-agent runtime focused on low latency, reliable turn-taking, and governed output.
 
 ## Architecture
 
-- **3-Lane System**: Lane A (reflex acknowledgements), Lane B (reasoning), Lane C (policy/governance)
-- **OpenAI Realtime API** for voice loop (Mic → WebSocket → OpenAI → playback)
-- **ChromaDB** for persistent cross-session memory
-- **Enterprise UI** with electric blue design system (Tailwind-first)
-
-## Key Constraints
-
-- Do NOT remove the 3-lane architecture — this is a portfolio-level architectural decision
-- Preserve sub-400ms latency achievement
-- UAT bugs #1 (audio feedback loop) and #5 (audit trail FK race) — RESOLVED 2026-02-20, verified 2026-03-12
-- Test coverage: ~97% actual (server: stmt 97.25 / branch 92.3 / fn 96.65 / lines 97.49). Floor enforced via `coverageThreshold` in `server/jest.config.js` — stmt 94, branch 90, fn 93, lines 94 (set ~3% below actual per 2026-03-25 CRUCIBLE). Test runner: Jest 30 (server), Vitest 3.x (client).
+- 3-lane interaction model: reflex acknowledgement, reasoning, and policy/governance
+- realtime voice transport for microphone-to-model-to-playback flow
+- persistent conversation memory
+- enterprise-facing web UI
 
 ## Development
 
 ```bash
-npm test          # Run test suite
-npm run dev       # Start development server
+npm test
+npm run dev
 ```
 
----
+## Engineering Rules
 
-## ASIF Governance
+- Preserve the 3-lane architecture unless an explicit product-level design change says otherwise.
+- Protect latency-sensitive paths with measurable performance tests.
+- Keep security, audit, and governance behavior observable and fail safely.
+- Do not reduce test coverage or test counts without documented justification.
+- Preserve public API, WebSocket, and configuration contracts.
 
-This project is **P-07** in the ASIF portfolio (Voice & Media vertical). It is governed by the ASIF Chief of Staff.
+## Public / Private Boundary
 
-**On every session**:
-1. Read `.asif/NEXUS.md` — check the `## CoS Directives` section at the bottom
-2. Execute any **PENDING** directives before other work (unless Asif explicitly overrides)
-3. Write your response inline under each directive's `**Response**` section
-4. Update initiative statuses in NEXUS if your work changes them
-5. If you have questions for the CoS, add them under `## Team Questions` in NEXUS
-6. **Re-read `## Team Questions`** — check for CoS responses to your previous questions. Responses are written inline under each question entry. Do NOT claim questions are unanswered without scrolling to the actual question entry and checking for a `> **CoS Response**` block.
+This is a public repository. Do not commit private portfolio state, internal directives or handoffs, local machine topology, absolute developer-machine paths, private memory/retrieval wiring, internal agent hooks, credentials, production tokens, or private cross-project operating data.
 
-## Execution Strategy
-For any directive that touches 3+ files or requires architectural decisions:
-1. USE PLAN MODE — think before you code. Outline your approach first.
-2. USE AGENT TEAMS — break complex work into parallel sub-tasks. You have sub-agents. Use them.
-3. Test everything. Test counts never decrease.
-Do NOT skip planning on complex directives. Plan mode and agent teams are your super-powers.
+Use synthetic tenants, agents, endpoints, and fixture data in public examples and tests.
 
-**Escalation via Team Questions**: When you hit a blocker, need an architecture review, or have a portfolio-level question, add it under `## Team Questions` in your `.asif/NEXUS.md`. Your CoS checks these 3x daily during scheduled enrichment cycles and will respond inline or issue follow-up directives.
+## Security
 
-## Idle Time Protocol
-When no directives are pending and no active work exists:
-1. Run CRUCIBLE Gates 1-7 self-audit on your test suite
-2. Document recent research in docs/research/
-3. Review and strengthen hollow test assertions
-4. Check Portfolio Intelligence section for reuse signals
-5. Update stale documentation (README, badges, CHANGELOG)
-
-Time limit: 30 minutes. Log actions in NEXUS ## Self-Improvement Log.
-Do NOT make architecture changes or add new features during self-improvement.
-
-## CI Gate Protocol (ASIF Standard)
-Before EVERY `git push`, you MUST:
-1. Run the full test suite (`npm test`)
-2. Verify ZERO failures (xfail/skip OK, failures NOT OK)
-3. If tests fail → fix before pushing. No exceptions.
-4. Include test count in commit message: "Tests: X passed, Y skipped"
-Violating this protocol means broken CI, which means Asif gets spammed.
-
-## CRUCIBLE Protocol (Test Quality)
-This project follows the CRUCIBLE Protocol (`~/ASIF/standards/crucible-protocol.md`).
-Rules that apply to this project:
-- Gate 4: Delta gate — test count decreases > 5 require justification in commit message
-- Oracle tier: STANDARD — minimum 2 oracle types per feature
-
-## Dx3 Brain Integration
-On every session start, recall relevant context from Dx3 before starting work:
-- Use recall() to check for prior decisions, lessons, and patterns related to your current task
-- After shipping work, use remember() to store what you learned
-- The brain at dx3-cognitive MCP has context from ALL projects — use it
-
-This is how the portfolio compounds intelligence. Your work benefits from every other team's learning.
-
-## Voice Identity
-**Voice**: `am_echo`
-**Service**: http://100.123.83.34:8880/v1/audio/speech
-**Registry**: ~/ASIF/standards/voice-registry.md
-**Use**: every cycle-complete, every P0/P1 completion, every directive response.
-
-Speak via: `~/ASIF/scripts/cos-speak-remote --voice am_echo "text"`
-
-Note: `am_onyx` was assigned but claimed by P-03b (forge-orchestrator) first. P-07 registered `am_echo` per earliest-commit-wins anti-collision rule.
-
-<!-- ASIF:TEAM-ALIGNMENT-WIRING:START -->
-## ASIF Alignment Wiring
-
-@/home/axw/ASIF/standards/claude-team-alignment-wiring.md
-
-- Team alignment id: `vjj`.
-- Cross-team room: `/alignment`, written through `~/ASIF/scripts/alignment-say`.
-- If an `[ALIGNMENT ...]` message appears, respond through `alignment-say`; do not answer only in this private TUI.
-- Deterministic state first: typed Dx3/asifctl, `.asif/NEXUS.md`, git/tests/runtime probes. Prose is backup and local steering only.
-<!-- ASIF:TEAM-ALIGNMENT-WIRING:END -->
+- Never commit `.env`, private keys, API credentials, or production customer data.
+- Keep authentication, rate limiting, audit, and tenant-isolation tests in place.
+- Treat transcripts and voice-derived data as sensitive by default.
