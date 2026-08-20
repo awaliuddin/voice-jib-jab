@@ -41,9 +41,9 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# Claude
-.claude/tmp/*
-!.claude/tmp/.gitkeep
+# Private local agent/runtime context
+.claude/
+.asif/
 
 # Misc
 *.pem
